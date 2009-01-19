@@ -1,0 +1,39 @@
+#!/bin/sh 
+
+stty -isig
+trap ":" INT QUIT TSTP
+
+stapledir=/boot/staple
+
+echo "Trying to load staple from \"$staplesrc\"..."
+
+if [ ! -e "$stapledir" ]; then
+    mkdir $stapledir
+    if [ ! -e "$stapledir" ]; then
+	echo "$stapledir doesn't exits, can't mount staple filesystem"
+	echo "sleeping 300 seconds..."
+	sleep 300
+	/sbin/reboot -f
+    fi
+fi
+
+if [ "$staplesrc" = "" ]; then
+    echo "staplesrc variable isn't set, don't know from where to mount staple database"
+    echo "sleeping 300 seconds..."
+    sleep 300
+    /sbin/reboot -f
+fi
+
+mount -n -o nolock,ro -t nfs $staplesrc $stapledir
+
+PERL5LIB=$stapledir/lib $stapledir/bin/stapleboot-dev
+
+if [ "$?" != "0" ]; then
+    echo "stapleboot failed, please notify system@cs"
+    echo "rebooting in 300 seconds..."
+    sleep 300
+    /sbin/reboot -f
+fi
+
+stty isig
+

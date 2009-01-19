@@ -1,0 +1,558 @@
+#!/usr/bin/perl -w
+
+#
+# Copyright (C) 2007-2009 Hebrew University Of Jerusalem, Israel
+# See the LICENSE file.
+#
+# Author: Yair Yarom <irush@cs.huji.ac.il>
+#
+
+use strict;
+use warnings;
+use lib "../lib";
+use Staple;
+use Staple::Misc;
+use Staple::Hangman;
+use Staple::Application::Boot;
+#use Sys::Syslog;
+#use Sys::Syslog qw(:macros);
+
+require 'syscall.ph';
+
+my $sysinitoutput = "";
+
+my $currentStage = "init";
+
+my %stages = (
+              init             => {name => "Init"             , function => \&initStage            , next => "autoScripts"     , prev => "init"            },
+              autoScripts      => {name => "Auto Scripts"     , function => \&autoScriptsStage     , next => "auto"            , prev => "init"            },
+              auto             => {name => "Auto"             , function => \&autoStage            , next => "mountTemplates"  , prev => "autoScripts"     },
+              mountTemplates   => {name => "Mount Templates"  , function => \&mountTemplatesStage  , next => "mountScripts"    , prev => "auto"            },
+              mountScripts     => {name => "Mount Scripts"    , function => \&mountScriptsStage    , next => "mount"           , prev => "mountTemplates"  },
+              mount            => {name => "Mounts"           , function => \&mountStage           , next => "sysinitTemplates", prev => "mountScripts"    },
+              sysinitTemplates => {name => "Sysinit Templates", function => \&sysinitTemplatesStage, next => "sysinitScripts"  , prev => "mount"           },
+              sysinitScripts   => {name => "Sysinit Scripts"  , function => \&sysinitScriptsStage, , next => "sysinit"         , prev => "sysinitTemplates"},
+              sysinit          => {name => "Sysinit"          , function => \&sysinitStage,        , next => "finalTemplates"  , prev => "sysinitScripts"  },
+              finalTemplates   => {name => "Final Templates"  , function => \&finalTemplatesStage, , next => "finalScript"     , prev => "sysinit"         },
+              finalScript      => {name => "Final Scripts"    , function => \&finalScriptsStage,   , next => "final"           , prev => "finalTemplates"  },
+              final            => {name => "Final"            , function => \&finalStage,          , next => "done"            , prev => "finalScript"     },
+              done             => {name => "Done"             , function => \&doneStage,           , next => undef             , prev => "final"           },
+             );
+
+# input: boot, debug action
+# output: no debug: 0
+#         bash: 0 on failer, or exit code of bash
+#         prompt: enters prompt
+# does debuggin according to input (bash or prompt)
+sub debug {
+    my $boot = shift;
+    my $stage = $stages{$currentStage}->{name};
+    my $action = shift;
+    if ($action eq "bash") {
+        $boot->output($stage, 0);
+        @SIG{("INT", "QUIT", "TSTP")} = ('DEFAULT','DEFAULT','DEFAULT');
+        system($boot->{bash});
+        @SIG{("INT", "QUIT", "TSTP")} = ('IGNORE','IGNORE','IGNORE');
+        if ($? == -1) {
+            $boot->error("Failed to run $boot->{bash}: $!");
+            $boot->addMail("Failed to run $boot->{bash}: $!");
+            return 0;
+        }
+        return $? >> 8;
+    } elsif ($action eq "prompt") {
+        print "staple [$stage]> ";
+        my $tokenValue = "";
+        my $tokenKey = "";
+        while (my $line = <>) {
+            if ($tokenKey) {
+                if ($line =~ m/;\n$/) {
+                    $line =~ s/;\n$//;
+                    $tokenValue .= $line;
+                    $boot->addToken({key => "$tokenKey", value => "$tokenValue", raw => "$tokenValue", type => "static"});
+                    $tokenValue = "";
+                    $tokenKey = "";
+                } else {
+                    $tokenValue .= $line;
+                    print "token>";
+                    next;
+                }
+            } else {
+                chomp $line;
+                $line =~ s/^ *//;
+                if ($line =~ m/^token:[^=]+=/i) {
+                    $line =~ s/^[tT][oO][kK][eE][nN]:/token:/;
+                } else {
+                    $line =~ s/ *$//;
+                    $line = lc($line);
+                }
+                if ($line eq "h") {
+                    my $failed = hangman();
+                    if ($failed > 0) {
+                        print "\n$failed hanged men\n";
+                    } elsif ($failed < 0) {
+                        print "\nfailed to run hangman :-(\n";
+                    }
+                } elsif ($line eq "run") {
+                    last;
+                } elsif ($line =~ m/^goto (.+)$/) {
+                    my $newStage = $1;
+                    (my $newCurrentStage) = grep {lc($stages{$_}->{name}) eq $newStage} keys %stages;
+                    if ($newCurrentStage) {
+                        $currentStage = $newCurrentStage;
+                        $stage = $stages{$currentStage}->{name};
+                    } else {
+                        print "unknown stage: \"$newStage\"\n";
+                    }
+                } elsif ($line eq "skip") {
+                    $currentStage = $stages{$currentStage}->{next};
+                    last unless $currentStage;
+                    $stage = $stages{$currentStage}->{name};
+                } elsif ($line eq "prev") {
+                    $currentStage = $stages{$currentStage}->{prev};
+                    $stage = $stages{$currentStage}->{name};
+                } elsif ($line eq "stages") {
+                    my $tempStage = "init";
+                    while ($tempStage) {
+                        if ($tempStage eq $currentStage) {
+                            print "-> ";
+                        } else {
+                            print "   ";
+                        }
+                        print $stages{$tempStage}->{name}."\n";
+                        $tempStage = $stages{$tempStage}->{next};
+                    }
+                } elsif ($line eq "bash") {
+                    @SIG{("INT", "QUIT", "TSTP")} = ('DEFAULT','DEFAULT','DEFAULT');
+                    system("$boot->{bash}");
+                    @SIG{("INT", "QUIT", "TSTP")} = ('IGNORE','IGNORE','IGNORE');
+                    $boot->error("Failed to run $boot->{bash}: $!") if ($? == -1);
+                } elsif ($line =~ m/^token:([^=]+)=(.*);$/) {
+                    $boot->addToken({key => "$1", value => "$2", raw => "$2", type => "static"});
+                } elsif ($line =~ m/^token:([^=]+)=(.*)$/) {
+                    $tokenKey = $1;
+                    $tokenValue = "$2\n";
+                    print "token>";
+                    next;
+                } elsif ($line eq "tokens") {
+                    my $oldVerbose = $boot->{verbose};
+                    $boot->{verbose} = 3;
+                    printTokens($boot);
+                    $boot->{verbose} = $oldVerbose;
+                } elsif ($line eq "mounts") {
+                    my $oldVerbose = $boot->{verbose};
+                    $boot->{verbose} = 3;
+                    printMounts($boot);
+                    $boot->{verbose} = $oldVerbose;
+                } elsif ($line eq "templates") {
+                    my $oldVerbose = $boot->{verbose};
+                    $boot->{verbose} = 3;
+                    $boot->printTemplates();
+                    $boot->{verbose} = $oldVerbose;
+                } elsif ($line eq "configurations") {
+                    my $oldVerbose = $boot->{verbose};
+                    $boot->{verbose} = 3;
+                    printConfigurations($boot);
+                    $boot->{verbose} = $oldVerbose;
+                } elsif ($line eq "groups") {
+                    my $oldVerbose = $boot->{verbose};
+                    $boot->{verbose} = 3;
+                    printGroups($boot);
+                    $boot->{verbose} = $oldVerbose;
+                } elsif ($line eq "scripts") {
+                    my $oldVerbose = $boot->{verbose};
+                    $boot->{verbose} = 3;
+                    printScripts($boot);
+                    $boot->{verbose} = $oldVerbose;
+                } elsif ($line eq "autos") {
+                    my $oldVerbose = $boot->{verbose};
+                    $boot->{verbose} = 3;
+                    printAutos(@{$boot->{autos}});
+                    $boot->{verbose} = $oldVerbose;
+                } elsif ($line eq "quit") {
+                    $currentStage = undef;
+                    last;
+                } elsif ($line eq "debug-off") {
+                    $boot->{tokens}->{__STAPLE_DEBUG__}->{value} = "0" if exists $boot->{tokens}->{__STAPLE_DEBUG__};
+                    $boot->updateData();
+                    #$boot->updateMounts();
+                } elsif ($line ne "") {
+                    if ($line !~ m/^help$|^\?$/) {
+                        print "Unknown command: $line\n";
+                    }
+                    print <<EOF
+Known commands:
+   help|h|?               - Print this message
+   stages                 - Print all stages
+   tokens                 - Print all tokens
+   mounts                 - Print all mounts
+   groups                 - Print all groups
+   templates              - Print all templates
+   configurations         - Print all configurations
+   scripts                - Print all scripts
+   autos                  - Print all autos
+   run                    - Run current stage
+   skip                   - Skip current stage (exits on last stage)
+   prev                   - Goto previous stage
+   goto <stage>           - Goto specific stage
+   token:<token>=<value>; - changes <token>'s value to <value> (no auto)
+   bash                   - runs $boot->{bash}
+   debug-off              - turns off debugging
+   quit                   - Completely exits stapleboot
+EOF
+                    
+                }
+            }
+            print "staple [$stage]> ";
+        }
+    }
+    return 0;
+}
+
+
+################################################################################
+#   Output (maybe move to Application?)
+################################################################################
+
+# input: boot
+# no output
+# prints the scripts on verbose level 2 (+ extended on 3);
+sub printScripts {
+    my $boot = shift;
+    return if $boot->{verbose} < 2;
+    my @scripts = @{$boot->{scripts}};
+    my $output = "scripts:\n";
+    foreach my $script (@scripts) {
+        $output .= "   $script->{name}";
+        $output .= ":\n". join "\n", map {if (ref $script->{$_}) {"      $_ => $script->{$_}->{name}"} else {"      $_ => $script->{$_}"}} keys %$script;
+        $output .= "\n";
+    }
+    $boot->output($output, 2);
+}
+
+# input: boot
+# no output
+# prints the autos on verbose level 2 (+ extended on 3);
+sub printAutos {
+    my $boot = shift;
+    return if $boot->{verbose} < 2;
+    my @autos = @{$boot->{autos}};
+    my $output = "autos:\n";
+    foreach my $auto (@autos) {
+        $output .= "   $auto->{name}";
+        $output .= ":\n". join "\n", map {if (ref $auto->{$_}) {"      $_ => $auto->{$_}->{name}"} else {"      $_ => $auto->{$_}"}} keys %$auto;
+        $output .= "\n";
+    }
+    $boot->output($output, 2);
+}
+
+# input: boot
+# no output
+# prints the groups on verbose level 2 (+ path on 3)
+sub printGroups {
+    my $boot = shift;
+    return if $boot->{verbose} < 2;
+    my @groups = @{$boot->{groups}};
+    my $output = "groups:\n";
+    #if ($verbose >= 3) {
+    #    $output .= join "\n", map {"   $_->{name} => $_->{path}"} @groups;
+    #} else {
+    $output .= join "\n", map {"   $_->{name}"} @groups;
+    #}
+    $boot->output($output, 2);
+}
+
+# input: boot
+# no output
+# prints the configurations on verbose level 2
+sub printConfigurations {
+    my $boot = shift;
+    return if $boot->{verbose} < 2;
+    my @configurations = @{$boot->{configurations}};
+    my $output = "configurations:\n";
+    #if ($verbose >= 3) {
+    #    $output .= join "\n", map {"   $_->{name} ($_->{path})"} @configurations;
+    #} else {
+    #    $output .= join "\n", map {"   $_->{name} ($_->{dist})"} @configurations;
+    #}
+    $output .= join "\n", map {"   $_->{name}"} @configurations;
+    $boot->output($output, 2);
+}
+
+# input: boot
+# no output
+# prints the mounts on verbose level 2 (extended on level 3)
+sub printMounts {
+    my $boot = shift;
+    return if $boot->{verbose} < 2;
+    my @mounts = @{$boot->{mounts}};
+    my $output = "mounts:\n";
+    foreach my $mount (@mounts) {
+        $output .= "   $mount->{destination}";        
+        $output .= ":\n". join "\n", map {"      $_ => $mount->{$_}"} keys %$mount if ($boot->{verbose} > 2);
+        $output .= "\n";
+    }
+    chomp $output;
+    $boot->output($output, 2);
+}
+
+# input: boot
+# no output
+# prints the tokens on verbose level 2
+sub printTokens {
+    my $boot = shift;
+    return if $boot->{verbose} < 2;
+    my %tokens = %{$boot->{tokens}};
+    my $output = "tokens:\n";
+    if ($boot->{verbose} >= 3) {
+        $output .= join "\n", map {"   $_ = $tokens{$_}->{value} ($tokens{$_}->{type})"} sort keys %tokens;
+    } else {
+        $output .= join "\n", map {"   $_ = $tokens{$_}->{value}"} sort keys %tokens;
+    }
+    $boot->output($output, 2);
+}
+
+
+################################################################################
+#   Stages
+################################################################################
+
+sub initStage {
+    my $boot = shift;
+    $boot->{tokens} = {getCompleteTokens({})};
+    $boot->updateData();
+
+    unless (getHostGroup($boot->{host})) {
+        $boot->error("$boot->{host} does not exist in the staple database");
+        $boot->addMail("$boot->{host} does not exist in the staple database");
+        $boot->doCriticalAction();
+    }
+    unless ($boot->{distribution}) {
+        $boot->error("Can't recognize distribution");
+        $boot->addMail("Can't determine current distribution (both /etc/staple/distribution and /proc/cmdline are missing)");
+        $boot->doCriticalAction();
+    }
+    my @distributions = getAllDistributions();
+    unless (grep {$_ eq $boot->{distribution}} @distributions) {
+        $boot->error("\"$boot->{distribution}\" does not exist in the staple database");
+        $boot->addMail("\"$boot->{distribution}\" does not exist in the staple database");
+        $boot->doCriticalAction();
+    }    
+
+    $boot->{groups} = [getCompleteGroups(getDistributionGroup($boot->{distribution}), getHostGroup($boot->{host}))];
+    $boot->update();
+    
+    $boot->output("distribution: $boot->{distribution}", 2);
+
+    #printTokens($boot);
+    #printGroups($boot);
+    #printConfigurations($boot);
+    #printMounts($boot);
+    #printTemplates($boot);
+    #printScripts($boot);
+
+    $boot->mountTmp() unless ($boot->{disabled});
+    # openlog("stapleboot", "", $boot->{syslog});
+}
+
+sub autoScriptsStage {
+    my $boot = shift;
+    unless ($boot->{disabled}) {
+        $boot->output("Auto Scripts", 1);
+        $boot->applyScripts("auto");
+    }
+}
+
+sub autoStage {
+    my $boot = shift;
+    unless ($boot->{disabled}) {
+        $boot->output("Auto", 1);
+        my @autoGroups = $boot->applyAutos();
+        if (@autoGroups) {
+            $boot->output("Automatically added groups:\n".join("\n", @autoGroups), 2);
+#            if ($boot->{syslog}) {
+#                foreach my $group (@autoGroups) {
+#                    syslog(LOG_INFO, "autogroup: \%s", $group);
+#                }
+#            }
+        } else { 
+            $boot->output("No automatically added groups", 2);
+        }
+        my @realGroups = getGroupsByName(@autoGroups);
+        if (scalar @realGroups != scalar @autoGroups) {
+            my @missings = grep {my $a = $_; not grep {$a eq $_->{name}} @realGroups} @autoGroups;
+            my $error = "Unknown groups from autogroup script:\n  ".join("\n  ", @missings)."\n";
+            $boot->error("$error");
+            $boot->addMail("$error");
+        }
+
+        $boot->{groups} = [getCompleteGroups(getDistributionGroup($boot->{distribution}), getGroupsByName(@autoGroups), getHostGroup($boot->{host}))];
+        $boot->update();
+
+        #printTokens($boot);
+        #printGroups($boot);
+        #printConfigurations($boot);
+        #printMounts($boot);
+        #printTemplates($boot);
+        #printScripts($boot);        
+    }
+}
+
+sub mountTemplatesStage {
+    my $boot = shift;
+    unless ($boot->{disabled}) {
+        $boot->output("Mount Templates", 1);
+        $boot->applyTemplates("mount");
+    }
+}
+
+sub mountScriptsStage {
+    my $boot = shift;
+    unless ($boot->{disabled}) {
+        $boot->output("Mount Scripts", 1);
+        $boot->applyScripts("mount");
+    }
+}
+
+sub mountStage {
+    my $boot = shift;
+    unless ($boot->{disabled}) {
+        $boot->output("Mounts", 1);
+        my @fstab = $boot->applyMounts();
+        if (open(FSTAB, ">/etc/fstab")) {
+            print FSTAB join "\n", @fstab;
+            print FSTAB "\n";
+            close(FSTAB);
+        } else {
+            my $err = "Can't open /etc/fstab: $!";
+            $boot->error($err);
+            $boot->addMail($err."\n\nShould Contain:\n".join("\n", @fstab));
+        }
+    }
+}
+
+sub sysinitTemplatesStage {
+    my $boot = shift;
+    unless ($boot->{disabled}) {
+        $boot->output("Sysinit Templates", 1);
+        $boot->applyTemplates("sysinit");
+    }
+}
+
+sub sysinitScriptsStage {
+    my $boot = shift;
+    unless ($boot->{disabled}) {
+        $boot->output("Sysinit Scripts", 1);
+        $boot->applyScripts("sysinit");
+    }
+}
+
+sub sysinitStage {
+    my $boot = shift;
+    unless ($boot->{disabled}) {
+        $boot->output("Sysinit ($boot->{sysinit})", 1);
+        system("$boot->{sysinit}");
+        # but I want it to show on the screen as well...
+        #$sysinitoutput = `$boot->{sysinit} 2>&1`;
+    }
+}
+
+sub finalTemplatesStage {
+    my $boot = shift;
+    unless ($boot->{disabled}) {
+        $boot->output("Final Templates", 1);
+        $boot->applyTemplates("final");
+    }
+}
+
+sub finalScriptsStage {
+    my $boot = shift;
+    unless ($boot->{disabled}) {
+        $boot->output("Final scripts", 1);
+        $boot->applyScripts("final");
+    }
+}
+
+sub finalStage {
+    my $boot = shift;
+    unless ($boot->{disabled}) {
+        $boot->output("Final", 1);
+        $boot->umountTmp();
+        
+        if ($boot->{staplelog}) {
+            
+            # rotate logs
+            unlink "/$boot->{staplelog}.9.gz";
+            for (my $i = 8; $i > 0; $i--) {
+                my $j = $i + 1;
+                if (-e "/$boot->{staplelog}.$i.gz") {
+                    `mv /$boot->{staplelog}.$i.gz /$boot->{staplelog}.$j.gz`;
+                }
+            }
+            if (-e "/$boot->{staplelog}.0") {
+                `mv /$boot->{staplelog}.0 $boot->{staplelog}.1`;
+                `gzip /$boot->{staplelog}.1`;
+            }
+            `mv /$boot->{staplelog} /$boot->{staplelog}.0` if (-e "/$boot->{staplelog}");
+
+            # create new log
+            unless (open(LOG, ">/$boot->{staplelog}")) {
+                my $err = "Can't open file /$boot->{staplelog} for writing: $!";
+                $boot->error($err);
+                $boot->addMail($err);
+            } else {
+                print LOG "staple finished at: ".scalar(localtime(time))."\n";
+                print LOG "version: $Staple::VERSION\n";
+                print LOG "host name: $boot->{host}\n";
+                print LOG "distribution: $boot->{distribution}\n";
+                print LOG "\ngroups:\n";
+                print LOG join "", map {"  $_->{name}\n"} @{$boot->{groups}};
+                print LOG "\nconfigurations:\n";
+                print LOG join "", map {"  $_->{name}\n"} @{$boot->{configurations}};
+                print LOG "\ntokens:\n";
+                my %tokens = %{$boot->{tokens}};
+                print LOG join "", map {"$_->{key}=$_->{value};\n"} @tokens{sort {$a cmp $b} keys %tokens};
+                if ($sysinitoutput) {
+                    print LOG "\nsysinit ($boot->{sysinit}):\n";
+                    print LOG $sysinitoutput;
+                }
+                close(LOG);
+            }
+        }
+    }
+}
+
+sub doneStage {
+    my $boot = shift;
+    $boot->output("Done", 1);
+    # syslog close
+    # closelog();
+}
+
+
+################################################################################
+#   main
+################################################################################
+
+@SIG{("INT", "QUIT", "TSTP")} = ('IGNORE','IGNORE','IGNORE');
+
+my $boot = Staple::Application::Boot->new(\&debug);
+
+if ($< != 0) {
+    $boot->error("Must run as root");
+    exit(1);
+}
+
+$boot->output("Version: $Staple::VERSION");
+$boot->output("Starting: $boot->{host}", 1);
+
+while ($currentStage) {
+    $boot->debug($boot->{debug});
+    last unless $currentStage;
+    #eval {&{$stages{$currentStage}->{function}}($boot)};
+    &{$stages{$currentStage}->{function}}($boot);
+    $currentStage = $stages{$currentStage}->{next};
+}
+
+$boot->mail("boot errors summary", $boot->{mailBody}) if $boot->{mailBody};
+
+exit(0);

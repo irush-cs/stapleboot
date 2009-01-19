@@ -1,0 +1,368 @@
+#!/usr/bin/perl -w
+
+#
+# Copyright (C) 2007-2009 Hebrew University Of Jerusalem, Israel
+# See the LICENSE file.
+#
+# Author: Yair Yarom <irush@cs.huji.ac.il>
+#
+
+use strict;
+use warnings;
+
+BEGIN {
+    my $file = $0;
+    while (-l $file) {
+        my $link = readlink $file;
+        if ($link !~ m/^\//) {
+            (my $dir) = $file =~ m,^(.*)/[^/]*$,;
+            $file = "$dir/$link";
+        } else {
+            $file = $link;
+        }
+    }
+    $file =~ m:^(.*)/[^/]*$:;
+    push @INC, "$1/../lib/";
+}
+
+use Getopt::Long;
+use Sys::Hostname;
+use Staple;
+use Staple::Misc;
+use Staple::Hangman;
+use Staple::Application::Stapler;
+
+my @allStages = qw(autoscripts auto mounttemplates mountscripts mount sysinittemplates sysinitscripts finaltemplates finalscript);
+
+sub usage {
+    my $exitCode = shift;
+    $exitCode = 0 unless $exitCode;
+    print "usage: stapler [options] [-g group [...]] [-c configuration [...]]
+options are:
+  -h  | --help\t\t Print this help message and exit
+  -s  | --stage=<stage>\t Execute only the specified <stage>'s
+        --host=host\t Run as if this was <host> (add the host group)
+        --dist=dist\t Run as if the root was of <dist>
+        --withdist\t adds the distribution group
+  -v  | --verbose\t verbose level (incremental)
+        --fstab\t\t Rewrite the fstab, but no mounts (this could lead to
+        \t\t false fstab entries)
+        --mounts\t Do mounts, implies --fstab (this is risky on an
+        \t\t already running machine).
+ --gt | --group-tokens\t add tokens from group
+ --ct | --configuration-tokens\t\t add tokens from configurations
+  -g  | --group\t\t apply group
+  -c  | --configuration\t apply configuration
+  -a  | --all\t\t If no -g -c are present, execute all instead of
+        \t\t just print them
+";
+    exit $exitCode;
+}
+
+sub fixStages {
+    my @stages = ();
+    #my @sort = qw(init autoscripts auto mounttemplates mountscripts mount sysinittemplates sysinitscripts sysinit finaltemplates finalscript final done);
+    #my @sorted = qw(autoscripts auto mounttemplates mountscripts sysinittemplates sysinitscripts finaltemplates finalscript);
+    if (@_) {
+        @stages = map {lc} @_;
+    } else {
+        @stages = @allStages;
+    }
+    my %stagesMap = (
+#                     init             => "init",
+                     autoscripts      => "autoscripts",
+                     as               => "autoscripts",
+                     auto             => "auto",
+                     a                => "auto",
+                     mounttemplates   => "mounttemplates",
+                     mt               => "mounttemplates",
+                     mountscripts     => "mountscripts",     
+                     ms               => "mountscripts",     
+                     mount            => "mount",
+                     sysinittemplates => "sysinittemplates", 
+                     st               => "sysinittemplates", 
+                     sysinitscripts   => "sysinitscripts",
+                     ss               => "sysinitscripts",
+#                     sysinit          => "sysinit",
+                     finaltemplates   => "finaltemplates",   
+                     ft               => "finaltemplates",
+                     finalscript      => "finalscript",
+                     fs               => "finalscript",      
+#                     final            => "final",
+#                     done             => "done",
+                    );
+    my @result = ();
+    foreach my $stage (@stages) {
+        if (exists $stagesMap{$stage}) {
+            push @result, $stagesMap{$stage};
+        } else {
+            print "Unknown stage \"$stage\"\n";
+            exit 3;
+        }
+    }
+
+    @result = grep {local $a = $_; grep {$a eq $_} @result} @allStages;
+    
+    return @result;
+}
+
+###
+#   main
+###
+
+#$SIG{__WARN__} = \&Carp::cluck;
+
+Getopt::Long::Configure("bundling");
+
+my $help = "";
+my $host = undef;
+my $withhost = 0;
+my $withdist = 0;
+my $distribution = getDistribution();
+my $verbose = 1;
+my $mounts = 0;
+my $fstab = 0;
+my $doall = 0;
+#my $hosttokens = 0;
+my $extraTokens;
+my @stages = ();
+my @configurations;
+my @groups;
+my @configurations_tokens;
+my @groups_tokens;
+unless (GetOptions('help|h|?'                  => \$help,
+                   'stage|s=s'                 => \@stages,
+                   'host=s'                    => \$host,
+                   'distribution|dist=s'       => \$distribution,
+                   'withdist|wd'               => \$withdist,
+                   'verbose|v+'                => \$verbose,
+                   'mounts'                    => \&mounts,
+                   'fstab'                     => \&fstab,
+                   'configuration|c=s'         => \@configurations,
+                   'group|g=s'                 => \@groups,
+                   'group-tokens|gt=s'         => \@groups_tokens,
+                   'configuration-tokens|ct=s' => \@configurations_tokens,
+#                   'host-tokens|ht=s'          => \$hosttokens,
+                   'all|a'                     => \$doall,
+                  )) {
+    usage(1);
+}
+
+if ($host) {
+    $withhost = 1;
+} else {
+    $host = hostname;
+}
+
+@stages = split(/,/,join(',',@stages));
+$fstab = 1 if $mounts;
+
+if (@ARGV) {
+    print STDERR "Unkown option $ARGV[0]\n";
+    usage(1);
+}
+
+@stages = fixStages(@stages);
+
+usage if $help;
+
+# init
+my $stapler = Staple::Application::Stapler->new($host, $distribution);
+$stapler->output("version $Staple::VERSION");
+$stapler->{tokens} = {getCompleteTokens({})};
+$stapler->{tmpDir} = "/tmp";
+$stapler->{verbose} = $verbose;
+$stapler->{disabled} = 0;
+$stapler->updateData();
+
+$doall = 1 if ($withdist or $withhost);
+
+if (not @groups and not @configurations) {
+    $withdist = 1;
+    $withhost = 1;
+}
+
+if (not getHostGroup($stapler->{host}) and $withhost) {
+    $stapler->error("$stapler->{host} does not exist in the staple database");
+    $stapler->doCriticalAction();
+}
+$stapler->output("host: $host") if $withhost;
+
+unless ($stapler->{distribution}) {
+    $stapler->error("Can't recognize distribution");
+    $stapler->doCriticalAction();
+}
+$stapler->output("distribution: $distribution");
+
+my @distributions = getAllDistributions();
+unless (grep {$_ eq $stapler->{distribution}} @distributions) {
+    $stapler->error("\"$stapler->{distribution}\" does not exist in the staple database");
+    $stapler->doCriticalAction();
+}
+
+my @badConfigurations = ();
+if (@groups or @configurations) {
+    $doall = 1;
+}
+
+my @g = getGroupsByName(@groups);
+unshift @g, getHostGroup($host) if ($withhost);
+unshift @g, getDistributionGroup($distribution) if ($withdist);
+$stapler->{groups} = [getCompleteGroups(@g)];
+
+$stapler->{configurations} = [getCompleteConfigurations([getGroupsConfigurations(@{$stapler->{groups}}), getConfigurationsByName(@configurations)], $stapler->{distribution}, \@badConfigurations)];
+$stapler->updateSettings();
+
+if (@groups_tokens or @configurations_tokens) {
+    $extraTokens = {getCompleteTokens(getRawTokens(getCompleteGroups(getGroupsByName(@groups_tokens)), getCompleteConfigurations([getConfigurationsByName(@configurations_tokens)], $stapler->{distribution})), $stapler->{host}, $stapler->{distribution})};
+    $stapler->addToken2($extraTokens);
+}
+
+if (@badConfigurations) {
+    my $error = "Unknown configurations for current distribution ($stapler->{distribution}):\n  ".join("\n  ", @badConfigurations)."\n";
+    $stapler->error("$error");
+}
+
+if (scalar @{$stapler->{groups}} > 0) {
+    $stapler->output("groups:\n".join("\n", map {"  $_->{name}"} @{$stapler->{groups}}));
+} else {
+    $stapler->output("no groups");
+}
+
+if (scalar @{$stapler->{configurations}} > 0) {
+    $stapler->output("configurations:\n".join("\n", map {"  $_->{name}"} @{$stapler->{configurations}}));
+} else {
+    $stapler->output("no configurations");
+}
+
+if (not $doall) {
+    exit 0;
+}
+
+# $stapler->mountTmp();
+
+# autoscripts
+if (grep {$_ eq "autoscripts"} @stages) {
+    $stapler->output("Auto Scripts", 1);
+    $stapler->applyScripts("auto");
+}
+
+# auto
+
+if (grep {$_ eq "auto"} @stages) {
+    $stapler->output("Auto", 1);
+    my @autoGroups = $stapler->applyAutos();
+    if (@autoGroups) {
+        $stapler->output("Automatically added groups:\n".join("\n", @autoGroups), 2);
+    } else { 
+        $stapler->output("No automatically added groups", 2);
+    }
+    my @realGroups = getGroupsByName(@autoGroups);
+    if (scalar @realGroups != scalar @autoGroups) {
+        my @missings = grep {my $a = $_; not grep {$a eq $_->{name}} @realGroups} @autoGroups;
+        my $error = "Unknown groups from autogroup script:\n  ".join("\n  ", @missings)."\n";
+        $stapler->error("$error");
+    }
+
+    #$stapler->{groups} = [getCompleteGroups(getDistributionGroup($boot->{distribution}), getGroupsByName(@autoGroups), getHostGroup($boot->{host}))];
+    #$stapler->{groups} = [getGroupsByName(@autoGroups), getGroupsByName(@groups)];
+    my @g = getGroupsByName(@groups);
+    unshift @g, getHostGroup($host) if ($withhost);
+    unshift @g, getGroupsByName(@autoGroups);
+    unshift @g, getDistributionGroup($distribution) if ($withdist);
+    $stapler->{groups} = [getCompleteGroups(@g)];
+    
+    $stapler->{configurations} = [getCompleteConfigurations([getGroupsConfigurations(@{$stapler->{groups}}), getConfigurationsByName(@configurations)], $stapler->{distribution}, \@badConfigurations)];
+    $stapler->updateSettings();
+
+    if (@badConfigurations) {
+        my $error = "Unknown configurations for current distribution ($stapler->{distribution}):\n  ".join("\n  ", @badConfigurations)."\n";
+        $stapler->error("$error");
+    }
+    
+    if ($extraTokens) {
+        $stapler->addToken2($extraTokens);
+    }
+}
+
+# mounttemplates
+if (grep {$_ eq "mounttemplates"} @stages) {
+    $stapler->output("Mount Templates", 1);
+    $stapler->applyTemplates("mount");
+}
+
+# mountscripts
+if (grep {$_ eq "mountscripts"} @stages) {
+    $stapler->output("Mount scripts", 1);
+    $stapler->applyScripts("mount");
+}
+
+# mount
+if (grep {$_ eq "mount"} @stages) {
+    my $message = "Mounts";
+    $message .= " (dry run)" unless $mounts;
+    $message .= " with fstab" if $fstab;
+    $stapler->output($message, 1);
+    $stapler->{disabled} = 1 unless $mounts;
+    my @fstab = $stapler->applyMounts();
+    if (scalar(@fstab) > 0) {
+        $message = "new /etc/fstab";
+        if ($fstab) {
+            unless (open(FSTAB, ">/etc/fstab")) {
+                $stapler->error("Can't open /etc/fstab for writing: $!\n");
+                $fstab = 0;
+            }
+        }
+        unless ($fstab) {
+            $message .= " (dry run)";
+            open(FSTAB, ">&STDOUT");
+        }
+        $stapler->output($message);
+        print FSTAB join "\n", @fstab;
+        print FSTAB "\n";
+        close(FSTAB);
+    } else {
+        $message = "No new /etc/fstab";
+        $message = " (not deleting old one)" if ($fstab);
+        $stapler->output($message);
+    }
+    $stapler->{disabled} = 0;
+}
+
+
+# sysinittemplates
+if (grep {$_ eq "sysinittemplates"} @stages) {
+    $stapler->output("Sysinit Templates", 1);
+    $stapler->applyTemplates("sysinit");
+}
+
+# sysinitscripts
+if (grep {$_ eq "sysinitscripts"} @stages) {
+    $stapler->output("Sysinit Scripts", 1);
+    $stapler->applyScripts("sysinit");
+}
+
+# sysinit
+$stapler->output("Not running Sysinit");
+
+# finaltemplates
+if (grep {$_ eq "finaltemplates"} @stages) {
+    $stapler->output("Final Templates", 1);
+    $stapler->applyTemplates("final");
+}
+
+# finalscript
+if (grep {$_ eq "finalscript"} @stages) {
+    $stapler->output("Final scripts", 1);
+    $stapler->applyScripts("final");
+}
+
+# final
+# $stapler->umountTmp();
+
+# done
+$stapler->output("Done", 1);
+
+
+exit 0;
+

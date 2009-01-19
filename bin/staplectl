@@ -1,0 +1,3619 @@
+#!/usr/bin/perl -w
+
+#
+# Copyright (C) 2007-2009 Hebrew University Of Jerusalem, Israel
+# See the LICENSE file.
+#
+# Author: Yair Yarom <irush@cs.huji.ac.il>
+#
+
+use warnings;
+use strict;
+
+BEGIN {
+    my $file = $0;
+    while (-l $file) {
+        my $link = readlink $file;
+        if ($link !~ m/^\//) {
+            (my $dir) = $file =~ m,^(.*)/[^/]*$,;
+            $file = "$dir/$link";
+        } else {
+            $file = $link;
+        }
+    }
+    $file =~ m:^(.*)/[^/]*$:;
+    push @INC, "$1/../lib/";
+}
+
+use Staple;
+use Staple::Misc;
+use Staple::DB::Sync;
+use Staple::Hangman;
+use Term::ReadLine;
+use Term::ANSIColor;
+use Net::DNS;
+
+my $distribution = "";
+my $input;
+my $attribs;
+my $echooff = 0;
+my $singleCommand = "";
+my @dnsHostList = (); # for ah completion and warning
+
+my %commands = (
+                ac => \&ac,
+                ad => \&ad,
+                ag => \&ag,
+                ah => \&ah,
+                rc => \&rc,
+                rd => \&rd,
+                rg => \&rg,
+                rh => \&rh,
+                gm => \&gm,
+                am => \&am,
+                rm => \&rm,
+                gt => \&gtm,
+                at => \&at,
+                rt => \&rt,
+                ut => \&ut,
+                gs => \&gs,
+                as => \&as,
+                rs => \&rs,
+                us => \&us,
+                ga => \&ga,
+                aa => \&aa,
+                ra => \&ra,
+                ua => \&ua,
+                cc => \&cc,
+
+                act => \&act,
+                adt => \&adt,
+                agt => \&agt,
+                aht => \&aht,
+                ahg => \&ahg,
+                adg => \&adg,
+                rdg => \&rdg,
+                agg => \&agg,
+                rgg => \&rgg,
+                gac => \&gac,
+                gad => \&gad,
+                gag => \&gag,
+                gah => \&gah,
+                gct => \&gct,
+                gdt => \&gdt,
+                ggt => \&ggt,
+                gdg => \&gdg,
+                ggg => \&ggg,
+                ght => \&ght,
+                ghg => \&ghg,
+                rct => \&rct,
+                rdt => \&rdt,
+                rgt => \&rgt,
+                rht => \&rht,
+                rhg => \&rhg,
+                ggc => \&ggc,
+                ghc => \&ghc,
+                gdc => \&gdc,
+                ahc => \&ahc,
+                adc => \&adc,
+                agc => \&agc,
+                rhc => \&rhc,
+                rdc => \&rdc,
+                rgc => \&rgc,
+                gts => \&gts,
+                gss => \&gss,
+                gas => \&gas,
+                ghi => \&ghi,
+                ggi => \&ggi,
+                gci => \&gci,
+                gdi => \&gdi,
+                whg => \&whg,
+                whc => \&whc,
+                wht => \&wht,
+
+                sd  => \&sd,
+                sync => \&syncctl,
+
+                quit    => \&quit,
+                help    => \&help,
+                setdb   => \&setdb,
+                getdb   => \&getdb,
+                hangman => \&hangman,
+                debug   => \&debugOn,
+                undebug => \&debugOff,
+
+                bad => \&bad,
+                " " => \&empty,
+               );
+
+my %commandMap = (
+                  h                               => "help",
+                  q                               => "quit",
+                  "?"                             => "help",
+
+                  ac                              => "ac",
+                  ad                              => "ad",
+                  ag                              => "ag",
+                  ah                              => "ah",
+                  rc                              => "rc",
+                  rd                              => "rd",
+                  rg                              => "rg",
+                  rh                              => "rh",
+                  gm                              => "gm",
+                  am                              => "am",
+                  rm                              => "rm",
+                  gt                              => "gt",
+                  at                              => "at",
+                  rt                              => "rt",
+                  ut                              => "ut",
+                  gs                              => "gs",
+                  as                              => "as",
+                  rs                              => "rs",
+                  us                              => "us",
+                  ga                              => "ga",
+                  aa                              => "aa",
+                  ra                              => "ra",
+                  ua                              => "ua",
+                  cc                              => "cc",
+
+                  act                             => "act",
+                  adt                             => "adt",
+                  agt                             => "agt",
+                  aht                             => "aht",
+                  ahg                             => "ahg",
+                  adg                             => "adg",
+                  rdg                             => "rdg",
+                  agg                             => "agg",
+                  rgg                             => "rgg",
+                  gac                             => "gac",
+                  gad                             => "gad",
+                  gag                             => "gag",
+                  gah                             => "gah",
+                  gct                             => "gct",
+                  gdt                             => "gdt",
+                  ggt                             => "ggt",
+                  gdg                             => "gdg",
+                  ggg                             => "ggg",
+                  ght                             => "ght",
+                  ghg                             => "ghg",
+                  rct                             => "rct",
+                  rdt                             => "rdt",
+                  rgt                             => "rgt",
+                  rht                             => "rht",
+                  rhg                             => "rhg",
+                  ggc                             => "ggc",
+                  ghc                             => "ghc",
+                  gdc                             => "gdc",
+                  ahc                             => "ahc",
+                  adc                             => "adc",
+                  agc                             => "agc",
+                  rhc                             => "rhc",
+                  rdc                             => "rdc",
+                  rgc                             => "rgc",
+                  gts                             => "gts",
+                  gss                             => "gss",
+                  gas                             => "gas",
+                  ghi                             => "ghi",
+                  ggi                             => "ggi",
+                  gci                             => "gci",
+                  gdi                             => "gdi",
+                  whg                             => "whg",
+                  whc                             => "whc",
+                  wht                             => "wht",
+
+                  sd                              => "sd",
+                  sdb                             => "setdb",
+                  gdb                             => "getdb",
+                  sync                            => "sync",
+
+                  quit                            => "quit",
+                  help                            => "help",
+                  exit                            => "quit",
+                  setdb                           => "setdb",
+                  getdb                           => "getdb",
+                  setdistribution                 => "sd",
+                  getallhosts                     => "gah",
+                  getallgroups                    => "gag",
+                  getalldistributions             => "gad",
+                  getallconfigurations            => "gac",
+                  getconfigurationtokens          => "gct",
+                  getgrouptokens                  => "ggt",
+                  getdistributiontokens           => "gdt",
+                  gethosttokens                   => "ght",
+                  gethostgroups                   => "ghg",
+                  getdistributiongroups           => "gdg",
+                  getgroupgroups                  => "ggg",
+                  addhost                         => "ah",
+                  addgroup                        => "ag",
+                  adddistribution                 => "ad",
+                  addconfiguration                => "ac",
+                  adddistributiontoken            => "adt",
+                  addhosttoken                    => "aht",
+                  addhostgroup                    => "ahg",
+                  addgrouptoken                   => "agt",
+                  addconfigurationtoken           => "act",
+                  removedistribution              => "rd",
+                  removehost                      => "rh",
+                  removegroup                     => "rg",
+                  removeconfiguration             => "rc",
+                  removedistributiontoken         => "adt",
+                  removeconfigurationtoken        => "rct",
+                  removehosttoken                 => "rht",
+                  removegrouptoken                => "rgt",
+                  removehostgroup                 => "rhg",
+                  adddistributiongroup            => "adg",
+                  removedistributiongroup         => "rdg",
+                  addgroupgroup                   => "agg",
+                  removegroupgroup                => "rgg",
+                  getgroupconfigurations          => "ggc",
+                  gethostconfigurations           => "ghc",
+                  getdistributionconfigurations   => "gdc",
+                  addhostconfiguration            => "ahc",
+                  adddistributionconfiguration    => "adc",
+                  addgroupconfiguration           => "agc",
+                  removehostconfiguration         => "rhc",
+                  removedistributionconfiguration => "rdc",
+                  removegroupconfiguration        => "rgc",
+                  getmounts                       => "gm",
+                  addmount                        => "am",
+                  removeMount                     => "rm",
+                  gettemplates                    => "gtm",
+                  gettemplatesource               => "gts",
+                  addtemplate                     => "at",
+                  removetemplate                  => "rt",
+                  updatetemplate                  => "ut",
+                  getscripts                      => "gs",
+                  getscriptsource                 => "gss",
+                  addscript                       => "as",
+                  removescript                    => "rs",
+                  updatescript                    => "us",
+                  getautos                        => "ga",
+                  getautosource                   => "gas",
+                  addauto                         => "aa",
+                  removeauto                      => "ra",
+                  updateauto                      => "ua",
+                  gethostinfo                     => "ghi",
+                  getgroupinfo                    => "ggi",
+                  getconfigurationinfo            => "gci",
+                  getdistributioninfo             => "gdi",
+                  copyconfiguration               => "cc",
+                  hangman                         => "hangman",
+                  debug                           => "debug",
+                  undebug                         => "undebug",
+                  whohasgroup                     => "whg",
+                  whohasconfiguration             => "whc",
+                  whohastoken                     => "wht",
+                  
+                  badcommandorfilename            => "bad",
+                  " "                             => " ",
+                 );
+
+my %commandCompletionMap =
+  (h         => [\&help_completion],
+   help      => [\&help_completion],
+   "?"       => [\&help_completion],
+   q         => [],
+   exit      => [],
+   quit      => [],
+   ac        => [\&configuration_completion],
+   ad        => [],
+   ag        => [\&group_completion],
+   ah        => [\&new_host_completion],
+   rc        => [\&configuration_completion],
+   rg        => [\&group_completion],
+   rh        => [\&host_completion],
+   rd        => [\&distribution_completion],
+   gm        => [\&configuration_completion],
+   am        => [\&configuration_completion, \&sign_dir_completion],
+   rm        => [\&configuration_completion, \&mount_completion],
+   gt        => [\&configuration_completion],
+   at        => [\&configuration_completion],
+   rt        => [\&configuration_completion, \&template_stage_completion, \&template_completion],
+   ut        => [\&configuration_completion, \&template_stage_completion, \&template_completion],
+   gs        => [\&configuration_completion],
+   as        => [\&configuration_completion],
+   rs        => [\&configuration_completion, \&script_stage_completion, \&script_completion],
+   us        => [\&configuration_completion, \&script_stage_completion, \&script_completion],
+   ga        => [\&configuration_completion],
+   aa        => [\&configuration_completion],
+   ra        => [\&configuration_completion, \&auto_completion],
+   ua        => [\&configuration_completion, \&auto_completion],
+   act       => [\&configuration_completion],
+   adt       => [\&distribution_completion],
+   agt       => [\&group_completion],
+   aht       => [\&host_completion],
+   ahg       => [\&host_completion, \&group_completion],
+   adg       => [\&group_completion],
+   rdg       => [\&distribution_groups_completion],
+   agg       => [\&group_completion, \&group_completion],
+   rgg       => [\&group_completion, \&group_groups_completion],
+   gac       => [],
+   gad       => [],
+   gag       => [],
+   gah       => [],
+   gct       => [\&configuration_completion],
+   gdt       => [\&distribution_completion],
+   ggt       => [\&group_completion],
+   gdg       => [\&distribution_completion],
+   ggg       => [\&group_completion],
+   ght       => [\&host_completion],
+   ghg       => [\&host_completion],
+   rct       => [\&configuration_completion, \&configuration_tokens_completion],
+   rdt       => [\&distribution_and_tokens_completion, \&distribution_tokens_completion],
+   rgt       => [\&group_completion, \&group_tokens_completion],
+   rht       => [\&host_completion, \&host_tokens_completion],
+   rhg       => [\&host_completion, \&host_groups_completion],
+   ggc       => [\&group_completion],
+   ghc       => [\&host_completion],
+   gdc       => [\&distribution_completion],
+   ahc       => [\&host_completion, \&sign_configuration_completion],
+   adc       => [\&sign_configuration_completion],
+   agc       => [\&group_completion, \&sign_configuration_completion],
+   rhc       => [\&host_completion, \&host_configurations_completion],
+   rdc       => [\&distribution_configurations_completion],
+   rgc       => [\&group_completion, \&group_configurations_completion],
+   gts       => [\&configuration_completion, \&template_stage_completion, \&template_completion],
+   gss       => [\&configuration_completion, \&script_stage_completion, \&script_completion],
+   gas       => [\&configuration_completion, \&auto_completion],
+   ghi       => [\&host_completion],
+   ggi       => [\&group_completion], 
+   gci       => [\&configuration_completion],
+   gdi       => [\&distribution_completion],
+   sd        => [\&distribution_completion],
+   sdb       => [\&database_completion],
+   gdb       => [],
+   setdb     => [\&database_completion],
+   getdb     => [],
+   sync      => [],
+   cc        => [\&configuration_completion, \&distribution_completion, \&distribution_completion],
+   hangman   => [],
+   debug     => [\&host_completion],
+   undebug   => [\&host_completion],
+   whg       => [\&group_completion],
+   whc       => [\&configuration_completion],
+   wht       => [],
+  );
+
+my %commandsHelp = (
+                    ac => "
+name: ac | add configuration
+parameters: <configuration>
+
+Adds <configuration> for the current distribution. Will create the parent
+configurations if they don't exist.
+",
+                    ad => "
+name: ad | add distribution
+parameters: <distribution>
+
+Adds <distribution> as a new distribution with an empty configuration tree.
+",
+                    ag => "
+name: ag | add group
+parameters: <group>
+
+Adds <group> to the database. Will create the group parents, if they don't
+exist.
+",
+                    ah => "
+name: ah | add host
+parameters: <host>
+
+Adds <host> to the database.
+",
+                    rc => "
+name: rc | remove configuration
+parameters: <configuration>
+
+Deletes <configuration> and all its sub-configuration. Will delete only
+the configuration for the current distribution.
+",
+                    rd => "
+name: rd | remove distribution
+parameters: <distribution>
+
+Deletes <distribution> from the staple database. Also deletes all the
+configuration tree for <distribution>
+",
+                    rg => "
+name: rg | remove group
+parameters: <group>
+
+Deletes <group> from the database, and all its subgroups.
+",
+                    rh => "
+name: rh | remove host
+parameters: <host>
+
+Deletes <host> from the database.
+",
+                    gm => "
+name: gm | get mounts
+parameters: <configuration>
+
+Prints the mount list of <configuration>
+",
+                    am => "
+name: am | add mount
+parameters: <configuration> {+|-}<mount> [<location>]
+
+Adds <mount> to <configuration> at the end of the mount list, or at <location>
+if given.
+",
+                    rm => "
+name: rm | remove mount
+parameters: <configuration> {+|-}<mount>
+
+Removes the <mount> from <configuration>.
+",
+                    gt => "
+name: gt | get templates
+parameters: <configuration>
+
+Prints <configuration>'s list of templates.
+",
+                    at => "
+name: at | add template
+parameters: <configuration>
+
+Adds a new template to <configuration>. First an editor will be invoked, to add
+the template. After it finishes, you'll be prompt for the template's parameters:
+         uid: The uid of the template either uid or name, defaults to 0.
+         gid: The gid of the template either gid or name, defaults to 0.
+        mode: The permissions of the template, octal, defaults to 644.
+       stage: when to copy the template: mount, sysinit or final.
+ destination: where to coy the template to.
+",
+                    rt => "
+name: rt | remove template
+parameters: <configuration> <stage> <template>
+
+Deletes the given <template> from <configuration> at <stage>.
+",
+                    ut => "
+name: ut | update template
+parameters: <configuration> <stage> <template>
+  stage: mount | sysinit | final
+
+Updates <template> at <stage> of <configuration>.
+",
+                    gs => "
+name: gs | get scripts
+parameters: <configuration>
+
+Prints the scripts list of <configuration>.
+",
+                    as => "
+name: as | add script
+parameters: <configuration>
+
+Adds a new script to <configuration>. First an editor will be invoked, to add
+the script. After it finishes, you'll be prompt for the script's parameters:
+    name: name of the script
+   stage: stage to run (auto, mount, sysinit, final)
+location: when, relative to other scripts on this configuration, should it run.
+critical: whether to stop the boot, if this script fails
+  tokens: whether to do tokes substitution on this auto before running it
+tokenScript: whether this script output new tokens values.
+",
+                    rs => "
+name: rs | remove script
+parameters: <configuration> <stage> {<script>|<location>}
+  stage: auto | mount | sysinit | final
+
+Deletes the <script> (or the <location>-th script) of stage <stage> from
+<configuration>.
+",
+                    us => "
+name: us | update script
+parameters: <configuration> <stage> {<script>|<location>}
+  stage: auto | mount | sysinit | final
+
+Updates the <configuration>'s <script> in <stage>. if <location> is given,
+update the <location>-th script in <configuration> (at <stage>).
+An editor will be invoked, and later a prompt for each of the <script>'s
+paramters.
+",
+                    ga => "
+name: ga | get autos
+parameters: <configuration>
+
+Prints the <configuration>'s list of autos.
+",
+                    aa => "
+name: aa | add auto
+parameters: <configuration>
+
+Add a new autogroup script to <configuration>. First an editor will be invoked,
+to add the script. After it finishes, you'll be prompt for the auto parameters:
+     name: name of the auto
+ location: when, relative to other auto's on this configuration, should it run.
+ critical: whether to stop the boot, if this auto fails
+   tokens: whether to do tokes substitution on this auto before running it
+",
+                    ra => "
+name: ra | remove auto
+parameters: <configuration> <auto>
+
+Deletes <auto> from <configuration>.
+",
+                    ua => "
+name: ua | update auto
+parameters: <configuration> <auto>
+
+Updates the autogroup <auto>. An editor will be invoked, and after it finishes,
+a prompt for each of the <auto> parameters will be given (defaults to current
+state).
+",
+                    cc => "
+name: cc | copy configuration
+parameters: <configuration> <distribution1> <distribution2>
+
+Copies the entire <configuration> from <distribution1> to <distribution2>. This
+includes all child configurations.
+",
+
+                    act => "
+name: act | add configuration token
+parameters: <configuration>
+
+Adds a token to the <configuration>. You'll be prompt for token type (static,
+regexp, or dynamic), key and value. value must end with a semicolon.
+",
+                    adt => "
+name: adt | add distribution token
+parameters: [<distribution>]
+
+Adds a token to the (current) <distribution>. You'll be prompt for token type
+(static, regexp, or dynamic), key and value. value must end with a semicolon.
+",
+                    agt => "
+name: agt | add group token
+parameters: <group>
+
+Adds a token to the <group>. You'll be prompt for token type (static, regexp,
+or dynamic), key and value. value must end with a semicolon.
+",
+                    aht => "
+name: aht | add host token
+parameters: <host>
+
+Adds a token to the <host>. You'll be prompt for token type (static, regexp, or
+dynamic), key and value. value must end with a semicolon.
+",
+                    ahg => "
+name: ahg | add host group
+parameters: <host> <group> [<location>]
+
+Adds <group> to the <host>'s group list in <location>, or at the end if
+<location> is omitted.
+",
+                    adg => "
+name: adg | add distribution group
+parameters: <group> [<location>]
+
+Adds <group> to the current distribution's group list in <location>, or at the
+end if <location> is omitted.
+",
+                    rdg => "
+name: rdg | remove distribution group
+parameters: <group>
+
+Removes <group> from the current distribution's group list.
+",
+                    agg => "
+name: agg | add group group
+parameters: <group1> <group2> [<location>]
+
+Adds <group2> to <group1>'s group list at <location>, or at the end if
+<location> is omitted.
+",
+                    rgg => "
+name: rgg | remove group group
+parameters: <group1> <group2>
+
+Removes <group2> from <group1>'s group list
+",
+                    gac => "
+name: gac | get all configurations
+parameters: [<pattern>]
+  <pattern>: perl regular expression
+
+Prints a list of all configurations in the current distribution. If pattern is
+given, print only configurations that match it.
+",
+                    gad => "
+name: gad | get all distributions
+
+Prints a list of all distribution. The current distribution is marked with (*).
+",
+                    gag => "
+name: gag | get all groups
+parameters: [<pattern>]
+  <pattern>: perl regular expression
+
+Prints a list of all groups. If <pattern> is given, prints only groups that
+match it.
+",
+                    gah => "
+name: gah | get all hosts
+parameters: [<pattern>]
+  <pattern>: perl regular expression
+
+Prints a list of all hosts. If <pattern> is given, prints only hosts the match
+it.
+",
+                    gct => "
+name: gct | get configuration tokens
+parameters: <configuration>
+
+Prints all the tokens for <configuration> (not including parents)
+",
+                    gdt => "
+name: gdt | get distribution tokens
+parameters: [<distribution>]
+
+Prints all the tokens for (current) <distribution> (not descending into groups
+or configurations).
+",
+                    ggt => "
+name: ggt | get group tokens
+parameters: <group>
+
+Prints all the tokens for <group> (not descending into attached groups,
+configurations, or parents).
+",
+                    gdg => "
+name: gdg | get distribution groups
+parameters: [<distribution>]
+
+Prints all the groups in the (current) <distribution>'s group list
+",
+                    ggg => "
+name: ggg | get group groups
+parameters: <group>
+
+Prints all the groups in the <group>'s group list (not recursively).
+",
+                    ght => "
+name: ght | get host tokens
+parameters: <host>
+
+Prints all the tokens for <host> (not descending into group or configurations).
+",
+                    ghg => "
+name: ghg | get host groups
+parameters: <host>
+
+Prints all the groups in the <host>'s group list
+",
+                    rct => "
+name: rct | remove configuration token
+parameters: <configuration> <token>
+
+Removes the <token> from the <configuration>'s tokens list.
+",
+                    rdt => "
+name: remove distribution token
+parameters: [<distribution>] <token>
+
+Removes the <token> from the (current) <distribution>'s tokens list.
+",
+                    rgt => "
+name: remove group token
+parameters: <group> <token>
+
+Removes the <token> from the <group>'s tokens.
+",
+                    rht => "
+name: remove host token
+parameters: <host> <token>
+
+Removes the <token> from the <host>'s tokens.
+",
+                    rhg => "
+name: rhg | remove host group
+parameters: <host> <group>
+
+Removes the <group> from the <host>'s group list.
+",
+                    ggc => "
+name: ggc | get group configurations
+parameters: <group>
+
+Prints the list of configurations (active and inactive) for the given
+<group>. Also prints the configurations for the <group>'s parents
+",
+                    ghc => "
+name: ghc | get host configurations
+parameters: <host>
+
+Prints the list of configurations (active and inactive) for the given <host>.
+",
+                    gdc => "
+name: gdc | get distribution configurations
+parameters: [<distribution>]
+
+Prints the list of configurations (active and inactive) for the (current)
+<distribution>.
+",
+                    ahc => "
+name: ahc | add host configuration
+parameters: <host> {+|-}<configuration> [<location>]
+
+Adds the <configuration> (either active or inactive) to the <host>'s list of
+configurations at <location>. If <location> is omitted, add to the end of the
+list.
+",
+                    adc => "
+name: adc | add distribution configuration
+parameters: <distribution> {+|-}<configuration> [<location>]
+
+Adds the <configuration> (either active or inactive) to the <distribution>'s
+list of configurations at <location>. If <location> is omitted, add to the end
+of the list.
+",
+                    agc => "
+name: agc | add group configuration
+parameters: <group> {+|-}<configuration> [<location>]
+
+Adds the <configuration> (either active or inactive) to the <group>'s list of
+configurations at <location>. If <location> is omitted, add to the end of the
+list.
+",
+                    rhc => "
+name: rhc | remove host configuration
+parameters: <host> {+|-}<configuration>
+
+Removes the {+|-}<configuration> from the <host>'s list of
+configurations.
+",
+                    rdc => "
+name: rdc | remove distribution configuration
+parameters: <distribution> {+|-}<configuration>
+
+Removes the {+|-}<configuration> from the <distribution>'s list of
+configurations.
+",
+                    rgc => "
+name: rgc | remove group configuration
+parameters: <group> {+|-}<configuration>
+
+Removes the {+|-}<configuration> from the <group>'s list of configurations.
+",
+                    gts => "
+name: gts | get template source
+parameters: <configuration> <stage> <template>
+  stage: auto | mount | sysinit | final
+
+Prints the source of the <configurations>'s <template> at stage <stage>.
+",
+                    gss => "
+name gss | get script source
+parameters: <configuration> <stage> {<script>|<location>}
+  stage: auto | mount | sysinit | final
+  location: script location (integer)
+
+Prints the source of the <configuration>'s <script> in <stage>.
+<location> can be specified instead of <script>, denoting the <location>'s
+script (according to their order in the <configuration>
+",
+                    gas => "
+name: gas | get auto source
+parameters: <configuration> <auto>
+
+Prints the source of the <auto> script in <configuration>
+",
+                    ghi => "
+name: ghi | get host info
+parameters: <host>
+
+Prints all available <host> information. Including tokens, groups, and
+configurations (not recursively).
+",
+                    ggi => "
+name: ggi | get group info
+parameters: <group>
+
+Prints all available <group> information. Includes tokens, groups,
+and configuration (both locally defined and inherited).
+",
+                    gci => "
+name: gci | get configuration info
+parameters: <configuration>
+
+Prints all available <configuration> information. Includes tokens, mounts,
+templates, scripts, and autos (both locally defined and inherited).
+",
+                    gdi => "
+name: gdi | get distribution info
+parameters: [<distribution>]
+
+Prints the (current) <distribution> tokens, groups and configurations.
+",
+                    whg => "
+name: whg | who has group
+parameters: <group>
+
+Prints all hosts, distributions, and groups who directly uses the given
+<group>, or one of it's descendents.
+",
+                    whc => "
+name: whc | who has configuration
+parameters: <configuration>
+
+Prints all hosts, distributions, and groups who directly uses (either
+activates or deactivates) the given <configuration>, or one of it's
+descendents.
+",
+                    wht => "
+name: wht | who has token
+parameters: <token>
+
+Prints all hosts, distributions, groups, and configurations who directly sets
+the given <token>.
+",
+
+                    sd  => "
+name: sd | set distribution
+parameters: <distribution>
+
+Sets the current distribution to <distribution>.
+To get a list of all distributions, run 'gad'.
+
+The default distribution is taken from the machine's root
+file-system. i.e. either from /etc/staple/distribution, or by trying to parse
+/proc/cmdline (if available).
+
+If no current distribution is set, all distribution related commands will
+probably not work.
+",
+
+                    sync => "
+name: sync
+
+Syncs between two staple databases. After calling sync you'll be prompt with
+the two databases parameters (see sdb command for databases parameters).
+
+",
+
+                    quit    => "
+name: quit | exit | q
+
+Exits staplectl.
+",
+                    help    => "
+General help:
+name: help | h | ?
+parameters: topic | command
+  topic   - all | distributions | hosts | groups | configurations | others
+  command - any command (run 'help all' to list all commands)
+
+With topic, list all commands for that topic.
+With command, gives help on that command.
+
+All commands have abbreviations with their initialls (e.g. \"add host\" -> \"ah\")
+Parameters are marked with <>
+Parameters with [] are optional
+Paraemters like {a|b} means can be the string a or the string b
+Parameters like {<host>|<group>} means can be either a host or a group
+",
+
+                    setdb   => "
+name: sdb | setdb
+parameters: {fs|sql} [<database specific parameters> ...]
+
+Sets this staplectl session to the given database. There are currently two
+types of databases: fs - file system, or sql - \"real\" database (postgres).
+
+fs - receives a single parameter: the directory of the database. When omitted,
+     uses the default (as set by Staple.pm, which is currently
+     /boot/staple). This is the default when staplectl starts.
+
+sql - can receive 2 parameters:
+      1. The database schema to use. If omitted, defaults to \"staple\".
+      2. The database connection parameters, as given to DBI->connect perl
+         function. Defaults to 'dbi:Pg:dbname=staple;host=pghost;port=5432;'
+",
+                    getdb   => "
+name: gdb | getdb
+
+Get the current database info string (as given with the setdb command)
+",
+                    hangman => "
+name: hangman
+",
+                    debug   => "
+name: debug
+parameters: <host>
+
+Sets debugging mode to \"prompt\" on the specified <host>.
+",
+                    undebug => "
+namd: undebug
+parameters: <host>
+
+Turns off debugging on the specified <host>.
+",
+
+                    helpdistributions  => "
+Distribution commands:
+  sd  | set distribution <dist>
+  gad | get all distributions
+  gdi | get distribution info <dist>
+  ad  | add distribution <dist>
+  rd  | remove distribution <dist>
+  gdt | get distribution tokens [<dist>]
+  adt | add distribution token [<dist>]
+  rdt | remove distribution token [<dist>] <token>
+  gdg | get distribution groups [<dist>]          
+  adg | add distribution group <group> [<location>]
+  rdg | remove distribution group <group>          
+  gdc | get distribution configurations [<dist>]   
+  adc | add distribution configuration {+|-}<conf> [<location>] 
+  rdc | remove distribution configuration {+|-}<conf>
+",
+                    helphosts          => "
+Host commands:
+  gah | get all hosts [pattern]
+  ghi | get host info <host> 
+  ah  | add host <host> 
+  rh  | remove host <host> 
+  ght | get host tokens <host> 
+  aht | add host token <host>  
+  rht | remove host token <host> <token>
+  ghg | get host groups <host>
+  ahg | add host group <host> <group> [<location>]
+  rhg | remove host group <host> <group> 
+  ghc | get host configurations <host>
+  ahc | add host configuration <host> {+|-}<conf> [<location>] 
+  rhc | remove host configuration <host> {+|-}<conf>
+",
+                    helpgroups         => "
+Group commands:
+   gag | get all groups [pattern]
+   ggi | get group info 
+   ag  | add group <group>
+   rg  | remove group <group>
+   ggt | get group tokens <group>
+   agt | add group token <group> 
+   rgt | remove group token <group> <token>
+   ggg | get group groups <group> 
+   agg | add group group <group1> <group2> [<location>]
+   rgg | remove group group <group1> <group2> 
+   ggc | get group configurations <group> 
+   agc | add group configuration <group> {+|-}<conf> [<location>]
+   rgc | remove group configuration <group> {+|-}<conf>
+   whg | who has group <group>
+",
+                    helpconfigurations => "
+Configuration commands:
+   gac | get all configurations [<pattern>]
+   gci | get configuration info 
+   ac  | add configuration <conf> 
+   rc  | remove configuration <conf> 
+   gct | get configuration tokens <conf> 
+   act | add configuration token <conf>  
+   rct | remove configuration token <conf> <token>
+   gm  | get mounts <conf> 
+   am  | add mount <conf> {+|-}<mount> [<location>]
+   rm  | remove mount <conf> {+|-}<mount> 
+   gt  | get templates <conf> 
+   gts | get template source <conf> <stage> <template>
+   at  | add template <conf> 
+   rt  | remove template <conf> <stage> <template> 
+   ut  | update template <conf> <stage> <template> 
+   gs  | get scripts <conf> 
+   gss | get script source <conf> <stage> <script> 
+   as  | add script <conf> 
+   rs  | remove script <conf> <stage> <script> 
+   us  | update script <conf> <stage> <script> 
+   ga  | get autos <conf> 
+   gas | get auto source <conf> <auto> 
+   aa  | add auto <conf> 
+   ra  | remove auto <conf> <auto> 
+   ua  | update auto <conf> <auto> 
+   cc  | copy configuration <conf> <from> <to> 
+   whc | who has configuration <conf> 
+",
+                    helpothers         => "
+Other commands:
+   h   | help [{<topic>|<command>}]
+   q   | exit | quit
+   sdb | set db {fs|sql} <params>
+   gdb
+   sync
+   debug <host>
+   undebug <host>
+",
+                   );
+
+my @singleCommandCommands = ("ahc", "rhc", "gag", "ghc", "wht", "whc", "whg", "ghi", "ggi", "gci", "bad", "badcommandorfilename");
+
+sub help {
+    my %topics = (a              => "helpall",
+                  all            => "helpall",
+                  d              => "helpdistributions",
+                  distributions  => "helpdistributions",
+                  h              => "helphosts",
+                  hosts          => "helphosts",
+                  g              => "helpgroups",
+                  groups         => "helpgroups",
+                  c              => "helpconfigurations",
+                  configurations => "helpconfigurations",
+                  o              => "helpothers",
+                  others         => "helpothers",
+                  " "            => "help");
+    my $line = join " ", @_;
+    (my $topic) = parseline($line);
+    $topic = "help" unless $topic;
+    if ($_[0]) {
+        if (grep {$_ eq $_[0]} keys %topics) {
+            $topic = $topics{$_[0]};
+        } else {
+            $topic = $commandMap{$topic};
+        }
+    } else {
+        $topic = "help";
+    }
+    $topic = "bad" unless $topic;
+
+    if ($topic eq "helpall") {
+        help("distributions");
+        help("hosts");
+        help("groups");
+        help("configurations");
+        help("others");
+    } elsif ($topic eq "bad") {
+        print "No help for \"$line\" (yet)\n";
+        print $commandsHelp{help};
+    } elsif (defined $commandsHelp{$topic}) {
+        print $commandsHelp{$topic};
+    } else {
+        print "No help for \"$topic\" (yet)\n";
+    }
+}
+
+sub fillDnsHostList {
+    my $res = new Net::DNS::Resolver;
+    (my $domain) = $res->searchlist;
+    my @hosts = map {$_->name} grep {$_->type eq "A"} $res->axfr($domain);
+    @dnsHostList = map {$_ =~ s/\.$domain//; $_} @hosts;    
+}
+
+# input: prompt string, [default value]
+sub prompt {
+    my $prompt = shift;
+    my $default = shift;
+    my $string = "$prompt".(defined $default ? " [$default]" : "").": ";
+    print $string;
+    my $value = <>;
+    chomp($value);
+    $value = $default if defined $default and $value eq "";
+    return $value;
+}
+
+# input: prompt string, [default value}
+# output: 0/1
+sub boolprompt {
+    my $prompt = shift;
+    my $default = shift;
+    $default = "yes" if $default =~ m/^(?:1|y|yes)$/i;
+    $default = "no" if $default =~ m/^(?:0|n|no)$/i;
+    my $string = "$prompt".(defined $default ? " [$default]" : "").": ";
+    print $string;
+    my $value = <>;
+    chomp($value);
+    $value = $default if defined $default and $value =~ /^\s*$/;
+    if ($value =~ m/^(?:yes|y|ok|1)$/i) {
+        $value = 1;
+    } else {
+        $value = 0;
+    }
+    return $value;
+}
+
+# input: list of strings (sorted)
+# no output, prints like tree
+sub printTree {
+    print join "\n", @_;
+    print "\n";
+    return;
+
+    my @groups = @_;
+    my @ancestors = ();
+    while (my $current = shift @groups) {
+        if (@ancestors) {
+            my $father = pop @ancestors;
+            if ($current =~ m/^$father(.*)/) {
+                my @list = split "/",$father;
+                print "     " x $#list;
+                print $1;
+                print "\n";
+                push @ancestors, $father, $current;
+            } else {
+                unshift @groups, $current;
+            }
+        } else {
+            print "$current\n";
+            push @ancestors, $current;
+        }
+    }
+}
+
+sub quit {
+    exit 0;
+}
+
+sub bad {
+    print "bad command or file name\n";
+}
+
+sub empty {
+}
+
+sub wht {
+    my $token = shift;
+    my $dist = shift;
+    $dist = $distribution unless $dist;
+    unless ($token) {
+        print "Missing token key\n";
+        return;
+    }
+    (my $groups, my $configurations) = whoHasToken($token, $dist);
+    foreach my $type ("host", "distribution", "group") {
+        my @subset = grep {$_->{type} eq $type} @$groups;
+        if (@subset) {
+            print "${type}s:\n";
+            print join("", map {"  $_->{name}\n"} @subset);
+            print "\n";
+        }
+    }
+
+    if (@$configurations) {
+        print "configurations ($dist):\n";
+        print join("", map{"  $_->{name}\n"} @$configurations);
+        print "\n";
+    }
+}
+
+sub whc {
+    my $configuration = shift;
+    unless ($configuration) {
+        print "Missing configuration\n";
+        return;
+    }
+    my @groups = whoHasConfiguration($configuration);
+    if (@groups and not defined $groups[0]) {
+        print getLastError()."\n";
+        return;
+    }
+    foreach my $type ("host", "distribution", "group") {
+        my @subset = grep {$_->{type} eq $type} @groups;
+        if (@subset) {
+            print "${type}s:\n";
+            print join("", map {"  $_->{name}\n"} @subset);
+            print "\n";
+        }
+    }
+}
+
+sub whg {
+    my $group = shift;
+    unless ($group) {
+        print "Missing group\n";
+        return;
+    }
+    my @groups = whoHasGroup($group);
+    if (@groups and not defined $groups[0]) {
+        print getLastError()."\n";
+        return;
+    }
+    foreach my $type ("host", "distribution", "group") {
+        my @subset = grep {$_->{type} eq $type} @groups;
+        if (@subset) {
+            print "${type}s:\n";
+            print join("", map {"  $_->{name}\n"} sort {$a->{name} cmp $b->{name}} @subset);
+            print "\n";
+        }
+    }
+}
+
+sub debugOn {
+    my $host = shift;
+    unless ($host) {
+        print "Missing host\n";
+        return;
+    }
+    my $group = getHostGroup($host);
+    unless ($group) {
+        print "Host \"$host\" doesn't exist\n";
+        return;
+    }
+    unless (addTokens({"__STAPLE_DEBUG__" => {key => "__STAPLE_DEBUG__", value => "prompt", raw => "prompt", type => "static"}}, $group)) {
+        print getLastError()."\n";
+        return;
+    }
+    print "$host set to debug (prompt) mode\n";
+}
+
+sub debugOff {
+    my $host = shift;
+    unless ($host) {
+        print "Missing host\n";
+        return;
+    }
+    if (my $group = getHostGroup($host)) {
+        unless (removeTokens(["__STAPLE_DEBUG__"], $group)) {
+            print getLastError()."\n";
+            return 0;
+        }
+        print "$host set to debug off\n";
+    } else {
+        print "Host \"$host\" doesn't exist\n";
+    }
+}
+
+sub cc {
+    my $configuration_name = shift;
+    my $from = shift;
+    my $to = shift;
+    unless ($configuration_name) {
+        print "Missing configurations\n";
+        return;
+    }
+    unless ($from) {
+        print "Missing source distribution\n";
+        return;
+    }
+    unless ($to) {
+        print "Missing destination distribution\n";
+        return;
+    }
+    unless (copyConfiguration($configuration_name, $from, $to)) {
+        print getLastError()."\n";
+        return;
+    }
+}
+
+sub gdi {
+    my $dist = shift;
+    $dist = $distribution unless $dist;
+    unless ($dist) {
+        print "Distribution not set\n";
+        return;
+    }
+    unless (getDistributionGroup($dist)) {
+        print "Unknown distribution \"$dist\"\n";
+        return;
+    }
+    print "Tokens:\n";
+    gdt($dist);
+    print "\nGroups:\n";
+    gdg($dist);
+    print "\nConfigurations:\n";
+    gdc($dist);
+}
+
+sub ghi {
+    my $host = shift;
+    unless ($host) {
+        print "Missing host\n";
+        return;
+    }
+    unless (getHostGroup($host)) {
+        print "No such host \"$host\"\n";
+        return;
+    }
+    print "Tokens:\n";
+    ght($host);
+    print "\nGroups:\n";
+    ghg($host);
+    print "\nConfigurations:\n";
+    ghc($host);
+}
+
+sub ggi {
+    my $group_name = shift;
+    unless ($group_name) {
+        print "Missing group\n";
+        return;
+    }
+    (my $groupg) = getGroupsByName($group_name);
+    unless ($groupg) {
+        print "No such group \"$group_name\"\n";
+        return;
+    }
+    my @groups_names = splitData($group_name);
+    my @groups = getGroupsByName(@groups_names);
+    foreach my $group (@groups) {
+        print "$group->{name}:\n";
+        print "-" x length($group->{name});
+        print "\n";
+        #print "Path: $group->{path}\n";
+        print "Tokens:\n";
+        printgctokens($group);
+        print "Groups:\n";
+        my @groupsref = getGroupGroups($group);
+        if (@groupsref and not defined $groupsref[0]) {
+            print getLastError()."\n";
+            return;
+        } else {
+            print join "\n", map {"$_->{name}"} @groupsref;
+            print "\n";
+        }
+        print "Configurations:\n";
+        my @configurations = getGroupsConfigurations($group);
+        if (@configurations and not defined $configurations[0]) {
+            print getLastError()."\n";
+            return;
+        } else {
+            if (@configurations) {
+                print "  ";
+                print join "\n  ", map {($_->{active} ?  "+" : "-").$_->{name}} @configurations;
+                print "\n";
+            }
+            print "\n";
+        }
+        print "\n";
+    }
+}
+
+sub gci {
+    my $configuration_name = shift;
+    unless ($configuration_name) {
+        print "Missing configurations\n";
+        return;
+    }
+    (my $conf) = grep {$_->{name} eq $configuration_name} getCompleteConfigurations([getConfigurationsByName($configuration_name)], $distribution);
+    unless ($conf) {
+        print "No such configuration \"$configuration_name\"\n";
+        return;
+    }
+    my @configurations_names = splitData($configuration_name);
+    foreach my $configuration_name (@configurations_names) {
+        print "$configuration_name\n";
+        print "-" x length($configuration_name);
+        print "\n";
+        (my $configuration) = grep {$_->{name} eq $configuration_name} getCompleteConfigurations([getConfigurationsByName($configuration_name)], $distribution);
+        print "Tokens:\n";
+        gct($configuration_name);
+        print "Mounts:\n";
+        gm($configuration_name);
+        print "\nTemplates:\n";
+        gtm($configuration_name);
+        print "\nScripts:\n";
+        gs($configuration_name);
+        print "\nAutos:\n";
+        ga($configuration_name);
+        print "\n";
+    }
+}
+
+# input: filename
+# output: 1 or undef
+# edits filename
+sub edit {
+    my $file = shift;
+    my $editor = $ENV{VISUAL};
+    $editor = $ENV{EDITOR} unless $editor;
+    $editor = "vi" unless $editor;
+    unless (system("$editor $file") == 0) {
+        print "Editor \"$editor\" failed\n";
+        return undef;
+    }
+    return 1;
+}
+
+# input: configuration name
+# output: list of autos
+sub localgetautos {
+    my $configuration = shift;
+    unless ($configuration) {
+        print "Missing configuration\n" unless $echooff;
+        return undef;
+    }
+    (my $conf) = getConfigurationsByName($configuration);
+    unless ($conf) {
+        print "unknown configuration \"$configuration\"\n" unless $echooff;
+        return undef;
+    }
+    ($conf) = grep {$_->{name} eq $configuration} getCompleteConfigurations([$conf], $distribution);
+    unless ($conf) {
+        print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n" unless $echooff;
+        return undef;
+    }
+    my @autos = getAutos($conf);
+    if (@autos and not defined $autos[0]) {
+        print getLastError()."\n" unless $echooff;
+        return undef;
+    }
+    return @autos;
+}
+
+sub ga {
+    (my @autos) = localgetautos(@_);
+    if (@autos and $autos[0]) {
+        print join "", map {"   $_->{order}. $_->{name}   (".($_->{critical} ? "critical " : "").($_->{tokens} ? "tokened " : "").($_->{source} ? "file" : "data").")\n"} sort {$a->{order} <=> $b->{order}} @autos;
+    } 
+}
+
+sub gas {
+    my $configuration = shift;
+    my $auto_name = shift;
+    (my @autos) = localgetautos($configuration);
+    unless ($auto_name) {
+        print "Missing auto name/location\n";
+        return;
+    }
+    if (@autos and $autos[0]) {
+        my $auto;
+        if ($auto_name =~ m/^\d+$/) {
+            ($auto) = grep {$_->{order} == $auto_name} @autos;
+        } else {
+            ($auto) = grep {$_->{name} eq $auto_name} @autos;
+        }
+        unless ($auto) {
+            print "No such auto \"$auto_name\" in \"$configuration\"\n";
+            return;
+        }
+        if ($auto->{source}) {
+            unless (open(FILE, "<$auto->{source}")) {
+                print "Error opening auto \"$auto->{source}\": $!\n";
+                return;
+            }
+            my $data = join "", <FILE>;
+            close(FILE);
+            print $data;
+        } elsif ($auto->{data}) {
+            print $auto->{data};
+        } else {
+            print "Bad auto, no source or data\n";
+            return;
+        }
+    } else {
+        print "No such auto \"$auto_name\" in \"$configuration\"\n";
+        return;
+    }
+}
+
+
+sub aa {
+    my $configuration = shift;
+    unless ($configuration) {
+        print "Missing configuration\n";
+        return undef;
+    }
+    (my $conf) = getConfigurationsByName($configuration);
+    unless ($conf) {
+        print "unknown configuration \"$configuration\"\n";
+        return undef;
+    }
+    ($conf) = grep {$_->{name} eq $configuration} getCompleteConfigurations([$conf], $distribution);
+    unless ($conf) {
+        print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n";
+        return undef;
+    }
+    my $tmpFile = `mktemp /tmp/staplectl.XXXXXXXX 2>/dev/null`;
+    if ($? != 0) {
+        print "Can't create temporary file on /tmp/\n";
+        return;
+    }    
+    chomp $tmpFile;
+    unless (edit($tmpFile)) {
+        unlink $tmpFile;
+        return;
+    }
+    my %auto;
+    $auto{name} = prompt "name";
+    $auto{source} = $tmpFile;
+    $auto{configuration} = $conf;
+    $auto{order} = prompt "location", "end";
+    $auto{order} = undef unless $auto{order} =~ m/^\d+$/;
+    $auto{critical} = boolprompt "critical", "no";
+    $auto{tokens} = boolprompt "tokens", "no";
+    print getLastError()."\n" unless (addAutos(\%auto));
+    unlink $tmpFile
+}
+
+sub ra {
+    my $configuration = shift;
+    my $auto_name = shift;
+    (my @autos) = localgetautos($configuration);
+    unless ($auto_name) {
+        print "Missing auto\n";
+        return;
+    }
+    if (@autos and $autos[0]) {
+        (my $auto) = grep {$_->{name} eq $auto_name or $_->{order} eq $auto_name} @autos;
+        unless ($auto) {
+            print "No such auto \"$auto_name\" in \"$configuration\"\n";
+            return;
+        }
+        unless (removeAutos($auto)) {
+            print getLastError()."\n";
+            return;
+        }
+    } else {
+        print "No such auto \"$auto_name\" in \"$configuration\"\n";
+        return;
+    }
+}
+
+sub ua {
+    my $configuration = shift;
+    my $auto_name = shift;
+    (my @autos) = localgetautos($configuration);
+    unless ($auto_name) {
+        print "Missing auto\n";
+        return;
+    }
+    if (@autos and $autos[0]) {
+        (my $auto) = grep {$_->{name} eq $auto_name or $_->{order} eq $auto_name} @autos;
+        unless ($auto) {
+            print "No such auto \"$auto_name\" in \"$configuration\"\n";
+            return;
+        }
+        my $data = $auto->{data};
+        if ($auto->{source}) {
+            unless (open(FILE, "<$auto->{source}")) {
+                print "Can't open auto \"$auto->{source}\"\n";
+                return;
+            }
+            $data = join "", <FILE>;
+            close(FILE);
+        }
+        my $tmpFile = `mktemp /tmp/staplectl.XXXXXXXX 2>/dev/null`;
+        if ($? != 0) {
+            print "Can't create temporary file on /tmp/\n";
+            return;
+        }
+        chomp $tmpFile;
+        unless (open(FILE, ">$tmpFile")) {
+            print "Can't open temporary file for writing $tmpFile: $!\n";
+            unlink $tmpFile;
+            return;
+        }
+        print FILE $data;
+        close(FILE);
+        unless (edit($tmpFile)) {
+            unlink $tmpFile;
+            return;
+        }
+        my %newAuto;
+        $newAuto{source} = $tmpFile;
+        $newAuto{name} = prompt "name", $auto->{name};
+        $newAuto{order} = prompt "order", $auto->{order};
+        $newAuto{order} = undef unless $newAuto{order} =~ m/^\d+$/;
+        $newAuto{critical} = boolprompt "critical", $auto->{critical};
+        $newAuto{tokens} = boolprompt "tokens", $auto->{tokens};
+        $newAuto{configuration} = $auto->{configuration};
+        print getLastError()."\n" unless (removeAutos($auto));
+        print getLastError()."\n" unless (addAutos(\%newAuto));
+        unlink $tmpFile
+    } else {
+        print "No such auto \"$auto_name\" in \"$configuration\"\n";
+        return;
+    }
+}
+
+# input: configuration name
+# output: list of scripts
+sub localgetscripts {
+    my $configuration = shift;
+    unless ($configuration) {
+        print "Missing configuration\n" unless $echooff;
+        return undef;
+    }
+    (my $conf) = getConfigurationsByName($configuration);
+    unless ($conf) {
+        print "unknown configuration \"$configuration\"\n" unless $echooff;
+        return undef;
+    }
+    ($conf) = grep {$_->{name} eq $configuration} getCompleteConfigurations([$conf], $distribution);
+    unless ($conf) {
+        print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n" unless $echooff;
+        return undef;
+    }
+    my @scripts = getScripts($conf);
+    if (@scripts and not defined $scripts[0]) {
+        print getLastError()."\n" unless $echooff;
+        return undef;
+    }
+    return @scripts;
+}
+
+sub rs {
+    my $configuration = shift;
+    my $stage = shift;
+    my $script_name = shift;
+    (my @scripts) = localgetscripts($configuration);
+    unless ($stage) {
+        print "Missing stage\n";
+        return;
+    }
+    unless ($script_name) {
+        print "Missing script\n";
+        return;
+    }
+    if (@scripts and $scripts[0]) {
+        (my $script) = grep {$_->{stage} eq $stage and ($_->{name} eq $script_name or $_->{order} eq $script_name)} @scripts;
+        unless ($script) {
+            print "No such script \"$script_name\" in \"$configuration\"\n";
+            return;
+        }
+        unless (removeScripts($script)) {
+            print getLastError()."\n";
+            return;
+        }
+    } else {
+        print "No such script \"$script_name\" in \"$configuration\"\n";
+        return;
+    }
+}
+
+sub us {
+    my $configuration = shift;
+    my $stage = shift;
+    my $script_name = shift;
+    (my @scripts) = localgetscripts($configuration);
+    unless ($stage) {
+        print "Missing stage\n";
+        return;
+    }
+    unless ($script_name) {
+        print "Missing script\n";
+        return;
+    }
+    if (@scripts and $scripts[0]) {
+        (my $script) = grep {$_->{stage} eq $stage and ($_->{name} eq $script_name or ($script_name =~ m/^\d+$/ and $_->{order} == $script_name))} @scripts;
+        unless ($script) {
+            print "No such script \"$script_name\" in \"$configuration\"\n";
+            return;
+        }
+        my $data = $script->{data};
+        if ($script->{source}) {
+            unless (open(FILE, "<$script->{source}")) {
+                print "Can't open script \"$script->{source}\"\n";
+                return;
+            }
+            $data = join "", <FILE>;
+            close(FILE);
+        }
+        my $tmpFile = `mktemp /tmp/staplectl.XXXXXXXX 2>/dev/null`;
+        if ($? != 0) {
+            print "Can't create temporary file on /tmp/\n";
+            return;
+        }
+        chomp $tmpFile;
+        unless (open(FILE, ">$tmpFile")) {
+            print "Can't open temporary file for writing $tmpFile: $!\n";
+            unlink $tmpFile;
+            return;
+        }
+        print FILE $data;
+        close(FILE);
+        unless (edit($tmpFile)) {
+            unlink $tmpFile;
+            return;
+        }
+        my %newScript;
+        $newScript{source} = $tmpFile;
+        $newScript{name} = prompt "name", $script->{name};
+        do {
+            $newScript{stage} = prompt "stage (auto, mount, sysinit, final)", $script->{stage};
+        } until ($newScript{stage} =~ m/^(?:auto|mount|sysinit|final)$/);
+        $newScript{order} = prompt "order", $script->{order};
+        $newScript{order} = undef unless $newScript{order} =~ m/^\d+$/;
+        $newScript{critical} = boolprompt "critical", $script->{critical};
+        $newScript{tokens} = boolprompt "tokens", $script->{tokens};
+        $newScript{tokenScript} = boolprompt "tokenScript", $script->{tokenScript};
+        $newScript{configuration} = $script->{configuration};
+        print getLastError()."\n" unless (removeScripts($script));
+        print getLastError()."\n" unless (addScripts(\%newScript));
+        unlink $tmpFile
+    } else {
+        print "No such script \"$script_name\" in \"$configuration\"\n";
+        return;
+    }
+}
+
+sub as {
+    my $configuration = shift;
+    unless ($configuration) {
+        print "Missing configuration\n";
+        return undef;
+    }
+    (my $conf) = getConfigurationsByName($configuration);
+    unless ($conf) {
+        print "unknown configuration \"$configuration\"\n";
+        return undef;
+    }
+    ($conf) = grep {$_->{name} eq $configuration} getCompleteConfigurations([$conf], $distribution);
+    unless ($conf) {
+        print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n";
+        return undef;
+    }
+    my $tmpFile = `mktemp /tmp/staplectl.XXXXXXXX 2>/dev/null`;
+    if ($? != 0) {
+        print "Can't create temporary file on /tmp/\n";
+        return;
+    }    
+    chomp $tmpFile;
+    unless (edit($tmpFile)) {
+        unlink $tmpFile;
+        return;
+    }
+    my %script;
+    $script{name} = prompt "name";
+    $script{source} = $tmpFile;
+    $script{configuration} = $conf;
+    do {
+        $script{stage} = prompt "stage (auto, mount, sysinit, final)";
+    } until ($script{stage} =~ m/^(?:auto|mount|sysinit|final)$/);
+    $script{order} = prompt "location", "end";
+    $script{order} = undef unless $script{order} =~ m/^\d+$/;
+    $script{critical} = boolprompt "critical", "no";
+    $script{tokens} = boolprompt "tokens", "no";
+    $script{tokenScript} = boolprompt "tokenScript", "no";
+    print getLastError()."\n" unless (addScripts(\%script));
+    unlink $tmpFile
+}
+
+sub gss {
+    my $configuration = shift;
+    my $stage = shift;
+    my $script_name = shift;
+    (my @scripts) = localgetscripts($configuration);
+    unless ($stage) {
+        print "Missing stage\n";
+        return;
+    }
+    unless ($script_name) {
+        print "Missing script name/location\n";
+        return;
+    }
+    if (@scripts and $scripts[0]) {
+        my $script;
+        if ($script_name =~ m/^\d+$/) {
+            ($script) = grep {$_->{stage} eq $stage and $_->{order} == $script_name} @scripts;
+        } else {
+            ($script) = grep {$_->{stage} eq $stage and $_->{name} eq $script_name} @scripts;
+        }
+        unless ($script) {
+            print "No such script \"$script_name\" in \"$configuration\"\n";
+            return;
+        }
+        if ($script->{source}) {
+            unless (open(FILE, "<$script->{source}")) {
+                print "Error opening script \"$script->{source}\": $!\n";
+                return;
+            }
+            my $data = join "", <FILE>;
+            close(FILE);
+            print $data;
+        } elsif ($script->{data}) {
+            print $script->{data};
+        } else {
+            print "Bad script, no source or data\n";
+            return;
+        }
+    } else {
+        print "No such script \"$script_name\" in \"$configuration\"\n";
+        return;
+    }
+}
+
+sub gs {
+    (my @scripts) = localgetscripts(@_);
+    if (@scripts and $scripts[0]) {
+        foreach my $stage ("auto", "mount", "sysinit", "final") {
+            next unless grep {$_->{stage} eq $stage} @scripts;
+            print "  $stage:\n";
+            print join "", map {"     $_->{order}. $_->{name}   (".($_->{critical} ? "critical " : "").($_->{tokens} ? "tokened " : "").($_->{tokenScript} ? "tokenScript " : "").($_->{source} ? "file" : "data").")\n"} sort {$a->{order} <=> $b->{order}} grep {$_->{stage} eq $stage} @scripts;
+        }
+    }
+}
+
+# input: configuration name
+# output: list of templates
+sub localgettemplates {
+    my $configuration = shift;
+    unless ($configuration) {
+        print "Missing configuration\n" unless $echooff;
+        return undef;
+    }
+    (my $conf) = getConfigurationsByName($configuration);
+    unless ($conf) {
+        print "unknown configuration \"$configuration\"\n"  unless $echooff;
+        return undef;
+    }
+    ($conf) = grep {$_->{name} eq $configuration} getCompleteConfigurations([$conf], $distribution);
+    unless ($conf) {
+        print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n" unless $echooff;
+        return undef;
+    }
+    my @templates = getTemplates($conf);
+    if (@templates and not defined $templates[0]) {
+        print getLastError()."\n"  unless $echooff;
+        return undef;
+    }
+    return @templates;
+}
+
+sub rt {
+    my $configuration = shift;
+    my $stage = shift;
+    my $template_name = shift;
+    (my @templates) = localgettemplates($configuration);
+    unless ($stage) {
+        print "Missing stage\n";
+        return;
+    }
+    unless ($template_name) {
+        print "Missing Template\n";
+        return;
+    }
+    if (@templates and $templates[0]) {
+        (my $template) = grep {$_->{stage} eq $stage and $_->{destination} eq $template_name} @templates;
+        unless ($template) {
+            print "No such template \"$template_name\" in \"$configuration\"\n";
+            return;
+        }
+        unless (removeTemplates($template)) {
+            print getLastError()."\n";
+            return;
+        }
+    } else {
+        print "No such template \"$template_name\" in \"$configuration\"\n";
+        return;
+    }
+}
+
+sub at {
+    my $configuration = shift;
+    unless ($configuration) {
+        print "Missing configuration\n";
+        return undef;
+    }
+    (my $conf) = getConfigurationsByName($configuration);
+    unless ($conf) {
+        print "unknown configuration \"$configuration\"\n";
+        return undef;
+    }
+    ($conf) = grep {$_->{name} eq $configuration} getCompleteConfigurations([$conf], $distribution);
+    unless ($conf) {
+        print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n";
+        return undef;
+    }
+    my $tmpFile = `mktemp /tmp/staplectl.XXXXXXXX 2>/dev/null`;
+    if ($? != 0) {
+        print "Can't create temporary file on /tmp/\n";
+        return;
+    }    
+    chomp $tmpFile;
+    unless (edit($tmpFile)) {
+        unlink $tmpFile;
+        return;
+    }
+    my %template;
+    $template{source} = $tmpFile;
+    $template{uid} = prompt "uid", 0;
+    $template{gid} = prompt "gid", 0;
+    $template{mode} = oct(prompt "mode", 644);
+    do {
+        $template{stage} = prompt "stage (mount, sysinit, final)";
+    } until ($template{stage} =~ m/^(?:mount|sysinit|final)$/);
+    $template{destination} = prompt "destination";
+    $template{configuration} = $conf;
+    print getLastError()."\n" unless (addTemplates(\%template));
+    unlink $tmpFile
+}
+
+sub ut {
+    my $configuration = shift;
+    my $stage = shift;
+    my $template_name = shift;
+    (my @templates) = localgettemplates($configuration);
+    unless ($stage) {
+        print "Missing stage\n";
+        return;
+    }
+    unless ($template_name) {
+        print "Missing Template\n";
+        return;
+    }
+    if (@templates and $templates[0]) {
+        (my $template) = grep {$_->{stage} eq $stage and $_->{destination} eq $template_name} @templates;
+        unless ($template) {
+            print "No such template \"$template_name\" in \"$configuration\"\n";
+            return;
+        }
+        my $data = $template->{data};
+        if ($template->{source}) {
+            unless (open(FILE, "<$template->{source}")) {
+                print "Can't open template \"$template->{source}\"\n";
+                return;
+            }
+            $data = join "", <FILE>;
+            close(FILE);
+        }
+        my $tmpFile = `mktemp /tmp/staplectl.XXXXXXXX 2>/dev/null`;
+        if ($? != 0) {
+            print "Can't create temporary file on /tmp/\n";
+            return;
+        }
+        chomp $tmpFile;
+        unless (open(FILE, ">$tmpFile")) {
+            print "Can't open temp file for writing $tmpFile: $!\n";
+            unlink $tmpFile;
+            return;
+        }
+        print FILE $data;
+        close(FILE);
+        unless (edit($tmpFile)) {
+            unlink $tmpFile;
+            return;
+        }
+        my %newTemplate;
+        $newTemplate{source} = $tmpFile;
+        $newTemplate{uid} = prompt "uid", $template->{uid};
+        $newTemplate{gid} = prompt "gid", $template->{gid};
+        $newTemplate{mode} = oct(prompt "mode", sprintf("%04o", $template->{mode}));
+        do {
+            $newTemplate{stage} = prompt "stage (mount, sysinit, final)", $template->{stage};
+        } until ($newTemplate{stage} =~ m/^(?:mount|sysinit|final)$/);
+        $newTemplate{destination} = prompt "destination", $template->{destination};
+        $newTemplate{configuration} = $template->{configuration};
+        print getLastError()."\n" unless (removeTemplates($template));
+        print getLastError()."\n" unless (addTemplates(\%newTemplate));
+        unlink $tmpFile
+    } else {
+        print "No such template \"$template_name\" in \"$configuration\"\n";
+        return;
+    }
+}
+
+sub gts {
+    my $configuration = shift;
+    my $stage = shift;
+    my $template_name = shift;
+    (my @templates) = localgettemplates($configuration);
+    unless ($stage) {
+        print "Missing stage\n";
+        return;
+    }
+    unless ($template_name) {
+        print "Missing Template\n";
+        return;
+    }
+    if (@templates and $templates[0]) {
+        (my $template) = grep {$_->{stage} eq $stage and $_->{destination} eq $template_name} @templates;
+        unless ($template) {
+            print "No such template \"$template_name\" in \"$configuration\"\n";
+            return;
+        }
+        if ($template->{source}) {
+            unless (open(FILE, "<$template->{source}")) {
+                print "Error opening \"$template->{source}\": $!\n";
+                return;
+            }
+            my $data = join "", <FILE>;
+            close(FILE);
+            print $data;
+        } elsif ($template->{data}) {
+            print $template->{data};
+        } else {
+            print "Bad template, no source or data\n";
+            return;
+        }
+    } else {
+        print "No such template \"$template_name\" in \"$configuration\"\n";
+        return;
+    }
+}
+
+# gt is greate than, for my quick search: sub qt {
+sub gtm {
+    (my @templates) = localgettemplates(@_);
+    if (@templates and $templates[0]) {
+        foreach my $stage ("mount", "sysinit", "final") {
+            next unless grep {$_->{stage} eq $stage} @templates;
+            print "  $stage:\n";
+            print join "", map {"     ($_->{uid}:$_->{gid} ".sprintf("%04o", $_->{mode})." ".($_->{source} ? "file" : "data")."): $_->{destination}\n"} grep {$_->{stage} eq $stage} @templates;
+        }
+    }
+}
+
+sub rm {
+    my $configuration = shift;
+    my $mount = shift;
+    unless ($configuration) {
+        print "Missing configuration\n";
+        return;
+    }
+    unless ($mount) {
+        print "Missing mount\n";
+        return;
+    }
+    if ($mount !~ m,^([+-])(.*)$,) {
+        print "The mount should be preceded with + or -\n";
+        return;
+    }
+    my $active = $1 eq '+' ? 1 : 0;
+    $mount = $2;
+    unless ($mount) {
+        print "Missing mount\n";
+        return;
+    }
+    (my $conf) = getConfigurationsByName($configuration);
+    unless ($conf) {
+        print "unknown configuration \"$configuration\"\n";
+        return;
+    }
+    ($conf) = grep {$_->{name} eq $configuration} getCompleteConfigurations([$conf], $distribution);
+    unless ($conf) {
+        print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n";
+        return;
+    }
+    unless (removeMounts({destination => $mount, active => $active, configuration => $conf})) {
+        print getLastError()."\n";
+        return;
+    }
+}
+
+sub am {
+    my $configuration = shift;
+    my $mount = shift;
+    my $location = shift;
+    unless ($configuration) {
+        print "Missing configuration\n";
+        return;
+    }
+    unless ($mount) {
+        print "Missing mount\n";
+        return;
+    }
+    if ($mount !~ m,^([+-])(.*)$,) {
+        print "The mount should be preceded with + or -\n";
+        return;
+    }
+    my $active = $1 eq '+' ? 1 : 0;
+    $mount = $2;
+    unless ($mount) {
+        print "Missing mount\n";
+        return;
+    }
+    (my $conf) = getConfigurationsByName($configuration);
+    unless ($conf) {
+        print "unknown configuration \"$configuration\"\n";
+        return;
+    }
+    ($conf) = grep {$_->{name} eq $configuration} getCompleteConfigurations([$conf], $distribution);
+    unless ($conf) {
+        print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n";
+        return;
+    }
+    unless (addMount($conf, {destination => $mount, active => $active}, $location)) {
+        print getLastError()."\n";
+        return;
+    }
+}
+
+sub gm {
+    my $configuration = shift;
+    unless ($configuration) {
+        print "Missing configurations\n";
+        return;
+    }
+    (my $conf) = getConfigurationsByName($configuration);
+    if ($conf) {
+        ($conf) = grep {$_->{name} eq $configuration} getCompleteConfigurations([$conf], $distribution);
+        if ($conf) {
+            my @mounts = getRawMounts($conf);
+            if (@mounts and not defined $mounts[0]) {
+                print getLastError()."\n";
+                return;
+            } else {
+                print join "\n", map {($_->{active} ?  "  +" : "  -").$_->{destination}} @mounts;
+                print "\n" if (@mounts);
+            }
+        } else {
+            print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n";
+            return;
+        }
+    } else {
+        print "No such configuration \"$configuration\"\n";
+        return;
+    }
+}
+
+sub rgc {
+    my $group_name = shift;
+    my $configuration = shift;
+    unless ($group_name) {
+        print "Missing group\n";
+        return;
+    }
+    unless ($configuration) {
+        print "Missing configuration\n";
+        return;
+    }
+    if ($configuration !~ m,^([+-])(.*)$,) {
+        print "The configuration should be preceded with + or -\n";
+        return;
+    }
+    (my $group) = getGroupsByName($group_name);
+    unless ($group) {
+        print "Unknown group \"$group_name\"\n";
+        return;
+    }
+    my $active = $1 eq '+' ? 1 : 0;
+    $configuration = $2;
+    unless ($configuration) {
+        print "Missing configuration\n";
+        return;
+    }
+    (my $conf) = getConfigurationsByName($configuration);
+    if ($conf) {
+        $conf->{active} = $active;
+        unless (removeGroupConfigurations($group, $conf)) {
+            print getLastError()."\n";
+            return;
+        }
+    } else {
+        print "No such configuration \"$configuration\"\n";
+        return;
+    }
+}
+
+sub rdc {
+    my $configuration = shift;
+    unless ($configuration) {
+        print "Missing configuration\n";
+        return;
+    }
+    if ($configuration !~ m,^([+-])(.*)$,) {
+        print "The configuration should be preceded with + or -\n";
+        return;
+    }
+    my $group = getDistributionGroup($distribution);
+    unless ($group) {
+        print "Unknown distribution \"$distribution\"\n";
+        return;
+    }
+    my $active = $1 eq '+' ? 1 : 0;
+    $configuration = $2;
+    unless ($configuration) {
+        print "Missing configuration\n";
+        return;
+    }
+    (my $conf) = getConfigurationsByName($configuration);
+    if ($conf) {
+        $conf->{active} = $active;
+        unless (removeGroupConfigurations($group, $conf)) {
+            print getLastError()."\n";
+            return;
+        }
+    } else {
+        print "No such configuration \"$configuration\"\n";
+        return;
+    }
+}
+
+sub rhc {
+    my $host = shift;
+    my $configuration = shift;
+    unless ($host) {
+        print "Missing host\n";
+        return;
+    }
+    unless ($configuration) {
+        print "Missing configuration\n";
+        return;
+    }
+    if ($configuration !~ m,^([+-])(.*)$,) {
+        print "The configuration should be preceded with + or -\n";
+        return;
+    }
+    my $group = getHostGroup($host);
+    unless ($group) {
+        print "Unknown host \"$host\"\n";
+        return;
+    }
+    my $active = $1 eq '+' ? 1 : 0;
+    $configuration = $2;
+    unless ($configuration) {
+        print "Missing configuration\n";
+        return;
+    }
+    (my $conf) = getConfigurationsByName($configuration);
+    if ($conf) {
+        $conf->{active} = $active;
+        unless (removeGroupConfigurations($group, $conf)) {
+            print getLastError()."\n";
+            return;
+        }
+    } else {
+        print "No such configuration \"$configuration\"\n";
+        return;
+    }
+}
+
+sub agc {
+    my $group_name = shift;
+    my $configuration = shift;
+    my $location = shift;
+    unless ($group_name) {
+        print "Missing group\n";
+        return;
+    }
+    unless ($configuration) {
+        print "Missing configuration\n";
+        return;
+    }
+    if ($configuration !~ m,^([+-])(.*)$,) {
+        print "The configurations should be preceded with + or -\n";
+        return;
+    }
+    my $active = $1 eq '+' ? 1 : 0;
+    $configuration = $2;
+    unless ($configuration) {
+        print "Missing configuration\n";
+        return;
+    }
+    (my $group) = getGroupsByName($group_name);
+    unless ($group) {
+        print "unknown group \"$group_name\"\n";
+        return;
+    }
+    (my $conf) = getConfigurationsByName($configuration);
+    if ($conf) {
+        $conf->{active} = $active;
+        unless (addGroupConfiguration($group, $conf, $location)) {
+            print getLastError()."\n";
+            return;
+        }
+    } else {
+        print "No such configuration \"$configuration\"\n";
+        return;
+    }
+}
+
+sub adc {
+    my $configuration = shift;
+    my $location = shift;
+    unless ($configuration) {
+        print "Missing configurations\n";
+        return;
+    }
+    if ($configuration !~ m,^([+-])(.*)$,) {
+        print "The configurations should be preceded with + or -\n";
+        return;
+    }
+    my $active = $1 eq '+' ? 1 : 0;
+    $configuration = $2;
+    unless ($configuration) {
+        print "Missing configuration\n";
+        return;
+    }
+    my $group = getDistributionGroup($distribution);
+    unless ($group) {
+        print "unknown distribution \"$distribution\"\n";
+        return;
+    }
+    (my $conf) = getConfigurationsByName($configuration);
+    if ($conf) {
+        $conf->{active} = $active;
+        unless (addGroupConfiguration($group, $conf, $location)) {
+            print getLastError()."\n";
+            return;
+        }
+    } else {
+        print "No such configuration \"$configuration\"\n";
+        return;
+    }
+}
+
+sub ahc {
+    my $host = shift;
+    my $configuration = shift;
+    my $location = shift;
+    unless ($host) {
+        print "Missing host\n";
+        return;
+    }
+    unless ($configuration) {
+        print "Missing configurations\n";
+        return;
+    }
+    if ($configuration !~ m,^([+-])(.*)$,) {
+        print "The configurations should be preceded with + or -\n";
+        return;
+    }
+    my $active = $1 eq '+' ? 1 : 0;
+    $configuration = $2;
+    unless ($configuration) {
+        print "Missing configuration\n";
+        return;
+    }
+    my $group = getHostGroup($host);
+    unless ($group) {
+        print "unknown host \"$host\"\n";
+        return;
+    }
+    (my $conf) = getConfigurationsByName($configuration);
+    if ($conf) {
+        $conf->{active} = $active;
+        unless (addGroupConfiguration($group, $conf, $location)) {
+            print getLastError()."\n";
+            return;
+        }
+    } else {
+        print "No such configuration \"$configuration\"\n";
+        return;
+    }
+}
+
+sub gdc {
+    my $dist = shift;
+    $dist = $distribution unless $dist;
+    if (my $group = getDistributionGroup($dist)) {
+        my @configurations = getGroupsConfigurations($group);
+        if (@configurations and not defined $configurations[0]) {
+            print getLastError()."\n";
+            return;
+        } else {
+            print join "\n", map {($_->{active} ?  "+" : "-").$_->{name}} @configurations;
+            print "\n";
+        }
+    } else {
+        print "No such distribution \"$dist\"\n";
+        return;
+    }
+}
+
+sub ghc {
+    my $host = shift;
+    unless ($host) {
+        print "Missing host\n";
+        return;
+    }
+    if (my $group = getHostGroup($host)) {
+        my @configurations = getGroupsConfigurations($group);
+        if (@configurations and not defined $configurations[0]) {
+            print getLastError()."\n";
+            return;
+        } else {
+            print join "\n", map {($_->{active} ?  "+" : "-").$_->{name}} @configurations;
+            print "\n";
+        }
+    } else {
+        print "No such host \"$host\"\n";
+        return;
+    }
+}
+
+sub ggc {
+    my $group_name = shift;
+    unless ($group_name) {
+        print "Missing group\n";
+        return;
+    }
+    my @groups_names = splitData($group_name);
+    (my $groupg) = getGroupsByName($group_name);
+    unless ($groupg) {
+        print "No such group \"$group_name\"\n";
+        return;
+    }
+    my @groups = getGroupsByName(@groups_names);
+    foreach my $group (@groups) {
+        print "$group->{name}:\n";
+        my @configurations = getGroupsConfigurations($group);
+        if (@configurations and not defined $configurations[0]) {
+            print getLastError()."\n";
+            return;
+        } else {
+            if (@configurations) {
+                print "  ";
+                print join "\n  ", map {($_->{active} ?  "+" : "-").$_->{name}} @configurations;
+                print "\n";
+            }
+            print "\n";
+        }
+    }
+}
+
+sub agg {
+    my $group1 = shift;
+    my $group2 = shift;
+    my $location = shift;
+    unless ($group1) {
+        print "Missing group1\n";
+        return;
+    }
+    unless ($group2) {
+        print "Missing group2\n";
+        return;
+    }
+    (my $groupGroup) = getGroupsByName($group1);
+    if ($groupGroup) {
+        unless (addGroupGroup($groupGroup, $group2, $location)) {
+            print getLastError()."\n";
+            return;
+        }
+    } else {
+        print "No such group \"$group1\"\n";
+        return;
+    }
+}
+
+sub rgg {
+    my $group1 = shift;
+    my $group2 = shift;
+    unless ($group1) {
+        print "Missing group1\n";
+        return;
+    }
+    unless ($group2) {
+        print "Missing group2\n";
+        return;
+    }
+    (my $groupGroup) = getGroupsByName($group1);
+    if ($groupGroup) {
+        unless (removeGroupGroups($groupGroup, $group2)) {
+            print getLastError()."\n";
+            return;
+        }
+    } else {
+        print "No such group \"$group1\"\n";
+        return;
+    }
+}
+
+sub adg {
+    my $group = shift;
+    my $location = shift;
+    unless ($group) {
+        print "Missing group\n";
+        return;
+    }
+    if (my $distributionGroup = getDistributionGroup($distribution)) {
+        unless (addGroupGroup($distributionGroup, $group, $location)) {
+            print getLastError()."\n";
+            return;
+        }
+    } else {
+        print "No such distribution \"$distribution\"\n";
+        return;
+    }
+}
+
+sub rdg {
+    my $group = shift;
+    unless ($group) {
+        print "Missing group\n";
+        return;
+    }
+    if (my $distributionGroup = getDistributionGroup($distribution)) {
+        unless (removeGroupGroups($distributionGroup, $group)) {
+            print getLastError()."\n";
+            return;
+        }
+    } else {
+        print "No such host \"$distribution\"\n";
+        return;
+    }
+}
+
+sub ahg {
+    my $host = shift;
+    my $group = shift;
+    my $location = shift;
+    unless ($host) {
+        print "Missing host\n";
+        return;
+    }
+    unless ($group) {
+        print "Missing group\n";
+        return;
+    }
+    if (my $hostGroup = getHostGroup($host)) {
+        unless (addGroupGroup($hostGroup, $group, $location)) {
+            print getLastError()."\n";
+            return;
+        }
+    } else {
+        print "No such host \"$host\"\n";
+        return;
+    }
+}
+
+sub rhg {
+    my $host = shift;
+    my $group = shift;
+    unless ($host) {
+        print "Missing host\n";
+        return;
+    }
+    unless ($group) {
+        print "Missing group\n";
+        return;
+    }
+    if (my $hostGroup = getHostGroup($host)) {
+        unless (grep {$_->{name} eq "$group"} getGroupGroups($hostGroup)) {
+            print "\"$host\" doesn't have the group \"$group\"\n";
+            return;
+        }
+        unless (removeGroupGroups($hostGroup, $group)) {
+            print getLastError()."\n";
+            return;
+        }
+    } else {
+        print "No such host \"$host\"\n";
+        return;
+    }
+}
+
+sub gdg {
+    my $dist = shift;
+    $dist = $distribution unless $dist;
+    if (my $group = getDistributionGroup($dist)) {
+        my @groups = getGroupGroups($group);
+        if (@groups and not defined $groups[0]) {
+            print getLastError()."\n";
+            return;
+        } else {
+            print join "\n", map {$_->{name}} @groups;
+            print "\n";
+        }
+    } else {
+        print "No such distribution \"$dist\"\n";
+        return;
+    }
+}
+
+sub ggg {
+    my $group_name = shift;
+    unless ($group_name) {
+        print "Missing group\n";
+        return;
+    }
+    (my $group) = getGroupsByName($group_name);
+    if ($group) {
+        my @groups = getGroupGroups($group);
+        if (@groups and not defined $groups[0]) {
+            print getLastError()."\n";
+            return;
+        } else {
+            print join "\n", map {$_->{name}} @groups;
+            print "\n";
+        }
+    } else {
+        print "No such group \"$group_name\"\n";
+        return;
+    }
+}
+
+sub ghg {
+    my $host = shift;
+    unless ($host) {
+        print "Missing host\n";
+        return;
+    }
+    if (my $group = getHostGroup($host)) {
+        my @groups = getGroupGroups($group);
+        if (@groups and not defined $groups[0]) {
+            print getLastError()."\n";
+            return;
+        } else {
+            print join "\n", map {$_->{name}} @groups;
+            print "\n";
+        }
+    } else {
+        print "No such host \"$host\"\n";
+        return;
+    }
+}
+
+sub createToken {
+    my $group = shift;
+    print "type ([static], dynamic, regexp): ";
+    my $type = <>;
+    chomp($type);
+    $type = lc($type);
+    $type = "static" unless $type;
+    if ($type !~ m/^static|dynamic|regexp$/) {
+        print "Unknown type\n";
+        return;
+    }
+    print "key: ";
+    my $key = <>;
+    my $value;
+    if ($key =~ m/=/) {
+        ($key, $value) = $key =~ m/^([^=]+)=(.*)$/s;
+        while ($value !~ m/;\n$/) {
+            $value .= <>;
+        }
+    } else {
+        print "value (end with ;): ";
+        $value = "";
+        do {
+            $value .= <>;
+        } until ($value =~ m/;\n$/);
+    }
+    chomp($key);
+    $value =~ s/;\n$//;
+    unless (addTokens({"$key" => {key => $key, value => $value, raw => $value, type => $type}}, $group)) {
+        print getLastError()."\n";
+    }   
+}
+
+sub act {
+    my $configuration = shift;
+    unless ($configuration) {
+        print "Missing configuration\n";
+        return;
+    }
+    if ((my $group) = getConfigurationsByName($configuration)) {
+        ($group) = grep {$_->{name} eq $configuration} getCompleteConfigurations([$group], $distribution);
+        createToken($group);
+    } else {
+        print "Configuration \"$configuration\" does no exist\n";
+    }
+}
+
+sub rct {
+    my $configuration = shift;
+    my $token = shift;
+    unless ($configuration) {
+        print "Missing configuration\n";
+        return;
+    }
+    unless ($token) {
+        print "Missing token\n";
+        return;
+    }
+    if ((my $group) = getConfigurationsByName($configuration)) {
+        ($group) = grep {$_->{name} eq $configuration} getCompleteConfigurations([$group], $distribution);
+        unless (removeTokens([$token], $group)) {
+            print getLastError()."\n";
+        }
+    } else {
+        print "Configuration \"$configuration\" does not exist\n";
+    }
+}
+
+sub agt {
+    my $groupName = shift;
+    unless ($groupName) {
+        print "Missing group\n";
+        return;
+    }
+    if ((my $group) = getGroupsByName($groupName)) {
+        createToken($group);
+    } else {
+        print "Group \"$groupName\" does not exist\n";
+    }
+}
+
+sub rgt {
+    my $groupName = shift;
+    my $token = shift;
+    unless ($groupName) {
+        print "Missing group\n";
+        return;
+    }
+    unless ($token) {
+        print "Missing token\n";
+        return;
+    }
+    if ((my $group) = getGroupsByName($groupName)) {
+        unless (removeTokens([$token], $group)) {
+            print getLastError()."\n";
+        }
+    } else {
+        print "Group \"$groupName\" does not exist\n";
+    }
+}
+
+sub aht {
+    my $host = shift;
+    unless ($host) {
+        print "Missing host\n";
+        return;
+    }
+    if (my $group = getHostGroup($host)) {
+        createToken($group);
+    } else {
+        print "Host \"$host\" doesn't exist\n";
+    }
+}
+
+sub rht {
+    my $host = shift;
+    my $token = shift;
+    unless ($host) {
+        print "Missing host\n";
+        return;
+    }
+    unless ($token) {
+        print "Missing token\n";
+        return;
+    }
+    if (my $group = getHostGroup($host)) {
+        unless (removeTokens([$token], $group)) {
+            print getLastError()."\n";
+        }
+    } else {
+        print "Host \"$host\" does not exist\n";
+    }
+}
+
+sub adt {
+    my $dist = $distribution;
+    $dist = $_[0] if $_[0];
+    if (my $group = getDistributionGroup($dist)) {
+        createToken($group);
+    } else {
+        print getLastError()."\n";
+    }
+}
+
+sub rdt {
+    my $dist = $distribution;
+    $dist = shift if $_[1];
+    my $token = shift;
+    unless ($token) {
+        print "Missing token\n";
+        return;
+    }
+    if (my $group = getDistributionGroup($distribution)) {
+        unless (removeTokens([$token], $group)) {
+            print getLastError()."\n";
+        }
+    } else {
+        print getLastError()."\n";
+    }
+}
+
+sub printgctokens {
+    if (my $tokens = getRawTokens($_[0])) {
+        my %tokens = %$tokens;
+        foreach my $type ("static", "dynamic", "regexp") {
+            my @tokens = grep {$_->{type} eq $type} values %tokens;
+            if (@tokens) {
+                print "- $type:\n";
+                print join "\n", map "     $_->{key}=$_->{raw}", sort {$a->{key} cmp $b->{key}} @tokens;
+                print "\n";
+            }
+        }
+    } else {
+        print getLastError()."\n";
+    }
+}
+
+sub gct {
+    if ($_[0]) {
+        my @configurations = getCompleteConfigurations([getConfigurationsByName($_[0])], $distribution);
+        (my $configuration) = grep {$_->{name} eq $_[0]} @configurations;
+        if ($configuration) {
+            printgctokens($configuration);
+        } else {
+            print "Unknown configuration \"$_[0]\"\n";
+        }
+    } else {
+        print "Missing configuration\n";
+    }
+}
+
+sub ggt {
+    if ($_[0]) {
+        (my $group) = getGroupsByName($_[0]);
+        if ($group) {
+            printgctokens($group);
+        } else {
+            print "Unknown group \"$_[0]\"\n";
+        }
+    } else {
+        print "Missing group\n";
+    }
+}
+
+sub gdt {
+    my $dist = $distribution;
+    if ($_[0]) {
+        $dist = shift;
+    }
+    if ($dist) {
+        my $group = getDistributionGroup($dist);
+        if ($group) {
+            printgctokens($group);
+        } else {
+            print "Unknown distribution \"$distribution\"\n";
+        }
+    } else {
+        print "distribution not set\n";
+    }
+}
+
+sub ght {
+    if ($_[0]) {
+        my $host = getHostGroup($_[0]);
+        if ($host) {
+            printgctokens($host);
+        } else {
+            print "Unknown host \"$_[0]\"\n";
+        }
+    } else {
+        print "Missing host\n";
+    }
+}
+
+sub gac {
+    unless ($distribution) {
+        print "distribution not set\n";
+        return;
+    }
+    my @configurations = getAllConfigurations($distribution);
+    if (@configurations and not defined $configurations[0]) {
+        print getLastError()."\n";
+    } else {
+        if ($_[0]) {
+            my $regexp = qr/$_[0]/;
+            @configurations = grep {$_ =~ m/$regexp/} @configurations;
+        }
+        print join "\n", @configurations;
+        print "\n";
+    }
+}
+
+sub ac {
+    unless ($distribution) {
+        print "distribution not set\n";
+        return;
+    }
+    print getLastError()."\n" unless addConfiguration($distribution, $_[0]);
+}
+
+sub rc {
+    unless ($distribution) {
+        print "distribution not set\n";
+        return;
+    }
+    print getLastError()."\n" unless removeConfiguration($distribution, $_[0]);
+}
+
+sub sd {
+    if ($_[0]) {
+        my @distributions = getAllDistributions();
+        if (@distributions and not defined $distributions[0]) {
+            print "Can't get distribution list: ".getLastError()."\n";
+        } else {
+            my %distributions = ();
+            @distributions{@distributions} = @distributions;
+            if ($distributions{$_[0]}) {
+                $distribution = $_[0];
+            } else {
+                print "No such distribution \"$_[0]\"\n";
+            }
+        }
+    } else {
+        print "Missing distribution\n";
+    }
+    print "Current distribution: $distribution\n";
+}
+
+sub setdb {
+    print getLastError()."\n" unless setDB(@_);
+    print "Current database: ".getDB()."\n";    
+}
+
+sub getdb {
+    print getDB()."\n";
+}
+
+sub gah {
+    my @hosts = getAllHosts();
+    if (@hosts and not defined $hosts[0]) {
+        print getLastError()."\n";
+    } else {
+        if ($_[0]) {
+            my $regexp = qr/$_[0]/;
+            @hosts = grep {$_ =~ m/$regexp/} @hosts;
+        }
+        print join "\n", @hosts;
+        print "\n";
+    }
+}
+
+sub ah {
+    my $host = shift;
+    fillDnsHostList() unless @dnsHostList;
+    if (@dnsHostList and not grep {$_ eq $host} @dnsHostList) {
+        print "Warning: I don't think that \"$host\" is in the DNS\n";
+    }
+    print getLastError()."\n" unless addHost($host);
+}
+
+sub rh {
+    print getLastError()."\n" unless removeHost($_[0]);
+}
+
+sub gag {
+    my @groups = getAllGroups();
+    if (@groups and not defined $groups[0]) {
+        print getLastError()."\n";
+    } else {
+        if ($_[0]) {
+            my $regexp = qr/$_[0]/;
+            @groups = grep {$_ =~ m/$regexp/} @groups;
+        }
+        #print join "\n", @groups;
+        #print "\n";
+        printTree(@groups);
+    }
+}
+
+sub ag {
+    print getLastError()."\n" unless addGroup($_[0]);
+}
+
+sub rg {
+    print getLastError()."\n" unless removeGroup($_[0]);
+}
+
+sub gad {
+    my @distributions = getAllDistributions();
+    if (@distributions and not defined $distributions[0]) {
+        print getLastError()."\n";
+    } else {
+        @distributions = map {$distribution eq $_ ? "(*) $_" : "    $_"} @distributions;
+        print join "\n", @distributions;
+        print "\n";
+    }
+}
+
+sub ad {
+    print getLastError()."\n" unless addDistribution($_[0]);
+}
+
+sub rd {
+    print getLastError()."\n" unless removeDistribution($_[0]);
+}
+
+sub syncctl {
+    my $db1;
+    my $db2;
+    my @db1params = ();
+    my @db2params = ();
+    print "sync from <db> [<params...>]: ";
+    my $line = <>;
+    chomp($line);
+    return unless $line;
+    $line = "setdb $line";
+    (my $command, $db1, @db1params) = parseline($line);
+    print "sync to <db> [<params...>]: ";
+    $line = <>;
+    return unless $line;
+    chomp($line);
+    $line = "setdb $line";
+    ($command, $db2, @db2params) = parseline($line);
+
+    print "sync failed: ".syncError()."\n" unless sync($db1, [@db1params], $db2, [@db2params]);
+}
+
+sub parseline {
+    my $line = shift;
+    $line =~ s/\s+/ /g;
+    $line =~ s/^\s*//;
+    $line =~ s/\s*$//;
+    (my $command, my @params) = split / /, $line;
+    $command = lc($command);
+    $command = " " unless $command;
+    while (not $commandMap{$command} or not $commands{$commandMap{$command}}) {
+        if (@params) {
+            $command .= lc(shift @params);
+        } else {
+            $command = "badcommandorfilename";
+        }
+    }
+    return $command, @params
+}
+
+###
+#   readline stuff
+###
+
+my @currentCompletionList = ();
+my $currentCommand = "";
+
+# complete database
+sub database_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = " ";
+        @currentCompletionList = grep {index($_, $text) == 0} qw(fs sql);
+    }
+    return $currentCompletionList[$count];
+}
+
+# completes last group configurations, assumes last word was a group
+sub group_configurations_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = " ";
+        @currentCompletionList = ();
+        my $group_name = (split(/\s+/, $currentCommand))[-1];
+        return () unless $group_name;
+        (my $group) = getGroupsByName($group_name);
+        return () unless $group;
+        my @confs = getGroupsConfigurations($group);
+        return () if (@confs and not defined $confs[0]);
+        @currentCompletionList = grep {index($_, $text) == 0} map {($_->{active} ?  "+" : "-").$_->{name}} @confs;
+    }
+    return $currentCompletionList[$count];
+}
+
+# completes current distribution configurations
+sub distribution_configurations_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = " ";
+        @currentCompletionList = ();
+        my $group = getDistributionGroup($distribution);
+        return () unless $group;
+        my @confs = getGroupsConfigurations($group);
+        return () if (@confs and not defined $confs[0]);
+        @currentCompletionList = grep {index($_, $text) == 0} map {($_->{active} ?  "+" : "-").$_->{name}} @confs;
+    }
+    return $currentCompletionList[$count];
+}
+
+# completes host configuration, assumes last word was host
+sub host_configurations_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = " ";
+        @currentCompletionList = ();
+        my $host = (split(/\s+/, $currentCommand))[-1];
+        return () unless $host;
+        my $group = getHostGroup($host);
+        return () unless $group;        
+        my @confs = getGroupsConfigurations($group);
+        return () if (@confs and not defined $confs[0]);
+        @currentCompletionList = grep {index($_, $text) == 0} map {($_->{active} ?  "+" : "-").$_->{name}} @confs;
+    }
+    return $currentCompletionList[$count];
+
+}
+
+# completes singed configuration
+sub sign_configuration_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        @currentCompletionList = ();
+        if (length($text) < 2) {
+            $attribs->{completion_append_character} = "";
+            @currentCompletionList = grep {index($_, $text) == 0} qw(+/ -/);
+        } else {
+            return () unless $text =~ m,^([+-])(/.*),;
+            my $sign = $1;
+            my $conf = $2;
+            configuration_completion($conf, 0);
+            @currentCompletionList = map {"$sign$_"} @currentCompletionList;
+        }
+    }
+    return $currentCompletionList[$count];
+}
+
+# completes groups for host, assumes last word was a host
+sub host_groups_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = " ";
+        @currentCompletionList = ();
+        my $host = (split(/\s+/, $currentCommand))[-1];
+        return () unless $host;        
+        my $group = getHostGroup($host);
+        return () unless $group;
+        my @groups = getGroupGroups($group);
+        return () if (@groups and not defined $groups[0]);
+        @currentCompletionList = grep {index($_, $text) == 0} map {$_->{name}} @groups;
+    }
+    return $currentCompletionList[$count];
+}
+
+# copmletes tokens for last host, assumes last word is a host
+sub host_tokens_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = " ";
+        @currentCompletionList = ();
+        my $host = (split(/\s+/, $currentCommand))[-1];
+        return () unless $host;
+        my $group = getHostGroup($host);
+        return () unless $group;
+        my $tokens = getRawTokens($group);
+        my @tokens = keys %$tokens;
+        @currentCompletionList = grep {index($_, $text) == 0} @tokens;
+    }
+    return $currentCompletionList[$count];
+}
+
+# completes tokens for last group, assumes last word is a group
+sub group_tokens_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = " ";
+        @currentCompletionList = ();
+        my $group_name = (split(/\s+/, $currentCommand))[-1];
+        return () unless $group_name;
+        (my $group) = getGroupsByName($group_name);
+        return () unless $group;
+        my $tokens = getRawTokens($group);
+        my @tokens = keys %$tokens;
+        @currentCompletionList = grep {index($_, $text) == 0} @tokens;
+    }
+    return $currentCompletionList[$count];
+}
+
+# completes distributions and tokens for current distribution
+sub distribution_and_tokens_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = " ";
+        distribution_completion($text, 0);
+        my @temp = @currentCompletionList;
+        my $temp = $currentCommand;
+        $currentCommand = $distribution;
+        distribution_tokens_completion($text, 0);
+        $currentCommand = $temp;
+        push @currentCompletionList, @temp;
+    }
+    return $currentCompletionList[$count];
+}
+
+# copmletes tokens for last distribution, assumes last word is a distribution
+sub distribution_tokens_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = " ";
+        @currentCompletionList = ();
+        my $dist_name = (split(/\s+/, $currentCommand))[-1];
+        return () unless $dist_name;
+        my $dist = getDistributionGroup($dist_name);
+        return () unless $dist;
+        my $tokens = getRawTokens($dist);
+        my @tokens = keys %$tokens;
+        @currentCompletionList = grep {index($_, $text) == 0} @tokens;
+    }
+    return $currentCompletionList[$count];
+}
+
+# copmletes tokens for last configuration, assumes last word is a configuration
+sub configuration_tokens_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = " ";
+        @currentCompletionList = ();
+        my $conf_name = (split(/\s+/, $currentCommand))[-1];
+        return () unless $conf_name;
+        (my $configuration) = grep {$_->{name} eq $conf_name} (getCompleteConfigurations([getConfigurationsByName($conf_name)], $distribution));
+        return () unless $configuration;
+        my $tokens = getRawTokens($configuration);
+        my @tokens = keys %$tokens;
+        @currentCompletionList = grep {index($_, $text) == 0} @tokens;
+    }
+    return $currentCompletionList[$count];
+}
+
+# copmletes groups for last group, assumes last word is a group
+sub group_groups_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = " ";
+        @currentCompletionList = ();
+        my $group = (split(/\s+/, $currentCommand))[-1];
+        return () unless $group;
+        ($group) = getGroupsByName($group);
+        return () unless $group;
+        my @groups = getGroupGroups($group);
+        return () if (@groups and not defined $groups[0]);
+        @currentCompletionList = grep {index($_, $text) == 0} map {$_->{name}} @groups;
+    }
+    return $currentCompletionList[$count];
+}
+
+# completes groups for distributions
+sub distribution_groups_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = " ";
+        @currentCompletionList = ();
+        my $group = getDistributionGroup($distribution);
+        return () unless $group;
+        my @groups = getGroupGroups($group);
+        return () if (@groups and not defined $groups[0]);
+        @currentCompletionList = grep {index($_, $text) == 0} map {$_->{name}} @groups;        
+    }
+    return $currentCompletionList[$count];
+}
+
+# completes auto name, assume last word is configuration
+sub auto_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = " ";
+        @currentCompletionList = ();
+        my $configuration = (split(/\s+/, $currentCommand))[-1];
+        $echooff = 1;
+        (my @autos) = localgetautos($configuration);
+        $echooff = 0;
+        return () unless (@autos and $autos[0]);
+        @autos = map {$_->{name}} @autos;
+        @currentCompletionList = grep {index($_, $text) == 0} @autos;
+    }
+    return $currentCompletionList[$count];
+}
+
+# completes script name, assume last word is stage, and before that the configuration
+sub script_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = " ";
+        @currentCompletionList = ();
+        (my $configuration, my $stage) = (split(/\s+/, $currentCommand))[-2..-1];
+        return () unless $configuration and $stage;
+        $echooff = 1;
+        (my @scripts) = localgetscripts($configuration);
+        $echooff = 0;
+        return () unless (@scripts and $scripts[0]);        
+        @scripts = map {$_->{name}} grep {$_->{stage} eq $stage} @scripts;
+        @currentCompletionList = grep {index($_, $text) == 0} @scripts;
+    }
+    return $currentCompletionList[$count];
+}
+
+# completes template name, assume last word is stage, and before that the configuration
+sub template_completion {
+    my ($text, $count) =@_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = " ";
+        @currentCompletionList = ();
+        (my $configuration, my $stage) = (split(/\s+/, $currentCommand))[-2..-1];
+        return () unless $configuration and $stage;
+        $echooff = 1;
+        (my @templates) = localgettemplates($configuration);
+        $echooff = 0;
+        return () unless (@templates and $templates[0]);
+        @templates = map {$_->{destination}} grep {$_->{stage} eq $stage} @templates;
+        @currentCompletionList = grep {index($_, $text) == 0} @templates;
+    }
+    return $currentCompletionList[$count];
+}
+
+# complete stage for known scripts, assume last word is a configuration
+sub script_stage_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = " "; 
+        my $configuration = (split(/\s+/, $currentCommand))[-1];
+        return () unless $configuration;
+        $echooff = 1;
+        (my @scripts) = localgetscripts($configuration);
+        $echooff = 0;
+        return () unless (@scripts and $scripts[0]);
+        my @stages = map {$_->{stage}} @scripts;
+        my %stages;
+        @stages{@stages} = @stages;
+        @stages = sort {$a eq $b ? 0 :
+                          $a eq "auto" ? -1 : $b eq "auto" ? 1 :
+                            $a eq "mount" ? -1 : $b eq "mount" ? 1 :
+                              $a eq "sysinit" ? -1 : 1
+                          } keys %stages;
+        @currentCompletionList = grep {index($_, $text) == 0} @stages;
+    }
+    return $currentCompletionList[$count];
+}
+
+# complete stage for known templates, assume last word is a configuration
+sub template_stage_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = " "; 
+        my $configuration = (split(/\s+/, $currentCommand))[-1];
+        return () unless $configuration;
+        $echooff = 1;
+        (my @templates) = localgettemplates($configuration);
+        $echooff = 0;
+        return () unless (@templates and $templates[0]);
+        my @stages = map {$_->{stage}} @templates;
+        my %stages;
+        @stages{@stages} = @stages;
+        @stages = sort {$a eq $b ? 0 :
+                          $a eq "auto" ? -1 : $b eq "auto" ? 1 :
+                            $a eq "mount" ? -1 : $b eq "mount" ? 1 :
+                              $a eq "sysinit" ? -1 : 1
+                          } keys %stages;
+        
+        @currentCompletionList = grep {index($_, $text) == 0} @stages;
+    }
+    return $currentCompletionList[$count];
+}
+
+# complete stage
+sub stage_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = " ";
+        @currentCompletionList = grep {index($_, $text) == 0} qw(auto mount sysinit final);
+    }
+    return $currentCompletionList[$count];
+}
+
+# complete mount, assumes last word was configuration
+sub mount_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        @currentCompletionList = ();
+        $attribs->{completion_append_character} = " ";
+        my $configuration = (split(/\s+/, $currentCommand))[-1];
+        return () unless $configuration;
+        (my $conf) = getConfigurationsByName($configuration);
+        return () unless $conf;
+        ($conf) = grep {$_->{name} eq $configuration} getCompleteConfigurations([$conf], $distribution);
+        return () unless $conf;
+        my @mounts = getRawMounts($conf);
+        return () if @mounts and not defined $mounts[0];
+
+        @currentCompletionList = map {($_->{active} ?  "+" : "-").$_->{destination}} @mounts;
+        @currentCompletionList = grep {index($_, $text) == 0} @currentCompletionList;
+    }
+    return $currentCompletionList[$count];
+}
+
+# keep only 1 depth of directory
+# input: current text, list to modify
+# output: modified list
+sub dir_completion_helper {
+    my $text = shift;
+    my @list = @_;
+    $text = "/" unless $text;
+    (my $basedir, my $filename) = $text =~ m,^(.*?/)([^/]+)?$,;
+    return () unless $basedir;
+    unless ($filename) {
+        return grep {$_ =~ m,^${basedir}[^/]*$,} @list;
+    }
+    return grep {$_ =~ m,^${basedir}${filename}(?:(?:[^/]*)|(?:/[^/]*))$,} @list;
+}
+
+# complete a signed directory
+sub sign_dir_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = "";
+        @currentCompletionList = ();
+        if (length($text) < 2) {
+            @currentCompletionList = grep {index($_, $text) == 0} qw(+/ -/);
+        } else {
+            (my $sign, my $halfdir) = $text =~ m,^([+-])(/.*)$,;
+            return () unless $sign and $halfdir;
+            (my $dir) = $halfdir =~ m,^(.*?/)(?:[^/]+)?$,;
+            opendir(DIR, $dir);
+            (my @dirs) = grep {$_ ne "." and $_ ne ".." and -d "$dir/$_"} readdir(DIR);
+            @dirs = map {fixPath("$dir/$_")} @dirs;
+            close(DIR);
+            @dirs = grep {index($_, $halfdir) == 0} @dirs;
+            @currentCompletionList = map {fixPath("$sign/$_")} @dirs;
+        }
+    }
+    return $currentCompletionList[$count];
+}
+
+# complete the command name
+sub command_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = " ";
+        @currentCompletionList = grep {index($_, $text) == 0} (keys %commandMap)
+    }
+    return $currentCompletionList[$count];
+}
+
+# complete help topics
+sub help_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = " ";
+        @currentCompletionList = grep {index($_, $text) == 0} qw(all distributions hosts groups configurations others);
+        push @currentCompletionList, grep {index($_, $text) == 0} (keys %commandMap);
+    }
+    return $currentCompletionList[$count];
+}
+
+# complete configurations
+sub configuration_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = " ";
+        @currentCompletionList = ();
+        unless ($distribution) {
+            return ();
+        }
+        my @configurations = getAllConfigurations($distribution);
+        if (@configurations and not defined $configurations[0]) {
+            return ();
+        } else {
+            @configurations = grep {index($_, $text) == 0} @configurations;
+        }
+        @currentCompletionList = dir_completion_helper($text, @configurations);
+        $attribs->{completion_append_character} = "" if ($#currentCompletionList != $#configurations);
+    }
+    return $currentCompletionList[$count];
+}
+
+# complete groups
+sub group_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = " ";
+        @currentCompletionList = ();
+        my @groups = getAllGroups();
+        if (@groups and not defined $groups[0]) {
+            return ();
+        } else {
+            @groups = grep {index($_, $text) == 0} @groups;
+        }
+        @currentCompletionList = dir_completion_helper($text, @groups);
+        $attribs->{completion_append_character} = "" if ($#currentCompletionList != $#groups);
+    }
+    return $currentCompletionList[$count];
+}
+
+# complete unknown hosts
+sub new_host_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = " ";
+        fillDnsHostList() unless @dnsHostList;
+        my @hosts = getAllHosts();
+        if (@hosts and not defined $hosts[0]) {
+            return ();
+        }
+        my %hosts = ();
+        @hosts{@dnsHostList} = @dnsHostList;
+        delete @hosts{@hosts};
+        @hosts = keys %hosts;
+        #@hosts = grep {my $a = $_; not grep {$a eq $_} @hosts} @dnsHostList;
+        @currentCompletionList = grep {index($_, $text) == 0} @hosts;
+    }
+    return $currentCompletionList[$count];
+}
+
+# complete hosts
+sub host_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = " ";
+        @currentCompletionList = ();
+        my @hosts = getAllHosts();
+        if (@hosts and not defined $hosts[0]) {
+            return ();
+        } else {
+            @hosts = grep {index($_, $text) == 0} @hosts;
+        }
+        @currentCompletionList = @hosts;
+    }
+
+    return $currentCompletionList[$count];
+}
+
+# complete distribution
+sub distribution_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = " ";
+        @currentCompletionList = ();
+        my @distributions = getAllDistributions();
+        if (@distributions and not defined $distributions[0]) {
+            return ();
+        }
+        @currentCompletionList = grep {index($_, $text) == 0} @distributions;
+    }
+
+    return $currentCompletionList[$count];
+}
+
+sub attempted_completion {
+    my ($text, $line, $start, $end) = @_;
+    $currentCommand = substr($line, 0, $start);
+    if (substr($line, 0, $start) =~ /^\s*$/) {
+        return $input->completion_matches($text, \&command_completion);
+    } else {
+        my $parameter = substr($line, 0, $start) =~ s/((^|\s)\S)/$1/g;
+        $parameter--;
+        (my $command) = $line =~ m/^\s*(\S+)/;
+        $command = $commandMap{$command};
+        if ($command) {
+            my $completions = $commandCompletionMap{$command};
+            if ($completions and $completions->[$parameter]) {
+                return $input->completion_matches($text, $completions->[$parameter]);
+            } else {
+                return ();
+            }
+        }
+    }
+}
+
+
+###
+#   main
+###
+
+$ENV{ANSI_COLORS_DISABLED} = 1;
+while (my $arg = shift @ARGV) {
+    delete $ENV{ANSI_COLORS_DISABLED} if ($arg eq '--color');
+    if ($arg eq '-c') {
+        $singleCommand = join (" ", @ARGV);
+        @ARGV = ();
+        last;
+    }
+}
+
+if (-r "/etc/staple/distribution") {
+    open(FILE, "/etc/staple/distribution");
+    my $dist = <FILE>;
+    close(FILE);
+    chomp $dist;
+    $distribution = $dist;
+} elsif (-r "/proc/cmdline") {
+    open(FILE, "/proc/cmdline");
+    my $cmdline = <FILE>;
+    close(FILE);
+    $cmdline =~ s!^nfsroot=[^\s]*?/distributions/(.*?)\s.*$!$1!;
+    if ($cmdline) {
+        chomp $cmdline;
+        $distribution = $cmdline;
+    }
+}
+
+if ($singleCommand) {
+    (my $command, my @params) = parseline($singleCommand);
+    if (grep {$_ eq $command} @singleCommandCommands) {
+        $commands{$commandMap{$command}}(@params);
+    } else {
+        print "\"$command\" can't be executed as a single command (yet)\n";
+        exit 1;
+    }
+} else {
+    print "Staple version: $Staple::VERSION\n";
+    print "Starting with distribution:  $distribution\n" if ($distribution);
+    print "Starting with database: ".getDB()."\n";
+
+    # set up readline
+    $input = new Term::ReadLine 'staplectl';
+    $attribs = $input->Attribs;
+    if ($ENV{ANSI_COLORS_DISABLED}) {
+        $attribs->{term_set}->[0] = '';
+        $attribs->{term_set}->[1] = '';
+    } else {
+        $attribs->{term_set}->[0] = '[32;1m';
+        $attribs->{term_set}->[1] = '[0m';
+    }
+    $attribs->{completion_entry_function} = sub {return ()};
+    $attribs->{attempted_completion_function} = \&attempted_completion;
+
+    # main loop
+    while (1) {
+        my $line = $input->readline("($distribution) staplectl> ");
+        next unless $line;
+        chomp($line);
+        (my $command, my @params) = parseline($line);
+        $commands{$commandMap{$command}}(@params);
+    }
+}
+
+quit;
+
+exit 0;
