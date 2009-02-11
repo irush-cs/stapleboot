@@ -91,14 +91,29 @@ sub mail {
         (my $domain) = $res->searchlist;
         $host = "$host.".$domain;
     }
+    my $db = getDB();
+    if (index($db, "fs ") == 0) {
+        my $fs = (split /\s/,$db)[1];
+        if (-r "/proc/mounts" and open(PROC, "/proc/mounts")) {
+            my @mounts = <PROC>;
+            close(PROC);
+            ($fs) = (grep {(split /\s/,$_)[1] eq $fs} @mounts);
+            $db = $db." (".(split /\s/,$fs)[0].")";
+        }
+    }
+    my $prefix = "Staple version: $VERSION\n";
+    $prefix .= "Staple database: $db\n";
+    $prefix .= "Distribution: $self->{distribution}\n";
+    $prefix .= "Kernel: ".`uname -smr`;
+    $prefix .= "\n";
+    $prefix .= "=" x 77;
+    $body = $prefix."\n\n".$body;
     my %mail = (
                 subject => "$self->{host}: $subject",
                 to      => $self->{mailto},
                 from    => "stapleboot on $self->{host} <root\@$host>",
                 Smtp    => $self->{smtpServer},
                 Message => $body,
-                'X-Staple-Version'      => $VERSION,
-                'X-Staple-Distribution' => $self->{distribution},
                );
     unless (sendmail(%mail)) {
         $self->error("Can't send mail to $self->{mailto}");

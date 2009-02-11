@@ -463,7 +463,7 @@ sub addTemplates {
                 push @errors, "can't copy \"$template->{source}\" to \"$path\"";
                 next;
             }
-        } elsif ($template->{data}) {
+        } else {
             unless (open(FILE, ">$path")) {
                 push @errors, "can't open \"$path\" for writing: $!";
                 next;
@@ -1075,9 +1075,11 @@ sub getConfigurationPath {
     my $configuration = shift;
     my $distribution = shift;
     my $force = shift;
+    my $path = $self->getDistributionPath($distribution,$force);
+    return undef unless $path;
     $configuration =~ s!^/!!;
     $configuration =~ s!/!/configurations/!g;
-    $configuration = fixPath("$self->{stapleDir}/configurations/${distribution}/${configuration}");
+    $configuration = fixPath("$path/confs/${configuration}");
     return $configuration if -d $configuration or $force;
     return undef;
 }

@@ -29,7 +29,7 @@ mount -n -o nolock,ro -t nfs $staplesrc $stapledir
 PERL5LIB=$stapledir/lib $stapledir/bin/stapleboot-dev
 
 if [ "$?" != "0" ]; then
-    echo "stapleboot failed, please notify system@cs"
+    echo "stapleboot failed, please notify the system administrator"
     echo "rebooting in 300 seconds..."
     sleep 300
     /sbin/reboot -f
