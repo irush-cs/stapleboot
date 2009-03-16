@@ -500,14 +500,32 @@ sub finalStage {
                 $boot->error($err);
                 $boot->addMail($err);
             } else {
+                my $db = getDB();
+                if (index($db, "fs ") == 0) {
+                    my $fs = (split /\s/,$db)[1];
+                    if (-r "/proc/mounts" and open(PROC, "/proc/mounts")) {
+                        my @mounts = <PROC>;
+                        close(PROC);
+                        ($fs) = (grep {(split /\s/,$_)[1] eq $fs} @mounts);
+                        $db = $db." (".(split /\s/,$fs)[0].")";
+                    }
+                }
                 print LOG "staple finished at: ".scalar(localtime(time))."\n";
-                print LOG "version: $Staple::VERSION\n";
                 print LOG "host name: $boot->{host}\n";
+                print LOG "staple version: $Staple::VERSION\n";
+                print LOG "staple database: $db\n";
                 print LOG "distribution: $boot->{distribution}\n";
+                print LOG "kernel: ".`uname -smr`;
                 print LOG "\ngroups:\n";
                 print LOG join "", map {"  $_->{name}\n"} @{$boot->{groups}};
                 print LOG "\nconfigurations:\n";
                 print LOG join "", map {"  $_->{name}\n"} @{$boot->{configurations}};
+                print LOG "\ntemplates:\n  ";
+                print LOG join "\n  ", @{$boot->{applied}->{templates}};
+                print LOG "\n";
+                print LOG "\nscripts:\n  ";
+                print LOG join "\n  ", @{$boot->{applied}->{scripts}};
+                print LOG "\n";
                 print LOG "\ntokens:\n";
                 my %tokens = %{$boot->{tokens}};
                 print LOG join "", map {"$_->{key}=$_->{value};\n"} @tokens{sort {$a cmp $b} keys %tokens};
