@@ -1161,6 +1161,10 @@ sub wht {
         return;
     }
     (my $groups, my $configurations) = whoHasToken($token, $dist);
+    if (not defined $groups) {
+        print getLastError()."\n";
+        return;
+    }
     foreach my $type ("host", "distribution", "group") {
         my @subset = grep {$_->{type} eq $type} @$groups;
         if (@subset) {

@@ -996,7 +996,8 @@ sub whoHasToken {
     return undef if (grep {not defined $_} @hosts);
 
     # distributions
-    $cmd = "find ".$self->{stapleDir}."/distributions -type f \\( -path \\*/tokens/static -o -path \\*/tokens/dynamic -o -path \\*/tokens/regexp \\) -print0 | xargs -0 grep -l '^".$key."='";
+    #$cmd = "find ".$self->{stapleDir}."/distributions -type f \\( -path \\*/tokens/static -o -path \\*/tokens/dynamic -o -path \\*/tokens/regexp \\) -print0 | xargs -0 grep -l '^".$key."='";
+    $cmd = "find ".$self->{stapleDir}."/distributions/*/tokens/{static,dynamic,regexp} -print0 2>/dev/null | xargs -0 grep -l '^".$key."='";
     my @distributions = `$cmd`;
     chomp @distributions;
     #if ($? >> 8) {
@@ -1020,10 +1021,9 @@ sub whoHasToken {
     @groups = map {$a = $_; $a =~ s,^$self->{stapleDir}/groups(/.+)/tokens/(?:static|dynamic|regexp)$,$1,; $a =~ s,/subgroups/,/,g; $a} @groups;
     @groups = $self->getGroupsByName(@groups);
     return undef if (grep {not defined $_} @groups);
-
     
     # configurations
-    $cmd = "find ".$self->{stapleDir}."/configurations/$distribution -type f \\( -path */tokens/static -o -path */tokens/dynamic -o -path */tokens/regexp \\) -print0 | xargs -0 grep -l '^".$key."='";
+    $cmd = "find ".$self->{stapleDir}."/distributions/$distribution/confs -type f \\( -path */tokens/static -o -path */tokens/dynamic -o -path */tokens/regexp \\) -print0 | xargs -0 grep -l '^".$key."='";
     my @configurations = `$cmd`;
     chomp @configurations;
     #if ($? >> 8) {
@@ -1033,9 +1033,10 @@ sub whoHasToken {
     
     @configurations = map {
         $a = $_;
-        $a =~ s,^$self->{stapleDir}/configurations/${distribution}(/.+)/tokens/(?:static|dynamic|regexp)$,$1,;
+        $a =~ s,^$self->{stapleDir}/distributions/${distribution}/confs(/.+)/tokens/(?:static|dynamic|regexp)$,$1,;
         $a =~ s,/configurations/,/,g;
         $a} @configurations;
+
     @configurations = map {{name => $_, path => undef, dist => undef, active => 1, group => undef}} @configurations;
     @configurations = $self->getFullConfigurations(\@configurations, $distribution);
     return undef if (grep {not defined $_} @configurations);
