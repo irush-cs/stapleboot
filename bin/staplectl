@@ -1028,7 +1028,7 @@ Other commands:
 ",
                    );
 
-my @singleCommandCommands = ("ahc", "rhc", "gag", "ghc", "wht", "whc", "whg", "ghi", "ggi", "gci", "bad", "badcommandorfilename");
+my @singleCommandCommands = ("ahc", "rhc", "gag", "ghc", "wht", "whc", "whg", "ghi", "ggi", "gci", "bad", "badcommandorfilename", "gt");
 
 sub help {
     my %topics = (a              => "helpall",
@@ -2017,7 +2017,7 @@ sub gts {
     }
 }
 
-# gt is greate than, for my quick search: sub qt {
+# gt is greate than, for my quick search: sub gt {
 sub gtm {
     (my @templates) = localgettemplates(@_);
     if (@templates and $templates[0]) {
