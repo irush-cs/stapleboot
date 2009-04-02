@@ -10,6 +10,10 @@ package Staple::Misc;
 use strict;
 use warnings;
 use IPC::Open3;
+use XML::Writer;
+use XML::Simple;
+use IO::File;
+use IO::String;
 require Exporter;
 
 
@@ -45,6 +49,14 @@ Staple::Misc module
 
 =item readTokensFile(full path, [type])
 
+=item writeTokensFile(full path, hash ref of tokens)
+
+=item readTokensXMLFile(full path)
+
+=item writeTokensXMLFile(full path, hash ref of tokens)
+
+=item tokensToXML(hash ref of tokens)
+
 =item getDistribution()
 
 =item runCommand(<command>)
@@ -65,6 +77,10 @@ our @EXPORT = qw(
                     applyTokens
                     stageCmp
                     readTokensFile
+                    writeTokensFile
+                    readTokensXMLFile
+                    writeTokensXMLFile
+                    tokensToXML
                     runCommand
                );
 our $VERSION = '002';
@@ -305,6 +321,100 @@ sub readTokensFile {
     }
     return %tokens;
 }
+
+=item B<writeTokensFile(I<full path, hash ref of tokens>)
+
+Writes the tokens to file. Returns 1 on success or undef on failure.
+
+=cut
+
+sub writeTokensFile {
+    my $file = shift;
+    my $tokens = shift;
+    return undef unless ($file and $tokens);
+    if (open(FILE, ">$file")) {
+        my $data = join "", map {"$_->{key}=$_->{raw};\n"} sort {$a->{key} cmp $b->{key}} values %$tokens;
+        print FILE $data;
+        close(FILE);
+        return 1;
+    }
+    return undef;
+}
+
+=item B<readTokensXMLFile(I<full path>)
+
+Returns a tokens hash, with value = raw if either is missing (though there
+shouldn't be raw in a file), and type = unknown if missing (though it should be
+in an xml file format). Returns undef on error.
+
+=cut
+
+sub readTokensXMLFile {
+    my $file = shift;
+    return undef unless $file;
+    my $tokens = XMLin($file, "keyattr" => {"token" => "+key"}, "forcearray" => ["token"]);
+    return undef unless $tokens;
+    $tokens = $tokens->{token};
+    foreach my $key (keys %{$tokens}) {
+        $tokens->{$key}->{raw} = $tokens->{$key}->{value} unless exists $tokens->{$key}->{raw};
+        $tokens->{$key}->{value} = $tokens->{$key}->{raw} unless exists $tokens->{$key}->{value};
+        $tokens->{$key}->{type} = "unknown"
+    }
+    return %$tokens;
+}
+
+=item B<writeTokensXMLFile(I<full path, hash ref of tokens>)
+
+Writes the tokens to an xml file. Returns 1 on success or undef on failure.
+
+=cut
+
+sub writeTokensXMLFile {
+    my $file = shift;
+    my $tokens = shift;
+    return undef unless ($file and $tokens);
+    my $xml = tokensToXML($tokens, [qw(key value type)]);
+    return undef unless $xml;
+    if (open(FILE, ">$file")) {
+        print FILE $xml;
+        close(FILE);
+        return 1;
+    }
+    return undef;
+}
+
+
+=item B<tokensToXML(I<hash ref of tokens, [list ref of token attributes]>)
+
+Converts the tokens hash ref to XML string. Returns undef on error. The list
+ref is or attributes will determine which attributes will be printed in the
+xml. By default all attributes are printed.
+
+=cut
+
+sub tokensToXML {
+    my $tokens = shift;
+    my $attr = shift;
+    return undef unless ($tokens);
+    my $string = "";
+    my $io = new IO::String($string);
+    my $writer = new XML::Writer(DATA_MODE => 1, DATA_INDENT => 4, OUTPUT => $io);
+    $writer->xmlDecl();
+    $writer->startTag("tokens");
+    foreach my $token (sort {$a->{key} cmp $b->{key}} values %$tokens) {
+        $writer->startTag("token");
+        my $cattr = $attr;
+        $cattr = [keys %$token] unless $cattr;
+        for my $elem (sort {$a cmp $b} @$cattr) {
+            $writer->dataElement($elem, $token->{$elem}) if $token->{$elem};
+        }
+        $writer->endTag("token");
+    }
+    $writer->endTag("tokens");
+    $writer->end();
+    return $string;
+}
+
 
 ################################################################################
 #   The end

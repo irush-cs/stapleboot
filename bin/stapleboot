@@ -527,8 +527,7 @@ sub finalStage {
                 print LOG join "\n  ", @{$boot->{applied}->{scripts}};
                 print LOG "\n";
                 print LOG "\ntokens:\n";
-                my %tokens = %{$boot->{tokens}};
-                print LOG join "", map {"$_->{key}=$_->{value};\n"} @tokens{sort {$a cmp $b} keys %tokens};
+                print LOG tokensToXML($boot->{tokens});
                 if ($sysinitoutput) {
                     print LOG "\nsysinit ($boot->{sysinit}):\n";
                     print LOG $sysinitoutput;

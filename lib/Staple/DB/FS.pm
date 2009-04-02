@@ -1291,20 +1291,6 @@ sub setGroupConfigurations {
 #   Tokens Internals
 ################################################################################
 
-# input: full pathed file, tokens hash ref
-# output: 1 on success, undef on failure
-sub writeTokensFile {
-    my $file = shift;
-    my $tokens = shift;
-    if (open(FILE, ">$file")) {
-        my $data = join "", map {"$_->{key}=$_->{raw};\n"} sort {$a->{key} cmp $b->{key}} values %$tokens;
-        print FILE $data;
-        close(FILE);
-        return 1;
-    }
-    return undef;
-}
-
 ################################################################################
 #   The end
 ################################################################################
