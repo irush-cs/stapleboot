@@ -324,7 +324,8 @@ sub readTokensFile {
 
 =item B<writeTokensFile(I<full path, hash ref of tokens>)
 
-Writes the tokens to file. Returns 1 on success or undef on failure.
+Writes the tokens to file. Returns 1 on success or undef on failure. Writes the
+"raw" attribute of the token.
 
 =cut
 
@@ -344,14 +345,14 @@ sub writeTokensFile {
 =item B<readTokensXMLFile(I<full path>)
 
 Returns a tokens hash, with value = raw if either is missing (though there
-shouldn't be raw in a file), and type = unknown if missing (though it should be
-in an xml file format). Returns undef on error.
+shouldn't be "value" in a file), and type = unknown if missing (though it
+should be in an xml file format). Returns undef on error.
 
 =cut
 
 sub readTokensXMLFile {
     my $file = shift;
-    return undef unless $file;
+    return undef unless $file and -e $file;
     my $tokens = XMLin($file, "keyattr" => {"token" => "+key"}, "forcearray" => ["token"]);
     return undef unless $tokens;
     $tokens = $tokens->{token};
@@ -365,7 +366,8 @@ sub readTokensXMLFile {
 
 =item B<writeTokensXMLFile(I<full path, hash ref of tokens>)
 
-Writes the tokens to an xml file. Returns 1 on success or undef on failure.
+Writes the tokens to an xml file. Returns 1 on success or undef on
+failure. Writes only the "key" "type" and "raw" attributes.
 
 =cut
 
@@ -373,7 +375,7 @@ sub writeTokensXMLFile {
     my $file = shift;
     my $tokens = shift;
     return undef unless ($file and $tokens);
-    my $xml = tokensToXML($tokens, [qw(key value type)]);
+    my $xml = tokensToXML($tokens, [qw(key raw type)]);
     return undef unless $xml;
     if (open(FILE, ">$file")) {
         print FILE $xml;

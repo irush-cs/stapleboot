@@ -290,6 +290,8 @@ sub addTokens {
         }
         return undef;
     }
+
+    # old tokens style
     return undef unless ($self->mkdirs("$group->{path}/tokens"));
     foreach my $type ("static", "dynamic", "regexp") {
         my @tokens = map {$_->{key}} grep {$_->{type} eq $type} values %$tokens;
@@ -303,6 +305,17 @@ sub addTokens {
             $self->{error} = "Can't write tokens file $file: $!\n";
             return undef;
         }
+    }
+
+    # new xml style
+    my $file = "$group->{path}/tokens.xml";
+    my @read = readTokensXMLFile($file);
+    my %newTokens = ();
+    %newTokens = @read if (@read > 1);
+    @newTokens{keys %$tokens} = values %$tokens;
+    unless (writeTokensXMLFile($file, \%newTokens)) {
+        $self->{error} = "Can't write tokens file $file: $!\n";
+        return undef;
     }
     return 1;
 }
@@ -319,6 +332,8 @@ sub removeTokens {
         }
         return undef;
     }
+
+    # old tokens style
     foreach my $type ("static", "dynamic", "regexp") {
         my $file = "$group->{path}/tokens/$type";
         my %oldTokens = readTokensFile($file);
@@ -329,6 +344,19 @@ sub removeTokens {
             }
         }
     }
+
+    # new xml style
+    my $file = "$group->{path}/tokens.xml";
+    my @read = readTokensXMLFile($file);
+    my %oldTokens = ();
+    %oldTokens = @read if (@read > 1);
+    if (delete @oldTokens{@$tokens}) {
+        unless (writeTokensXMLFile($file, \%oldTokens)) {
+            $self->{error} = "Can't write tokens to file $file: $!\n";
+            return undef;
+        }
+    }
+    
     return 1;
 }
 

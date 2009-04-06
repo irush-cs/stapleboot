@@ -469,7 +469,7 @@ sub createDB {
         $params[1] = "dbi:Pg:dbname=staple;host=pghost;port=5432;" unless $params[1];
         $db = Staple::DB::SQL->new(@params);
         unless ($db) {
-            print "Error connecting sql database";
+            $error = "Error connecting sql database";
             return undef;
         }
     } elsif ($db =~ m/fs/i) {
