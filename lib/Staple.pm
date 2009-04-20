@@ -71,13 +71,15 @@ B<token hash>
 
 =over
 
-=item I<key>   - The token name
+=item I<key>    - The token name
 
-=item I<value> - The token value
+=item I<value>  - The token value
 
-=item I<type>  - The token type (static, auto, default, regexp, dynamic)
+=item I<type>   - The token type (static, regexp, dynamic)
 
-=item I<raw>   - The raw value: for static, auto and default - the same as I<value>, for regexp and dynmaic, the raw value.
+=item I<raw>    - The raw value: for static, auto and default - the same as I<value>, for regexp and dynmaic, the raw value.
+
+=item I<source> - The origin of the token as free text. Isn't used by staple itself. Used for debugging. (auto, file, group, configuration, host, default, etc.)
 
 =back
 
@@ -890,9 +892,9 @@ sub getCompleteTokens {
         push @delete, $key if $key =~ m/^__AUTO_/;
     }
     delete @tokens{@delete};
-    $tokens{__AUTO_DISTRIBUTION__} = {key => "__AUTO_DISTRIBUTION__", value => $distribution, raw => $distribution, type => "auto"} if $distribution;
-    $tokens{__AUTO_HOSTNAME__} = {key => "__AUTO_HOSTNAME__", value => $host, raw => $host, type => "auto"} if $host;
-    $tokens{__AUTO_TMP__} = {key => "__AUTO_TMP__", value => "$stapleDir/tmp", raw => "$stapleDir/tmp", type => "auto"};
+    $tokens{__AUTO_DISTRIBUTION__} = {key => "__AUTO_DISTRIBUTION__", value => $distribution, raw => $distribution, type => "static", source => "auto"} if $distribution;
+    $tokens{__AUTO_HOSTNAME__} = {key => "__AUTO_HOSTNAME__", value => $host, raw => $host, type => "static", source => "auto"} if $host;
+    $tokens{__AUTO_TMP__} = {key => "__AUTO_TMP__", value => "$stapleDir/tmp", raw => "$stapleDir/tmp", type => "static", source => "auto"};
     #$tokens{__AUTO_IP__} = $ip;
     %tokens = setDefaultTokens(\%tokens, \%defaultTokens);
     %tokens = verifyTokens(\%tokens, \%allowedTokensValues);
@@ -925,7 +927,8 @@ sub setDefaultTokens {
     $conf = $tokens{__STAPLE_CONF__}->{value} if $tokens{__STAPLE_CONF__};
     $conf = $defaults{__STAPLE_CONF__}->{value} if $defaults{__STAPLE_CONF__} and (not $conf or not -r $conf);
     if (-r $conf) {
-        my %files = readTokensFile($conf, "default");
+        my %files = readTokensFile($conf, "static");
+        map {exists $_->{source} and $_->{source} = "default:$_->{source}" or $_->{source} = "default"} values %files;
         %files = verifyTokens(\%files, \%allowedTokensValues);
         foreach my $key (keys %files) {
             $tokens{$key} = $files{$key} unless exists $tokens{$key};
@@ -933,7 +936,7 @@ sub setDefaultTokens {
     }
 
     foreach my $key (keys %defaults) {
-        $tokens{$key} = {key => $key, value => $defaults{$key}->{value}, raw => $defaults{$key}->{raw}, type => "default"} unless exists $tokens{$key};
+        $tokens{$key} = {key => $key, value => $defaults{$key}->{value}, raw => $defaults{$key}->{raw}, type => "static", source => "default"} unless exists $tokens{$key};
     }
     return %tokens;
 }

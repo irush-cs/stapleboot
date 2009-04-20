@@ -223,7 +223,7 @@ sub copyConfiguration {
 
 =item B<getTokens(I<group|configuration, [...]>)>
 
-Get raw tokens from the database, returns the raw tokens hash refefernce. On
+Get raw tokens from the database, returns the raw tokens hash reference. On
 failure returns undef (and sets the error)
 
 =cut

@@ -317,7 +317,7 @@ sub readTokensFile {
         my @tokens = split /;\n/, join "", <FILE>;
         close(FILE);
         my %rawTokens = map {/^(.*?)=(.*)$/s} @tokens;
-        @tokens{keys %rawTokens} = map {{key => $_, value => $rawTokens{$_}, raw => $rawTokens{$_}, type => $type}} keys %rawTokens;
+        @tokens{keys %rawTokens} = map {{key => $_, value => $rawTokens{$_}, raw => $rawTokens{$_}, type => $type, source => "file:$file"}} keys %rawTokens;
     }
     return %tokens;
 }
@@ -357,9 +357,11 @@ sub readTokensXMLFile {
     return undef unless $tokens;
     $tokens = $tokens->{token};
     foreach my $key (keys %{$tokens}) {
+        $tokens->{$key}->{value} = "" unless exists $tokens->{$key}->{value} or exists $tokens->{$key}->{value};
         $tokens->{$key}->{raw} = $tokens->{$key}->{value} unless exists $tokens->{$key}->{raw};
         $tokens->{$key}->{value} = $tokens->{$key}->{raw} unless exists $tokens->{$key}->{value};
-        $tokens->{$key}->{type} = "unknown"
+        $tokens->{$key}->{type} = "unknown" unless exists $tokens->{$key}->{type};
+        $tokens->{$key}->{source} = "file:$file";
     }
     return %$tokens;
 }
