@@ -11,7 +11,7 @@ use strict;
 use warnings;
 use IPC::Open3;
 use XML::Writer;
-use XML::Simple;
+use XML::Parser;
 use IO::File;
 use IO::String;
 require Exporter;
@@ -304,13 +304,13 @@ sub stageCmp {
 
 =item B<readTokensFile(I<full path, [type]>)
 
-Returns a tokens hash, with value = raw, and type = "unknown" (if not given)
+Returns a tokens hash, with value = raw, and type = "static" (if not given)
 
 =cut
 
 sub readTokensFile {
     my $file = shift;
-    my $type = "unknown";
+    my $type = "static";
     $type = shift if $_[0];
     my %tokens = ();
     if (open(FILE, "<$file")) {
@@ -345,7 +345,7 @@ sub writeTokensFile {
 =item B<readTokensXMLFile(I<full path>)
 
 Returns a tokens hash, with value = raw if either is missing (though there
-shouldn't be "value" in a file), and type = unknown if missing (though it
+shouldn't be "value" in a file), and type = static if missing (though it
 should be in an xml file format). Returns undef on error.
 
 =cut
@@ -353,14 +353,15 @@ should be in an xml file format). Returns undef on error.
 sub readTokensXMLFile {
     my $file = shift;
     return undef unless $file and -e $file;
-    my $tokens = XMLin($file, "keyattr" => {"token" => "+key"}, "forcearray" => ["token"]);
+    #my $tokens = XMLin($file, "keyattr" => {"token" => "+key"}, "forcearray" => ["token"]);
+    my $tokens = _parseXML($file);
     return undef unless $tokens;
-    $tokens = $tokens->{token};
+    #$tokens = $tokens->{token};
     foreach my $key (keys %{$tokens}) {
-        $tokens->{$key}->{value} = "" unless exists $tokens->{$key}->{value} or exists $tokens->{$key}->{value};
+        $tokens->{$key}->{value} = "" unless exists $tokens->{$key}->{value} or exists $tokens->{$key}->{raw};
         $tokens->{$key}->{raw} = $tokens->{$key}->{value} unless exists $tokens->{$key}->{raw};
         $tokens->{$key}->{value} = $tokens->{$key}->{raw} unless exists $tokens->{$key}->{value};
-        $tokens->{$key}->{type} = "unknown" unless exists $tokens->{$key}->{type};
+        $tokens->{$key}->{type} = "static" unless exists $tokens->{$key}->{type};
         $tokens->{$key}->{source} = "file:$file";
     }
     return %$tokens;
@@ -419,6 +420,79 @@ sub tokensToXML {
     return $string;
 }
 
+################################################################################
+#   XML handlers
+################################################################################
+
+my @_XML_tokenKeys = ("key", "raw", "value", "type", "source");
+
+our $_XML_tokens = {};
+our $_XML_currentToken = {};
+our $_XML_currentString = "";
+
+sub _parseXML {
+    (my $file) = @_;
+
+    # the XML::Parser doesn't seem to be able to pass arguments around. So I'll
+    # "simply" make them local.
+    local $_XML_tokens = {};
+    local $_XML_currentToken = {};
+    local $_XML_currentString = "";
+    my $parser = new XML::Parser(Handlers => {
+                                              Init => \&_parseXMLInit,
+                                              Final => \&_parseXMLFinal,
+                                              Start => \&_XMLstartTag,
+                                              End => \&_XMLendTag,
+                                              Char => \&_XMLcharData,
+                                             });
+    my $tokens = eval {$parser->parsefile($file)};
+    return undef if $@;
+    return $tokens;
+}
+
+sub _parseXMLInit {
+    (my $expat) = @_;
+    $_XML_tokens = {};
+    $_XML_currentToken = {};
+}
+
+sub _parseXMLFinal {
+    (my $expat) = @_;
+    return $_XML_tokens;
+}
+
+sub _XMLstartTag {
+    my($expat, $element, %attrs) = @_;
+    $_XML_currentString = "";
+    if ($element eq "tokens") {
+        $_XML_tokens = {};
+        $_XML_currentToken = {};
+    } elsif ($element eq "token") {
+        $_XML_currentToken = {};
+    } elsif (grep {$_ eq $element} @_XML_tokenKeys) {
+    } else {
+        print "start: $element\n";
+    }
+}
+
+sub _XMLendTag {
+    my($expat, $element) = @_;
+    if ($element eq "tokens") {
+    } elsif ($element eq "token") {
+        $_XML_tokens->{$_XML_currentToken->{key}} = $_XML_currentToken if $_XML_currentToken->{key} and $_XML_currentToken->{type};
+        $_XML_currentToken = {};
+    } elsif (grep {$_ eq $element} @_XML_tokenKeys) {
+        $_XML_currentToken->{$element} = $_XML_currentString;
+    } else {
+        print "end: $element\n";
+    }
+    $_XML_currentString = "";
+}
+
+sub _XMLcharData {
+    my($expat, $string) = @_;
+    $_XML_currentString .= $string;
+}
 
 ################################################################################
 #   The end

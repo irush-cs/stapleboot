@@ -47,6 +47,9 @@ B<group hash>
 
 B<configuration hash>
 
+=for comment
+Don't add "type" to configuration as some distinguish between group and configuration by the availability of the "type" key
+
 =over
 
 =over

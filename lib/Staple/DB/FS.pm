@@ -361,6 +361,34 @@ sub removeTokens {
 }
 
 sub getTokens {
+    return getTokensXML(@_);
+    #return getTokensOLD(@_);
+}
+
+sub getTokensXML {
+    my $self = shift;
+    my @gorc = @_;
+    my %tokens = ();
+    my @tokenFiles = map {$_->{path} ? "$_->{path}/tokens.xml" : undef} @gorc;
+    foreach my $gorc (@_) {
+        my $tokenFile = shift @tokenFiles;
+        next if not defined $tokenFile or not -r $tokenFile;
+        my %currentTokens = readTokensXMLFile($tokenFile);
+        my $prefix;
+        if ($gorc->{type}) {
+            # only group has type
+            $prefix = $gorc->{type};
+        } else {
+            # configuration has no type
+            $prefix = "configuration";
+        }
+        map {$_->{source} = "$prefix:$gorc->{name}";} values %currentTokens;
+        @tokens{keys %currentTokens} = values %currentTokens;
+    }
+    return \%tokens;
+}
+
+sub getTokensOLD {
     my $self = shift;
     my @tokenFiles = grep {$_} map {$_->{path} ? "$_->{path}/tokens" : undef} @_;
     my %tokens = ();

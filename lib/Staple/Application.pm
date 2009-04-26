@@ -132,7 +132,7 @@ Given a stage (string: auto, mount, sysinit or final). Applies the scripts in
 the boot at the given stage according to their order.
 
 The tokens in the boot data might change by token scripts. The new tokens have
-value = raw and type = "unknown".
+value = raw and type = "static".
 
 The boot data mounts will be recalculated according to the new tokens
 
@@ -170,11 +170,13 @@ sub applyScripts {
             $tokens->{__AUTO_CONFIGURATION__} = {key => "__AUTO_CONFIGURATION__",
                                                  value => $script->{configuration}->{name},
                                                  raw => $script->{configuration}->{name},
-                                                 type => "auto"};
+                                                 type => "static",
+                                                 source => "auto"};
             $tokens->{__AUTO_SCRIPT__} = {key => "__AUTO_SCRIPT__",
                                           value => $script->{name},
                                           raw => $script->{name},
-                                          type => "auto"};
+                                          type => "static",
+                                          source => "auto"};
             $data = applyTokens($data, $tokens);
             delete $tokens->{__AUTO_SCRIPT__};
             delete $tokens->{__AUTO_CONFIGURATION__};
@@ -218,12 +220,18 @@ sub applyScripts {
             print FILE "\n";
             close(FILE);
             push @toDelete, $file;
-            my %rawTokens = readTokensFile($file, "static");
+            my %rawTokens;
+            if ($scriptOutput =~ m/^\s*</s) {
+                %rawTokens = readTokensXMLFile($file);
+            } else {
+                %rawTokens = readTokensFile($file, "static");
+            }
             my %newTokens;
             @newTokens{map {my $a = $_; $a =~ s/^#/_/; $a} keys %rawTokens} = values %rawTokens;
             foreach my $token (values %rawTokens) {
                 $token->{key} =~ s/^#/_/;
             }
+            map {$_->{source} = "script:$script->{configuration}->{name}/$script->{stage}/$script->{name}"} values %newTokens;
             @$tokens{keys %newTokens} = values %newTokens;
             %$tokens = getCompleteTokens($tokens, $self->{host}, $self->{distribution});
             #setVariablesFromTokens($tokens, \%tokensToVariables);

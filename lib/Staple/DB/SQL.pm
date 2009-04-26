@@ -386,8 +386,10 @@ sub getTokens {
     my $sth;
     my %tokens = ();    
     foreach my $gorc (@groupsAndConfigurations) {
+        my $prefix;
         if (defined $gorc->{type}) {
             # only groups have types
+            $prefix = $gorc->{type};
             if ($gorc->{type} eq "group") {
                 $sth = $dbh->prepare_cached("SELECT key, value, type FROM $self->{schema}group_tokens WHERE group_name = ?");
             } elsif ($gorc->{type} eq "distribution") {
@@ -398,6 +400,7 @@ sub getTokens {
             $sth->execute($gorc->{name})
         } else {
             # configurations do not have types
+            $prefix = "configuration";
             $sth = $dbh->prepare_cached("SELECT key, value, type FROM $self->{schema}configuration_tokens WHERE configuration = ? AND distribution = ?");
             $sth->execute($gorc->{name}, $gorc->{dist});
         }
@@ -408,7 +411,7 @@ sub getTokens {
         }
         
         if (my $rawTokens = $sth->fetchall_hashref("key")) {
-            @tokens{keys %$rawTokens} = map {{key => $_->{key}, value => $_->{value}, raw => $_->{value}, type => $_->{type}}} values %$rawTokens;
+            @tokens{keys %$rawTokens} = map {{key => $_->{key}, value => $_->{value}, raw => $_->{value}, type => $_->{type}, source => "$prefix:$gorc->{name}"}} values %$rawTokens;
         } elsif ($sth->err) {
             $self->{error} = $sth->errstr;
             return undef;
