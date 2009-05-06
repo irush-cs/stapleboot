@@ -1028,7 +1028,7 @@ Other commands:
 ",
                    );
 
-my @singleCommandCommands = ("ahc", "rhc", "gag", "ghc", "wht", "whc", "whg", "ghi", "ggi", "gci", "bad", "badcommandorfilename", "gt", "gdt", "gct");
+my @singleCommandCommands = ("ahc", "rhc", "gag", "ghc", "wht", "whc", "whg", "ghi", "ggi", "gci", "bad", "badcommandorfilename", "gt", "gdt", "gct", "gah");
 
 sub help {
     my %topics = (a              => "helpall",
@@ -1072,6 +1072,29 @@ sub help {
     } else {
         print "No help for \"$topic\" (yet)\n";
     }
+}
+
+# checks if the given string is a range string
+sub isRange {
+    return 0 unless $_[0];
+    return ($_[0] =~ m/^\D+\d+\.\.\d+$/ or index($_[0], ",") >= 0 ? 1 : 0);
+}
+
+# input: range list
+# output: list
+sub parseRange {
+    my @results;
+    
+    foreach my $splited (split /,/,$_[0]) {
+        if ($splited =~ /(\D+)(\d+)\.\.(\d+)/) {
+            foreach my $i ($2..$3) {
+                push @results, sprintf "$1%0".length($2)."i", $i;
+            }
+        } else {
+            push @results, $splited;
+        }
+    }
+    return @results;
 }
 
 sub fillDnsHostList {
@@ -2220,15 +2243,21 @@ sub rhc {
         print "The configuration should be preceded with + or -\n";
         return;
     }
-    my $group = getHostGroup($host);
-    unless ($group) {
-        print "Unknown host \"$host\"\n";
-        return;
-    }
     my $active = $1 eq '+' ? 1 : 0;
     $configuration = $2;
     unless ($configuration) {
         print "Missing configuration\n";
+        return;
+    }
+    my $group = getHostGroup($host);
+    unless ($group) {
+        if (isRange($host)) {
+            my @hosts = parseRange($host);
+            $configuration = ($active ? "+" : "-").$configuration;
+            rhc($_, $configuration) foreach @hosts;
+        } else {
+            print "unknown host \"$host\"\n";
+        }
         return;
     }
     (my $conf) = getConfigurationsByName($configuration);
@@ -2343,7 +2372,13 @@ sub ahc {
     }
     my $group = getHostGroup($host);
     unless ($group) {
-        print "unknown host \"$host\"\n";
+        if (isRange($host)) {
+            my @hosts = parseRange($host);
+            $configuration = ($active ? "+" : "-").$configuration;
+            ahc($_, $configuration, $location) foreach @hosts;
+        } else {
+            print "unknown host \"$host\"\n";
+        }
         return;
     }
     (my $conf) = getConfigurationsByName($configuration);
@@ -2528,7 +2563,12 @@ sub ahg {
             return;
         }
     } else {
-        print "No such host \"$host\"\n";
+        if (isRange($host)) {
+            my @hosts = parseRange($host);
+            ahg($_, $group, $location) foreach @hosts;
+        } else {
+            print "unknown host \"$host\"\n";
+        }
         return;
     }
 }
@@ -2554,7 +2594,12 @@ sub rhg {
             return;
         }
     } else {
-        print "No such host \"$host\"\n";
+        if (isRange($host)) {
+            my @hosts = parseRange($host);
+            rhg($_, $group) foreach @hosts;
+        } else {
+            print "unknown host \"$host\"\n";
+        }
         return;
     }
 }
@@ -2935,13 +2980,27 @@ sub ah {
     my $host = shift;
     fillDnsHostList() unless @dnsHostList;
     if (@dnsHostList and not grep {$_ eq $host} @dnsHostList) {
-        print "Warning: I don't think that \"$host\" is in the DNS\n";
+        if (isRange($host)) {
+            my @hosts = parseRange($host);
+            ah($_) foreach @hosts;
+            return;
+        } else {
+            print "Warning: I don't think that \"$host\" is in the DNS\n";
+        }
     }
     print getLastError()."\n" unless addHost($host);
 }
 
 sub rh {
-    print getLastError()."\n" unless removeHost($_[0]);
+    my $host = shift;
+    unless (getHostGroup($host)) {
+        if (isRange($host)) {
+            my @hosts = parseRange($host);
+            rh($_) foreach @hosts;
+            return;
+        }
+    }
+    print getLastError()."\n" unless removeHost($host);
 }
 
 sub gag {

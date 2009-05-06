@@ -88,7 +88,7 @@ sub removeHost {
         }
         return 1;
     }
-    $self->{error} = "Host doesn't exists";
+    $self->{error} = "Host \"$host\" doesn't exist";
     return 0;
 }
 

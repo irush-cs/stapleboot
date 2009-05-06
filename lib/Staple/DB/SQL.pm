@@ -136,7 +136,7 @@ sub removeHost {
         $self->{error} = $dbh->errstr;
         return 0;
     } elsif ($rv == 0) {
-        $self->{error} = "Host \"$host\" does not exists";
+        $self->{error} = "Host \"$host\" does not exist";
         return 0;
     }
     return 1;
