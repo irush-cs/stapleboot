@@ -484,7 +484,7 @@ sub setDB {
     my $newDb;
     if ($type =~ m/fs/i) {
         $newStapleDir = $params[0] if $params[0];
-        $newDb = Staple::DB::FS->new($stapleDir);
+        $newDb = Staple::DB::FS->new($newStapleDir);
         if ($newDb) {
             $db = $newDb;
             $stapleDir = $newStapleDir;
