@@ -14,7 +14,7 @@ use Staple::Misc;
 use DBI;
 use DBD::Pg;
 our @ISA = ("Staple::DB");
-our $VERSION = '002';
+our $VERSION = '003';
 
 =head1 NAME
 

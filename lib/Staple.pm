@@ -366,7 +366,7 @@ our @EXPORT = qw(
                     whoHasConfiguration
                     whoHasToken
                );
-our $VERSION = '002';
+our $VERSION = '003';
 
 my $stapleDir;
 my $error;

@@ -83,7 +83,7 @@ our @EXPORT = qw(
                     tokensToXML
                     runCommand
                );
-our $VERSION = '002';
+our $VERSION = '003';
 
 
 ################################################################################

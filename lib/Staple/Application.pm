@@ -13,7 +13,7 @@ use Sys::Hostname;
 use Clone qw(clone);
 use Staple;
 use Staple::Misc;
-our $VERSION = '002';
+our $VERSION = '003';
 
 =head1 NAME
 
