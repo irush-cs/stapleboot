@@ -177,6 +177,11 @@ sub applyScripts {
                                           raw => $script->{name},
                                           type => "static",
                                           source => "auto"};
+            $tokens->{__AUTO_STAGE__} = {key => "__AUTO_STAGE__",
+                                         value => $script->{stage},
+                                         raw => $script->{stage},
+                                         type => "static",
+                                         source => "auto"};
             $data = applyTokens($data, $tokens);
             delete $tokens->{__AUTO_SCRIPT__};
             delete $tokens->{__AUTO_CONFIGURATION__};
