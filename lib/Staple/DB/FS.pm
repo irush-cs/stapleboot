@@ -49,7 +49,14 @@ sub new {
 
 sub info {
     my $self = shift;
-    return "fs $self->{stapleDir}"
+    my $db = "fs $self->{stapleDir}";
+    if (-r "/proc/mounts" and open(PROC, "/proc/mounts")) {
+        my @mounts = <PROC>;
+        close(PROC);
+        (my $fs) = (grep {(split /\s/,$_)[1] eq $self->{stapleDir}} @mounts);
+        $db = $db." (".(split /\s/,$fs)[0].")" if defined $fs;   
+    }
+    return $db;
 }
 
 sub addHost {

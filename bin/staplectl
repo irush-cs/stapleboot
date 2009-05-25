@@ -1084,16 +1084,24 @@ sub isRange {
 # output: list
 sub parseRange {
     my @results;
-    
+    my @removed;
     foreach my $splited (split /,/,$_[0]) {
+        my $list;
+        if ($splited =~ /^\^(.*)$/) {
+            $list = \@removed;
+            $splited = $1;
+        } else {
+            $list = \@results;
+        }
         if ($splited =~ /(\D+)(\d+)\.\.(\d+)/) {
             foreach my $i ($2..$3) {
-                push @results, sprintf "$1%0".length($2)."i", $i;
+                push @$list, sprintf "$1%0".length($2)."i", $i;
             }
         } else {
-            push @results, $splited;
+            push @$list, $splited;
         }
     }
+    @results = grep {my $a = $_; not grep {$_ eq $a} @removed} @results;
     return @results;
 }
 

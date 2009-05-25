@@ -55,6 +55,7 @@ options are:
   -c  | --configuration\t apply configuration
   -a  | --all\t\t If no -g -c are present, execute all instead of
         \t\t just print them
+ --db | --database=<db>\t Connect to the given database instead of the default
 ";
     exit $exitCode;
 }
@@ -123,6 +124,7 @@ my $verbose = 1;
 my $mounts = 0;
 my $fstab = 0;
 my $doall = 0;
+my $database = "";
 #my $hosttokens = 0;
 my $extraTokens;
 my @stages = ();
@@ -144,6 +146,7 @@ unless (GetOptions('help|h|?'                  => \$help,
                    'configuration-tokens|ct=s' => \@configurations_tokens,
 #                   'host-tokens|ht=s'          => \$hosttokens,
                    'all|a'                     => \$doall,
+                   'database|db=s'             => \$database,
                   )) {
     usage(1);
 }
@@ -169,6 +172,12 @@ usage if $help;
 # init
 my $stapler = Staple::Application::Stapler->new($host, $distribution);
 $stapler->output("version $Staple::VERSION");
+if ($database) {
+    unless (setDB(split /\s+/, $database)) {
+        $stapler->error("Error using $database: ".getLastError());
+        $stapler->doCriticalAction();
+    }
+}
 $stapler->{tokens} = {getCompleteTokens({})};
 $stapler->{tmpDir} = "/tmp";
 $stapler->{verbose} = $verbose;
@@ -200,6 +209,7 @@ unless (grep {$_ eq $stapler->{distribution}} @distributions) {
     $stapler->doCriticalAction();
 }
 
+$stapler->output("database: ".getDB());
 my @badConfigurations = ();
 if (@groups or @configurations) {
     $doall = 1;

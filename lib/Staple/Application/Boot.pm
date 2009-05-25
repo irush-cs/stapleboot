@@ -92,15 +92,6 @@ sub mail {
         $host = "$host.".$domain;
     }
     my $db = getDB();
-    if (index($db, "fs ") == 0) {
-        my $fs = (split /\s/,$db)[1];
-        if (-r "/proc/mounts" and open(PROC, "/proc/mounts")) {
-            my @mounts = <PROC>;
-            close(PROC);
-            ($fs) = (grep {(split /\s/,$_)[1] eq $fs} @mounts);
-            $db = $db." (".(split /\s/,$fs)[0].")";
-        }
-    }
     my $prefix = "Staple version: $VERSION\n";
     $prefix .= "Staple database: $db\n";
     $prefix .= "Distribution: $self->{distribution}\n";

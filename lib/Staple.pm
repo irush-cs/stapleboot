@@ -82,7 +82,7 @@ B<token hash>
 
 =item I<raw>    - The raw value: for static, auto and default - the same as I<value>, for regexp and dynmaic, the raw value.
 
-=item I<source> - The origin of the token as free text. Isn't used by staple itself. Used for debugging. (auto, file, group, configuration, host, default, etc.)
+=item I<source> - The origin of the token as free text. Isn't used by staple itself. Used for debugging. (auto, file, group, configuration, host, default, manual, etc.)
 
 =back
 
