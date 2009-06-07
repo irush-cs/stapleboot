@@ -70,16 +70,17 @@ sub info {
 sub addHost {
     my $self = shift;
     my $host = shift;
+    unless (legalHost($host)) {
+        $self->{error} = "Illegal host name \"$host\"";
+        return 0;
+    }
     return $self->insert("$self->{schema}hosts", "$host");
 }
 
 sub addGroup {
     my $self = shift;
     my $group = shift;
-    if ($group !~ m/^\//) {
-        $self->{error} = "Malformed group \"$group\"";
-        return undef;
-    }
+    return 0 if ($self->{error} = illegalGroup($group));
     $group = fixPath($group);
     $group =~ s/\/$//;
     if ($self->count("SELECT COUNT(name) FROM $self->{schema}groups WHERE name = ? AND type = 'group'", $group)) {
@@ -100,10 +101,8 @@ sub addConfiguration {
     my $self = shift;
     my $distribution = shift;
     my $configuration = shift;
-    if ($configuration !~ m/^\//) {
-        $self->{error} = "Malformed configuration \"$configuration\"";
-        return undef;
-    }
+    return 0 if ($self->{error} = illegalDistribution($distribution));
+    return 0 if ($self->{error} = illegalConfiguration($configuration));
     $configuration = fixPath($configuration);
     $configuration =~ s/\/$//;
     if ($self->count("SELECT COUNT(name) FROM $self->{schema}configurations WHERE name = ? AND distribution = ?", $configuration, $distribution)) {
@@ -123,6 +122,7 @@ sub addConfiguration {
 sub addDistribution {
     my $self = shift;
     my $distribution = shift;
+    return 0 if ($self->{error} = illegalDistribution($distribution));
     return $self->insert("$self->{schema}distributions(name)", "$distribution");
 }
 

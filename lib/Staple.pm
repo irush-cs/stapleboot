@@ -210,19 +210,11 @@ B<Auto hash>
 
 =item getDB
 
-=item addHost(host)
-
 =item removeHost(host)
-
-=item addGroup(group name)
 
 =item removeGroup(group name)
 
-=item addDistribution(distribution)
-
 =item removeDistribution(distribution)
-
-=item addConfiguration(distribution, configuration)
 
 =item removeConfiguration(distribution, configuration)
 
@@ -320,13 +312,9 @@ our @EXPORT = qw(
                     getRawTokens
                     getCompleteTokens
                     setDefaultTokens
-                    addHost
                     removeHost
-                    addGroup
                     removeGroup
-                    addDistribution
                     removeDistribution
-                    addConfiguration
                     removeConfiguration
                     copyConfiguration
                     addTokens
@@ -455,7 +443,7 @@ BEGIN {
 =item B<setDB(I<E<lt>"fs"|"sql"E<gt> [params ...] >)>
 
 Set the database to connect to for the remainder of the session. Returns 1 on
-success, adn 0 on failure (and sets the error).
+success, and 0 on failure (and sets the error).
 
 =over 
 
@@ -490,7 +478,7 @@ sub setDB {
             $stapleDir = $newStapleDir;
             return 1;
         }
-        $error = "can't open filesystem databse";
+        $error = "can't open filesystem database";
         return 0;
     } elsif ($type =~ m/sql/i) {
         $params[0] = "$params[0]" if defined $params[0];
@@ -519,29 +507,6 @@ sub getDB {
     return $db->info();
 }
 
-=item B<addHost(I<host>)>
-
-Adds a host, returns 1 on success, and 0 on failure (and sets the error)
-
-=cut
-
-sub addHost {
-    my $host = shift;
-    unless ($host) {
-        $error = "Missing host name";
-        return 0;
-    }
-    if ($host =~ m\/\) {
-        $error = "Host name can't contain '\/'";
-        return 0;
-    }
-    unless ($db->addHost($host)) {
-        $error = $db->{error};
-        return 0;
-    }
-    return 1;
-}
-
 =item B<removeHost(I<host>)>
 
 Deletes a host, returns 1 on success, and 0 on failure (and sets the error)
@@ -555,25 +520,6 @@ sub removeHost {
         return 0;
     }
     unless ($db->removeHost($host)) {
-        $error = $db->{error};
-        return 0;
-    }
-    return 1;
-}
-
-=item B<addGroup(I<group string>)>
-
-Adds a group, returns 1 on success, and 0 on failure (and sets the error)
-
-=cut
-
-sub addGroup {
-    my $group = shift;
-    unless ($group) {
-        $error = "Missing group name";
-        return 0;
-    }
-    unless ($db->addGroup($group)) {
         $error = $db->{error};
         return 0;
     }
@@ -626,25 +572,6 @@ sub addGroupConfiguration {
     return 1;
 }
 
-=item B<addDistribution(I<distribution>)>
-
-Adds a distribution, returns 1 on success, and 0 on failure (and sets the error)
-
-=cut
-
-sub addDistribution {
-    my $distribution = shift;
-    unless ($distribution) {
-        $error = "Missing distribution name";
-        return 0;
-    }
-    unless ($db->addDistribution($distribution)) {
-        $error = $db->{error};
-        return 0;
-    }
-    return 1;
-}
-
 =item B<removeDistribution(I<distribution string>)>
 
 Deletes a distribution, returns 1 on success, and 0 on failure (and sets the error)
@@ -658,30 +585,6 @@ sub removeDistribution {
         return 0;
     }
     unless ($db->removeDistribution($distribution)) {
-        $error = $db->{error};
-        return 0;
-    }
-    return 1;
-}
-
-=item B<addConfiguration(I<distribution, configuration string>)>
-
-Adds a configuration, returns 1 on success, and 0 on failure (and sets the error)
-
-=cut
-
-sub addConfiguration {
-    my $distribution = shift;
-    my $configuration = shift;
-    unless ($distribution) {
-        $error = "Missing distribution name";
-        return 0;
-    }
-    unless ($configuration) {
-        $error = "Missing configuration name";
-        return 0;
-    }
-    unless ($db->addConfiguration($distribution, $configuration)) {
         $error = $db->{error};
         return 0;
     }

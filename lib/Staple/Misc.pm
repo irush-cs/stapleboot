@@ -57,9 +57,17 @@ Staple::Misc module
 
 =item tokensToXML(hash ref of tokens)
 
-=item getDistribution()
+=item getDistribution( )
 
 =item runCommand(<command>)
+
+=item legalHost(host name)
+
+=item illegalGroup(group name)
+
+=item illegalDistribution(distribution name)
+
+=item illegalConfiguration(configuration name)
 
 =back
 
@@ -82,6 +90,10 @@ our @EXPORT = qw(
                     writeTokensXMLFile
                     tokensToXML
                     runCommand
+                    legalHost
+                    illegalGroup
+                    illegalDistribution
+                    illegalConfiguration
                );
 our $VERSION = '003';
 
@@ -95,7 +107,7 @@ our $VERSION = '003';
 
 =over
 
-=item B<getDistribution()>
+=item B<getDistribution( )>
 
 Tries to find out what distribution are we running on with the following methods:
 1. /etc/staple/distribution
@@ -302,7 +314,7 @@ sub stageCmp {
     return $stageComparisonChart->{$a}->{$b};
 }
 
-=item B<readTokensFile(I<full path, [type]>)
+=item B<readTokensFile(I<full path, [type]>)>
 
 Returns a tokens hash, with value = raw, and type = "static" (if not given)
 
@@ -322,7 +334,7 @@ sub readTokensFile {
     return %tokens;
 }
 
-=item B<writeTokensFile(I<full path, hash ref of tokens>)
+=item B<writeTokensFile(I<full path, hash ref of tokens>)>
 
 Writes the tokens to file. Returns 1 on success or undef on failure. Writes the
 "raw" attribute of the token.
@@ -342,7 +354,7 @@ sub writeTokensFile {
     return undef;
 }
 
-=item B<readTokensXMLFile(I<full path>)
+=item B<readTokensXMLFile(I<full path>)>
 
 Returns a tokens hash, with value = raw if either is missing (though there
 shouldn't be "value" in a file), and type = static if missing (though it
@@ -367,7 +379,7 @@ sub readTokensXMLFile {
     return %$tokens;
 }
 
-=item B<writeTokensXMLFile(I<full path, hash ref of tokens>)
+=item B<writeTokensXMLFile(I<full path, hash ref of tokens>)>
 
 Writes the tokens to an xml file. Returns 1 on success or undef on
 failure. Writes only the "key" "type" and "raw" attributes.
@@ -389,7 +401,7 @@ sub writeTokensXMLFile {
 }
 
 
-=item B<tokensToXML(I<hash ref of tokens, [list ref of token attributes]>)
+=item B<tokensToXML(I<hash ref of tokens, [list ref of token attributes]>)>
 
 Converts the tokens hash ref to XML string. Returns undef on error. The list
 ref is or attributes will determine which attributes will be printed in the
@@ -419,6 +431,74 @@ sub tokensToXML {
     $writer->end();
     return $string;
 }
+
+=item B<legalHost(I<host name>)>
+
+Checks whether the given host name is legal. Currently can't contain spaces or
+slashes, and can't equal to "." or "..". Returns 1 if host is legal, and 0
+otherwise.
+
+=cut
+
+sub legalHost {
+    my $host = shift;
+    return (defined $host and
+            length($host) > 0 and
+            $host ne ".." and
+            $host ne "." and
+            index($host, "/") < 0 and
+            $host !~ m/\s/);
+}
+
+=item B<illegalGroup(I<group name>)>
+
+Checks whether the given group name is illegal. Returns the empty string if the
+group is legal, or an error mesage if the group name is illegal.
+
+=cut
+
+sub illegalGroup {
+    my $group = shift;
+    return "Missing group name" if not defined $group or length($group) == 0;
+    return "Group must start with '/'" if (index($group, "/") != 0);
+    return "Group can't end with '/'" if (rindex($group, "/") == length($group) - 1);
+    return "Group can't contain '..'" if $group =~ m,/\.\./|/\.\.$,;
+    return "";
+}
+
+=item B<illegalDistribution(I<distribution name>)>
+
+Checks whether the given distribution name is illegal. Returns the empty string
+if the distribution is legal, else returns an error mesage.
+
+=cut
+
+sub illegalDistribution {
+    my $distribution = shift;
+    return "Missing distribution name" if not defined $distribution or length($distribution) == 0;
+    return "Distribution can't contain '/'" if index($distribution, "/") >= 0;
+    return "Distribution can't be '.' or '..'" if $distribution eq "." or $distribution eq "..";
+    return "";
+}
+
+
+=item B<illegalConfiguration(I<configuration name>)>
+
+Checks whether the given configuration name is illegal. Returns an empty string
+if the configuration is legal, otherwise returns an error mesage.
+
+=cut
+
+sub illegalConfiguration {
+    my $configuration = shift;
+    return "Missing configuration name" if not defined $configuration or length($configuration) == 0;
+    return "Configuration must start with '/'" if (index($configuration, "/") != 0);
+    return "Configuration can't end with '/'" if (rindex($configuration, "/") == length($configuration) - 1);
+    return "Configuration can't contain '..'" if $configuration =~ m,/\.\./|/\.\.$,;
+    return "";
+}
+
+
 
 ################################################################################
 #   XML handlers

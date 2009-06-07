@@ -62,6 +62,10 @@ sub info {
 sub addHost {
     my $self = shift;
     my $host = shift;
+    unless (legalHost($host)) {
+        $self->{error} = "Illegal host name \"$host\"";
+        return 0;
+    }
     my $hostPath = $self->getHostPath($host, 1);
     if (not -d "$hostPath") {
         return $self->mkdirs($hostPath);
@@ -102,14 +106,7 @@ sub removeHost {
 sub addGroup {
     my $self = shift;
     my $group = shift;
-    if (index($group, "/") != 0) {
-        $self->{error} = "Group must start with '/'";
-        return 0;
-    }
-    if ($group =~ m,/\.\./|/\.\.$,) {
-        $self->{error} = "Group can't contain '..'";
-        return 0;
-    }
+    return 0 if ($self->{error} = illegalGroup($group));
     my $groupPath = $self->getGroupPath($group, 1);
     if (not -d "$groupPath") {
         return $self->mkdirs($groupPath);
@@ -158,6 +155,7 @@ sub removeGroup {
 sub addDistribution {
     my $self = shift;
     my $distribution = shift;
+    return 0 if ($self->{error} = illegalDistribution($distribution));
     my $distributionPath = $self->getDistributionPath($distribution, 1);
     if (not -d "$distributionPath") {
         return $self->mkdirs($distributionPath);
@@ -199,14 +197,8 @@ sub addConfiguration {
     my $self = shift;
     my $distribution = shift;
     my $configuration = shift;
-    if (index($configuration, "/") != 0) {
-        $self->{error} = "Configuration must start with '/'";
-        return 0;
-    }
-    if ($configuration =~ m,/\.\./|/\.\.$,) {
-        $self->{error} = "Configuration can't contain '..'";
-        return 0;
-    }
+    return 0 if ($self->{error} = illegalDistribution($distribution));
+    return 0 if ($self->{error} = illegalConfiguration($configuration));
     my $path = $self->getConfigurationPath($configuration, $distribution, 1);
     unless (-d $path) {
         return $self->mkdirs($path);

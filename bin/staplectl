@@ -28,6 +28,7 @@ BEGIN {
 use Staple;
 use Staple::Misc;
 use Staple::DB::Sync;
+use Staple::DB::Factory;
 use Staple::Hangman;
 use Term::ReadLine;
 use Term::ANSIColor;
@@ -39,6 +40,7 @@ my $attribs;
 my $echooff = 0;
 my $singleCommand = "";
 my @dnsHostList = (); # for ah completion and warning
+my $db;
 
 my %commands = (
                 ac => \&ac,
@@ -2930,7 +2932,7 @@ sub ac {
         print "distribution not set\n";
         return;
     }
-    print getLastError()."\n" unless addConfiguration($distribution, $_[0]);
+    print $db->{error}."\n" unless $db->addConfiguration($distribution, $_[0]);
 }
 
 sub rc {
@@ -2962,8 +2964,16 @@ sub sd {
 }
 
 sub setdb {
-    print getLastError()."\n" unless setDB(@_);
-    print "Current database: ".getDB()."\n";    
+    my $newDB = createDB(@_);
+    unless (ref $newDB) {
+        print "$newDB\n";
+    } elsif ($newDB->{error}) {
+        print "$newDB->{error}\n";
+    } else {
+        $db = $newDB;
+        print getLastError()."\n" unless setDB(split /\s+/, $db->info());
+    }
+    print "Current database: ".getDB()."\n";
 }
 
 sub getdb {
@@ -2996,7 +3006,7 @@ sub ah {
             print "Warning: I don't think that \"$host\" is in the DNS\n";
         }
     }
-    print getLastError()."\n" unless addHost($host);
+    print $db->{error}."\n" unless $db->addHost($host);
 }
 
 sub rh {
@@ -3027,7 +3037,7 @@ sub gag {
 }
 
 sub ag {
-    print getLastError()."\n" unless addGroup($_[0]);
+    print $db->{error}."\n" unless $db->addGroup($_[0]);
 }
 
 sub rg {
@@ -3046,7 +3056,7 @@ sub gad {
 }
 
 sub ad {
-    print getLastError()."\n" unless addDistribution($_[0]);
+    print $db->{error}."\n" unless $db->addDistribution($_[0]);
 }
 
 sub rd {
@@ -3632,22 +3642,12 @@ while (my $arg = shift @ARGV) {
     }
 }
 
-if (-r "/etc/staple/distribution") {
-    open(FILE, "/etc/staple/distribution");
-    my $dist = <FILE>;
-    close(FILE);
-    chomp $dist;
-    $distribution = $dist;
-} elsif (-r "/proc/cmdline") {
-    open(FILE, "/proc/cmdline");
-    my $cmdline = <FILE>;
-    close(FILE);
-    $cmdline =~ s!^nfsroot=[^\s]*?/distributions/(.*?)\s.*$!$1!;
-    if ($cmdline) {
-        chomp $cmdline;
-        $distribution = $cmdline;
-    }
+$distribution = getDistribution();
+$db = createDB();
+unless (ref $db) {
+    
 }
+
 
 if ($singleCommand) {
     (my $command, my @params) = parseline($singleCommand);
@@ -3659,7 +3659,12 @@ if ($singleCommand) {
     }
 } else {
     print "Staple version: $Staple::VERSION\n";
-    print "Starting with distribution:  $distribution\n" if ($distribution);
+    if ($distribution) {
+        print "Starting with distribution:  $distribution\n";
+    } else {
+        print "Starting without a default distribution\n";
+    }
+    setDB(split /\s+/, $db->info());
     print "Starting with database: ".getDB()."\n";
 
     # set up readline
@@ -3677,7 +3682,8 @@ if ($singleCommand) {
 
     # main loop
     while (1) {
-        my $line = $input->readline("($distribution) staplectl> ");
+        my $prompt = $distribution ? "($distribution) staplectl> " : "(UNKNOWN) staplectl> ";
+        my $line = $input->readline($prompt);
         next unless $line;
         chomp($line);
         (my $command, my @params) = parseline($line);
