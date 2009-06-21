@@ -62,10 +62,7 @@ sub info {
 sub addHost {
     my $self = shift;
     my $host = shift;
-    unless (legalHost($host)) {
-        $self->{error} = "Illegal host name \"$host\"";
-        return 0;
-    }
+    return 0 if ($self->{error} = invalidHost($host));
     my $hostPath = $self->getHostPath($host, 1);
     if (not -d "$hostPath") {
         return $self->mkdirs($hostPath);
@@ -77,6 +74,7 @@ sub addHost {
 sub removeHost {
     my $self = shift;
     my $host = shift;
+    return 0 if ($self->{error} = invalidHost($host));
     my $hostPath = $self->getHostPath($host);
     if ($hostPath) {
         my @dirList = getDirectoryList("$hostPath");
@@ -106,7 +104,7 @@ sub removeHost {
 sub addGroup {
     my $self = shift;
     my $group = shift;
-    return 0 if ($self->{error} = illegalGroup($group));
+    return 0 if ($self->{error} = invalidGroup($group));
     my $groupPath = $self->getGroupPath($group, 1);
     if (not -d "$groupPath") {
         return $self->mkdirs($groupPath);
@@ -118,14 +116,7 @@ sub addGroup {
 sub removeGroup {
     my $self = shift;
     my $group = shift;
-    if (index($group, "/") != 0) {
-        $self->{error} = "Group must start with '/'";
-        return 0;
-    }
-    if ($group =~ m,/\.\./|/\.\.$,) {
-        $self->{error} = "Group can't contain '..'";
-        return 0;
-    }
+    return undef if ($self->{error} = invalidGroup($group));
     my $groupPath = $self->getGroupPath($group);
     if ($groupPath) {
         my @dirList = sort {$b cmp $a} getDirectoryList("$groupPath");
@@ -155,7 +146,7 @@ sub removeGroup {
 sub addDistribution {
     my $self = shift;
     my $distribution = shift;
-    return 0 if ($self->{error} = illegalDistribution($distribution));
+    return 0 if ($self->{error} = invalidDistribution($distribution));
     my $distributionPath = $self->getDistributionPath($distribution, 1);
     if (not -d "$distributionPath") {
         return $self->mkdirs($distributionPath);
@@ -167,6 +158,7 @@ sub addDistribution {
 sub removeDistribution {
     my $self = shift;
     my $distribution = shift;
+    return undef if ($self->{error} = invalidDistribution($distribution));
     my $distributionPath = $self->getDistributionPath($distribution);
     if ($distributionPath) {
         my @dirList = sort {$b cmp $a} getDirectoryList("$distributionPath");
@@ -197,8 +189,8 @@ sub addConfiguration {
     my $self = shift;
     my $distribution = shift;
     my $configuration = shift;
-    return 0 if ($self->{error} = illegalDistribution($distribution));
-    return 0 if ($self->{error} = illegalConfiguration($configuration));
+    return 0 if ($self->{error} = invalidDistribution($distribution));
+    return 0 if ($self->{error} = invalidConfiguration($configuration));
     my $path = $self->getConfigurationPath($configuration, $distribution, 1);
     unless (-d $path) {
         return $self->mkdirs($path);
@@ -211,14 +203,8 @@ sub removeConfiguration {
     my $self = shift;
     my $distribution = shift;
     my $configuration = shift;
-    if (index($configuration, "/") != 0) {
-        $self->{error} = "Configuration must start with '/'";
-        return 0;
-    }
-    if ($configuration =~ m,/\.\./|/\.\.$,) {
-        $self->{error} = "Configuration can't contain '..'";
-        return 0;
-    }
+    return undef if ($self->{error} = invalidDistribution($distribution));
+    return undef if ($self->{error} = invalidConfiguration($configuration));
     my $path = $self->getConfigurationPath($configuration, $distribution);
     if ($path) {
         my @dirList = sort {$b cmp $a} getDirectoryList("$path");

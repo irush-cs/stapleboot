@@ -70,17 +70,14 @@ sub info {
 sub addHost {
     my $self = shift;
     my $host = shift;
-    unless (legalHost($host)) {
-        $self->{error} = "Illegal host name \"$host\"";
-        return 0;
-    }
+    return 0 if ($self->{error} = invalidHost($host));
     return $self->insert("$self->{schema}hosts", "$host");
 }
 
 sub addGroup {
     my $self = shift;
     my $group = shift;
-    return 0 if ($self->{error} = illegalGroup($group));
+    return 0 if ($self->{error} = invalidGroup($group));
     $group = fixPath($group);
     $group =~ s/\/$//;
     if ($self->count("SELECT COUNT(name) FROM $self->{schema}groups WHERE name = ? AND type = 'group'", $group)) {
@@ -101,8 +98,8 @@ sub addConfiguration {
     my $self = shift;
     my $distribution = shift;
     my $configuration = shift;
-    return 0 if ($self->{error} = illegalDistribution($distribution));
-    return 0 if ($self->{error} = illegalConfiguration($configuration));
+    return undef if ($self->{error} = invalidDistribution($distribution));
+    return undef if ($self->{error} = invalidConfiguration($configuration));
     $configuration = fixPath($configuration);
     $configuration =~ s/\/$//;
     if ($self->count("SELECT COUNT(name) FROM $self->{schema}configurations WHERE name = ? AND distribution = ?", $configuration, $distribution)) {
@@ -122,13 +119,14 @@ sub addConfiguration {
 sub addDistribution {
     my $self = shift;
     my $distribution = shift;
-    return 0 if ($self->{error} = illegalDistribution($distribution));
+    return 0 if ($self->{error} = invalidDistribution($distribution));
     return $self->insert("$self->{schema}distributions(name)", "$distribution");
 }
 
 sub removeHost {
     my $self = shift;
     my $host = shift;
+    return 0 if ($self->{error} = invalidHost($host));
     my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
     my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}hosts WHERE host = ?");
     my $rv = $sth->execute("$host");
@@ -145,11 +143,7 @@ sub removeHost {
 sub removeGroup {
     my $self = shift;
     my $group = shift;
-    if ($group !~ m/^\//) {
-        $self->{error} = "Malformed group \"$group\"";
-        return undef;
-    }
-    $group =~ s/\/$//;
+    return undef if ($self->{error} = invalidGroup($group));
     unless ($self->count("SELECT COUNT(name) FROM $self->{schema}groups WHERE name = ? AND type = 'group'", $group)) {
         $self->{error} = "Group does not exists";
         return undef;
@@ -182,10 +176,8 @@ sub removeConfiguration {
     my $self = shift;
     my $distribution = shift;
     my $configuration = shift;
-    if ($configuration !~ m/^\//) {
-        $self->{error} = "Malformed configuration \"$configuration\"";
-        return undef;
-    }
+    return undef if ($self->{error} = invalidDistribution($distribution));
+    return undef if ($self->{error} = invalidConfiguration($configuration));
     $configuration = fixPath($configuration);
     $configuration =~ s/\/$//;
     unless ($self->count("SELECT COUNT(name) FROM $self->{schema}configurations WHERE name = ? AND distribution = ?", $configuration, $distribution)) {
@@ -301,15 +293,16 @@ sub copyConfiguration {
 sub removeDistribution {
     my $self = shift;
     my $distribution = shift;
+    return undef if ($self->{error} = invalidDistribution($distribution));
     my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
     my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}distributions WHERE name = ?");
     my $rv = $sth->execute("$distribution");
     if ($dbh->errstr) {
         $self->{error} = $dbh->errstr;
-        return 0;
+        return undef;
     } elsif ($rv == 0) {
         $self->{error} = "Distribution does not exists";
-        return 0;
+        return undef;
     }
     return 1;
 }

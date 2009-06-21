@@ -210,23 +210,7 @@ B<Auto hash>
 
 =item getDB
 
-=item removeHost(host)
-
-=item removeGroup(group name)
-
-=item removeDistribution(distribution)
-
-=item removeConfiguration(distribution, configuration)
-
 =item copyConfiguration(configuration name, from distribution, to distribution)
-
-=item addTokens(tokens hash ref, group|configuration ref)
-
-=item removeTokens(tokens names list ref, group|configuration ref)
-
-=item addMount(configuration, mount, [location])
-
-=item removeMounts(mount [mount [...]])
 
 =item getRawTokens(group|configuration [group|configuration [...]])
 
@@ -258,8 +242,6 @@ B<Auto hash>
 
 =item removeGroupGroups(group, group name list)
 
-=item addGroupConfiguration(group, configuration, location)
-
 =item getGroupsConfigurations(group [group [...]])
 
 =item removeGroupConfigurations(group, configuration [configuration [...]])
@@ -278,19 +260,9 @@ B<Auto hash>
 
 =item getTemplates(configuration [configuration [...]])
 
-=item addTemplates(template [template [...]]);
-
-=item removeTemplates(template [template [...]]);
-
-=item addScripts(script [script [...]]);
-
-=item removeScripts(script [script [...]]);
-
 =item getScripts(configuration [configuration [...]])
 
 =item getAutos(configuration [configuration [...]])
-
-=item addAutos(auto [auto [...]])
 
 =item removeAutos(auto [auto [...]])
 
@@ -312,15 +284,7 @@ our @EXPORT = qw(
                     getRawTokens
                     getCompleteTokens
                     setDefaultTokens
-                    removeHost
-                    removeGroup
-                    removeDistribution
-                    removeConfiguration
                     copyConfiguration
-                    addTokens
-                    removeTokens
-                    addMount
-                    removeMounts
                     getStapleDir
                     getLastError
                     getAllHosts
@@ -333,7 +297,6 @@ our @EXPORT = qw(
                     getGroupGroups
                     addGroupGroup
                     removeGroupGroups
-                    addGroupConfiguration
                     removeGroupConfigurations
                     getGroupsConfigurations
                     getCompleteConfigurations
@@ -342,13 +305,8 @@ our @EXPORT = qw(
                     getRawMounts
                     getCompleteMounts
                     getTemplates
-                    addTemplates
-                    removeTemplates
-                    addScripts
-                    removeScripts
                     getScripts
                     getAutos
-                    addAutos
                     removeAutos
                     whoHasGroup
                     whoHasConfiguration
@@ -507,221 +465,9 @@ sub getDB {
     return $db->info();
 }
 
-=item B<removeHost(I<host>)>
-
-Deletes a host, returns 1 on success, and 0 on failure (and sets the error)
-
-=cut
-
-sub removeHost {
-    my $host = shift;
-    unless ($host) {
-        $error = "Missing host name";
-        return 0;
-    }
-    unless ($db->removeHost($host)) {
-        $error = $db->{error};
-        return 0;
-    }
-    return 1;
-}
-
-=item B<removeGroup(I<group string>)>
-
-Deletes a group, returns 1 on success, and 0 on failure (and sets the error)
-
-=cut
-
-sub removeGroup {
-    my $group = shift;
-    unless ($group) {
-        $error = "Missing group name";
-        return 0;
-    }
-    unless ($db->removeGroup($group)) {
-        $error = $db->{error};
-        return 0;
-    }
-    return 1;
-}
-
-=item B<addGroupConfiguration(I<group configuration [location]>)>
-
-Adds the given configuration (should have "name" and "active" fields set) to
-the I<group>'s configuration list at I<location>. If location is omitted
-appends to the end. Returns 1 on success or undef on failure.
-
-=cut
-
-sub addGroupConfiguration {
-    my $group = shift;
-    my $configuration = shift;
-    my $location = shift;
-    unless ($group) {
-        $error = "Missing group";
-        return undef;
-    }
-    unless ($configuration) {
-        $error = "Missing configuration";
-        return undef;
-    }
-    unless ($db->addGroupConfiguration($group, $configuration, $location)) {
-        $error = $db->{error};
-        return undef;
-    }
-    return 1;
-}
-
-=item B<removeDistribution(I<distribution string>)>
-
-Deletes a distribution, returns 1 on success, and 0 on failure (and sets the error)
-
-=cut
-
-sub removeDistribution {
-    my $distribution = shift;
-    unless ($distribution) {
-        $error = "Missing distribution name";
-        return 0;
-    }
-    unless ($db->removeDistribution($distribution)) {
-        $error = $db->{error};
-        return 0;
-    }
-    return 1;
-}
-
-=item B<addTokens(I<tokens hash ref, group|configuration ref>)>
-
-Add the tokens (hash ref of tokens) to the given group or
-configuration. returns 1 on success, and 0 on failure (and sets the error)
-
-=cut
-
-sub addTokens {
-    my $tokens = shift;
-    my $group = shift;
-    unless ($tokens) {
-        $error = "Missing tokens";
-        return 0;
-    }
-    unless ($group) {
-        $error = "Missing group";
-        return 0;
-    }
-    if (grep {/=/} keys %$tokens) {
-        $error = "Tokens may not contain the '=' char";
-        return 0;
-    }
-    unless ($db->addTokens($tokens, $group)) {
-        $error = $db->{error};
-        return 0;
-    }
-    return 1;
-}
-
-=item B<addMount(I<configuration, mount, [location]>)>
-
-Add the mount (includes active and destination) to the given configuration in
-the given location (or the end if omitted). returns 1 on success, or undef on
-failure (and sets the error)
-
-=cut
-
-sub addMount {
-    my $configuration = shift;
-    my $mount = shift;
-    my $location = shift;
-    unless ($configuration) {
-        $error = "Missing configuration";
-        return 0;
-    }
-    unless ($mount) {
-        $error = "Missing mount";
-        return 0;
-    }
-    unless ($db->addMount($configuration, $mount, $location)) {
-        $error = $db->{error};
-        return undef;
-    }
-    return 1;
-}
-
-=item B<removeMounts(I<mount [mount [...]]>)>
-
-Removes the given mounts (list of hashes). The mount hashes should contains a
-valid destination, active and configuration. Returns 1 or undef.
-
-=cut
-
-sub removeMounts {
-    my @mounts = @_;
-    unless (@mounts) {
-        $error = "Missing mounts";
-        return undef;
-    }
-    unless ($db->removeMounts(@mounts)) {
-        $error = $db->{error};
-        return undef;
-    }
-    return 1;
-}
-
-=item B<removeTokens(I<tokens names list ref, group|configuration ref>)>
-
-Removes the tokens (list of strings) from the given group or
-configuration. returns 1 on success, and 0 on failure (and sets the error)
-
-=cut
-
-sub removeTokens {
-    my $tokens = shift;
-    my $group = shift;
-    unless ($tokens) {
-        $error = "Missing tokens";
-        return 0;
-    }
-    unless ($group) {
-        $error = "Missing group";
-        return 0;
-    }
-    unless ($db->removeTokens($tokens, $group)) {
-        $error = $db->{error};
-        return 0;
-    }
-    return 1;
-}
-
 =item B<removeConfiguration(I<distribution, configuration string>)>
 
 Deletes a configuration, returns 1 on success, and 0 on failure (and sets the error)
-
-=cut
-
-sub removeConfiguration {
-    my $distribution = shift;
-    my $configuration = shift;
-    unless ($distribution) {
-        $error = "Missing distribution name";
-        return 0;
-    }
-    unless ($configuration) {
-        $error = "Missing configuration name";
-        return 0;
-    }
-    unless ($db->removeConfiguration($distribution, $configuration)) {
-        $error = $db->{error};
-        return 0;
-    }
-    return 1;
-}
-
-=item copyConfiguration(configuration name, from distribution, to distribution)
-
-copyies the configuration (string), from one distribution to another including
-everything below it. (i.e. coping '/' will copy the entire configuration tree).
-
-returns 1 on success, and 0 on failure (and sets the error).
 
 =cut
 
@@ -737,7 +483,7 @@ sub copyConfiguration {
     }
     unless ($to) {
         $error = "Missing destination distribution";
-        return 0;
+        return 0;        
     }
     unless ($db->copyConfiguration($conf, $from, $to)) {
         $error = $db->{error};
@@ -1287,102 +1033,6 @@ sub getTemplates {
     return @templates;
 }
 
-=item B<addTemplates(I<template [template [...]]>)>
-
-Adds the given templates (hashes, contains the configurations to add
-to). Previous templates with the same stage + name + configuration, will be
-overridden.
-
-If I<source> is available, it will be taken as the source for the
-template. otherwise I<data> will be taken. The source will be copied, so it can
-be deleted after it was added.
-
-Returns 1 or undef.
-
-=cut
-
-sub addTemplates {
-    my @templates = @_;
-    unless (@templates) {
-        $error = "Missing templates to add";
-        return undef;
-    }
-    unless ($db->addTemplates(@templates)) {
-        $error = $db->{error};
-        return undef;
-    }
-    return 1;
-}
-
-=item B<addScripts(I<script [script [...]]>)>
-
-Adds the given scripts (hashes, contains the configurations to add to). The
-scripts will be inserted in the specified location (order).
-
-If I<source> is available, it will be taken as the source for the
-script. otherwise I<data> will be taken. The source will be copied, so it can
-be deleted after it was added.
-
-Returns 1 or undef.
-
-=cut
-
-sub addScripts {
-    my @scripts = @_;
-    unless (@scripts) {
-        $error = "Missing scripts to add";
-        return undef;
-    }
-    unless ($db->addScripts(@scripts)) {
-        $error = $db->{error};
-        return undef;
-    }
-    return 1;
-}
-
-=item B<removeScripts(I<script [script [...]]>)>
-
-Removes the given scripts (full script hashes).
-
-Returns 1 or undef;
-
-=cut
-
-sub removeScripts {
-    my @scripts = @_;
-    unless (@scripts) {
-        $error = "Missing scripts to remove";
-        return undef;
-    }
-    unless ($db->removeScripts(@scripts)) {
-        $error = $db->{error};
-        return undef;
-    }
-    return 1;
-}
-
-=item B<removeTemplates(I<template [template [...]]>)>
-
-Removes the given templates (hashes with configuration hash (name +
-distribution), destination and stage).
-
-Returns 1 or undef;
-
-=cut
-
-sub removeTemplates {
-    my @templates = @_;
-    unless (@templates) {
-        $error = "Missing templates to remove";
-        return undef;
-    }
-    unless ($db->removeTemplates(@templates)) {
-        $error = $db->{error};
-        return undef;
-    }
-    return 1;
-}
-
 =item B<getScripts(I<configuration [configuration [...]]>)>
 
 Returns an ordered list of scripts hashes. The script are ordered first by the
@@ -1424,33 +1074,6 @@ sub getAutos {
     }
     return @results;
 }
-
-=item B<addAutos(I<auto [auto [...]]>)>
-
-Adds the given autos (hashes, contains the configurations to add to). The
-autos will be inserted in the specified location (order).
-
-If I<source> is available, it will be taken as the source for the
-auto. otherwise I<data> will be taken. The source will be copied, so it can
-be deleted after it was added.
-
-Returns 1 or undef.
-
-=cut
-
-sub addAutos {
-    my @autos = @_;
-    unless (@autos) {
-        $error = "Missing autos to add";
-        return undef;
-    }
-    unless ($db->addAutos(@autos)) {
-        $error = $db->{error};
-        return undef;
-    }
-    return 1;
-}
-
 
 =item B<removeAutos(I<auto [auto [...]]>)>
 

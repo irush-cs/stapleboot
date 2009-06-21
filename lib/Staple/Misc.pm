@@ -61,13 +61,15 @@ Staple::Misc module
 
 =item runCommand(<command>)
 
-=item legalHost(host name)
+=item invalidHost(host name)
 
-=item illegalGroup(group name)
+=item invalidGroup(group name)
 
-=item illegalDistribution(distribution name)
+=item invalidDistribution(distribution name)
 
-=item illegalConfiguration(configuration name)
+=item invalidConfiguration(configuration name)
+
+=item invalidTokenKey(key name)
 
 =back
 
@@ -90,10 +92,11 @@ our @EXPORT = qw(
                     writeTokensXMLFile
                     tokensToXML
                     runCommand
-                    legalHost
-                    illegalGroup
-                    illegalDistribution
-                    illegalConfiguration
+                    invalidHost
+                    invalidGroup
+                    invalidDistribution
+                    invalidConfiguration
+                    invalidTokenKey
                );
 our $VERSION = '003';
 
@@ -432,48 +435,48 @@ sub tokensToXML {
     return $string;
 }
 
-=item B<legalHost(I<host name>)>
+=item B<invalidHost(I<host name>)>
 
-Checks whether the given host name is legal. Currently can't contain spaces or
-slashes, and can't equal to "." or "..". Returns 1 if host is legal, and 0
-otherwise.
+Checks whether the given host name is invalid. Currently host name can't
+contain spaces or slashes, and can't equal to "." or "..". Returns empty string
+if the host is legal, or an error message if the host name is invalid legal.
 
 =cut
 
-sub legalHost {
+sub invalidHost {
     my $host = shift;
-    return (defined $host and
-            length($host) > 0 and
-            $host ne ".." and
-            $host ne "." and
-            index($host, "/") < 0 and
-            $host !~ m/\s/);
+    return "Missing host name" if not defined $host or length($host) == 0;
+    return "Host can't contain '.' or '..'" if $host eq ".." or $host eq ".";
+    return "Host can't contain '/'" if index($host, "/") >= 0;
+    return "Host can't contain spaces" if $host =~ m/\s/;
+    return "";
 }
 
-=item B<illegalGroup(I<group name>)>
+=item B<invalidGroup(I<group name>)>
 
-Checks whether the given group name is illegal. Returns the empty string if the
-group is legal, or an error mesage if the group name is illegal.
+Checks whether the given group name is invalid. Returns the empty string if the
+group is legal, or an error mesage if the group name is invalid.
 
 =cut
 
-sub illegalGroup {
+sub invalidGroup {
     my $group = shift;
     return "Missing group name" if not defined $group or length($group) == 0;
     return "Group must start with '/'" if (index($group, "/") != 0);
     return "Group can't end with '/'" if (rindex($group, "/") == length($group) - 1);
     return "Group can't contain '..'" if $group =~ m,/\.\./|/\.\.$,;
+    return "Group can't contain '.'" if $group =~ m,/\./|/\.$,;
     return "";
 }
 
-=item B<illegalDistribution(I<distribution name>)>
+=item B<invalidDistribution(I<distribution name>)>
 
-Checks whether the given distribution name is illegal. Returns the empty string
+Checks whether the given distribution name is invalid. Returns the empty string
 if the distribution is legal, else returns an error mesage.
 
 =cut
 
-sub illegalDistribution {
+sub invalidDistribution {
     my $distribution = shift;
     return "Missing distribution name" if not defined $distribution or length($distribution) == 0;
     return "Distribution can't contain '/'" if index($distribution, "/") >= 0;
@@ -482,22 +485,37 @@ sub illegalDistribution {
 }
 
 
-=item B<illegalConfiguration(I<configuration name>)>
+=item B<invalidConfiguration(I<configuration name>)>
 
-Checks whether the given configuration name is illegal. Returns an empty string
+Checks whether the given configuration name is invalid. Returns an empty string
 if the configuration is legal, otherwise returns an error mesage.
 
 =cut
 
-sub illegalConfiguration {
+sub invalidConfiguration {
     my $configuration = shift;
     return "Missing configuration name" if not defined $configuration or length($configuration) == 0;
     return "Configuration must start with '/'" if (index($configuration, "/") != 0);
     return "Configuration can't end with '/'" if (rindex($configuration, "/") == length($configuration) - 1);
     return "Configuration can't contain '..'" if $configuration =~ m,/\.\./|/\.\.$,;
+    return "Configuration can't contain '.'" if $configuration =~ m,/\./|/\.$,;
     return "";
 }
 
+=item B<invalidTokenKey(I<key name>)>
+
+Checks whether the given string is a valid token key. Returns an empty string
+if the key is valid, otherwise returns an error message.
+
+=cut
+
+sub invalidTokenKey {
+    my $key = shift;
+    return "Missing key" if not defined $key or length($key) == 0;
+    return "Key can't contain '='" if (index($key, "=") >= 0);
+    return "Key can't contain ';\\n'" if (index($key, ";\n") >= 0);
+    return "";
+}
 
 
 ################################################################################

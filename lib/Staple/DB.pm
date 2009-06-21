@@ -180,8 +180,8 @@ sub addMount {
 
 =item B<removeMounts(I<mount [mount [...]]>)>
 
-Deletes the list of mounts, returns 1 on success, or undef on failure (and sets
-the error).
+Deletes the list of mounts (list of hashes), returns 1 on success, or undef on
+failure (and sets the error).
 
 =cut
 
@@ -431,8 +431,9 @@ sub getGroupConfigurations {
 
 =item B<addGroupConfiguration(I<group, configuration, location>)>
 
-Adds I<configuration> to I<group>'s configuration list at I<location> (or at
-the end if omitted). Returns 1 or undef.
+Adds I<configuration> (name, and active should be set) to I<group>'s
+configuration list at I<location> (or at the end if omitted). Returns 1 or
+undef.
 
 =cut
 

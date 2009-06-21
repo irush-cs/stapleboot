@@ -34,6 +34,7 @@ use Term::ReadLine;
 use Term::ANSIColor;
 use Net::DNS;
 
+my $historyFile = "$ENV{HOME}/.staplectl_history";
 my $distribution = "";
 my $input;
 my $attribs;
@@ -1175,6 +1176,10 @@ sub printTree {
 }
 
 sub quit {
+    if ($input and -w $historyFile) {
+        $input->WriteHistory($historyFile);
+        $input->history_truncate_file($historyFile, 1000);
+    }
     exit 0;
 }
 
@@ -1267,8 +1272,8 @@ sub debugOn {
         print "Host \"$host\" doesn't exist\n";
         return;
     }
-    unless (addTokens({"__STAPLE_DEBUG__" => {key => "__STAPLE_DEBUG__", value => "prompt", raw => "prompt", type => "static"}}, $group)) {
-        print getLastError()."\n";
+    unless ($db->addTokens({"__STAPLE_DEBUG__" => {key => "__STAPLE_DEBUG__", value => "prompt", raw => "prompt", type => "static"}}, $group)) {
+        print $db->{error}."\n";
         return;
     }
     print "$host set to debug (prompt) mode\n";
@@ -1281,8 +1286,8 @@ sub debugOff {
         return;
     }
     if (my $group = getHostGroup($host)) {
-        unless (removeTokens(["__STAPLE_DEBUG__"], $group)) {
-            print getLastError()."\n";
+        unless ($db->removeTokens(["__STAPLE_DEBUG__"], $group)) {
+            print $db->{error}."\n";
             return 0;
         }
         print "$host set to debug off\n";
@@ -1549,7 +1554,7 @@ sub aa {
     $auto{order} = undef unless $auto{order} =~ m/^\d+$/;
     $auto{critical} = boolprompt "critical", "no";
     $auto{tokens} = boolprompt "tokens", "no";
-    print getLastError()."\n" unless (addAutos(\%auto));
+    print $db->{error}."\n" unless ($db->addAutos(\%auto));
     unlink $tmpFile
 }
 
@@ -1626,7 +1631,7 @@ sub ua {
         $newAuto{tokens} = boolprompt "tokens", $auto->{tokens};
         $newAuto{configuration} = $auto->{configuration};
         print getLastError()."\n" unless (removeAutos($auto));
-        print getLastError()."\n" unless (addAutos(\%newAuto));
+        print getLastError()."\n" unless ($db->addAutos(\%newAuto));
         unlink $tmpFile
     } else {
         print "No such auto \"$auto_name\" in \"$configuration\"\n";
@@ -1679,8 +1684,8 @@ sub rs {
             print "No such script \"$script_name\" in \"$configuration\"\n";
             return;
         }
-        unless (removeScripts($script)) {
-            print getLastError()."\n";
+        unless ($db->removeScripts($script)) {
+            print $db->{error}."\n";
             return;
         }
     } else {
@@ -1746,8 +1751,8 @@ sub us {
         $newScript{tokens} = boolprompt "tokens", $script->{tokens};
         $newScript{tokenScript} = boolprompt "tokenScript", $script->{tokenScript};
         $newScript{configuration} = $script->{configuration};
-        print getLastError()."\n" unless (removeScripts($script));
-        print getLastError()."\n" unless (addScripts(\%newScript));
+        print $db->{error}."\n" unless ($db->removeScripts($script));
+        print $db->{error}."\n" unless ($db->addScripts(\%newScript));
         unlink $tmpFile
     } else {
         print "No such script \"$script_name\" in \"$configuration\"\n";
@@ -1793,7 +1798,7 @@ sub as {
     $script{critical} = boolprompt "critical", "no";
     $script{tokens} = boolprompt "tokens", "no";
     $script{tokenScript} = boolprompt "tokenScript", "no";
-    print getLastError()."\n" unless (addScripts(\%script));
+    print $db->{error}."\n" unless ($db->addScripts(\%script));
     unlink $tmpFile
 }
 
@@ -1897,8 +1902,8 @@ sub rt {
             print "No such template \"$template_name\" in \"$configuration\"\n";
             return;
         }
-        unless (removeTemplates($template)) {
-            print getLastError()."\n";
+        unless ($db->removeTemplates($template)) {
+            print $db->{error}."\n";
             return;
         }
     } else {
@@ -1943,7 +1948,7 @@ sub at {
     } until ($template{stage} =~ m/^(?:mount|sysinit|final)$/);
     $template{destination} = prompt "destination";
     $template{configuration} = $conf;
-    print getLastError()."\n" unless (addTemplates(\%template));
+    print $db->{error}."\n" unless ($db->addTemplates(\%template));
     unlink $tmpFile
 }
 
@@ -2002,8 +2007,8 @@ sub ut {
         } until ($newTemplate{stage} =~ m/^(?:mount|sysinit|final)$/);
         $newTemplate{destination} = prompt "destination", $template->{destination};
         $newTemplate{configuration} = $template->{configuration};
-        print getLastError()."\n" unless (removeTemplates($template));
-        print getLastError()."\n" unless (addTemplates(\%newTemplate));
+        print $db->{error}."\n" unless ($db->removeTemplates($template));
+        print $db->{error}."\n" unless ($db->addTemplates(\%newTemplate));
         unlink $tmpFile
     } else {
         print "No such template \"$template_name\" in \"$configuration\"\n";
@@ -2093,8 +2098,8 @@ sub rm {
         print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n";
         return;
     }
-    unless (removeMounts({destination => $mount, active => $active, configuration => $conf})) {
-        print getLastError()."\n";
+    unless ($db->removeMounts({destination => $mount, active => $active, configuration => $conf})) {
+        print $db->{error}."\n";
         return;
     }
 }
@@ -2131,8 +2136,8 @@ sub am {
         print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n";
         return;
     }
-    unless (addMount($conf, {destination => $mount, active => $active}, $location)) {
-        print getLastError()."\n";
+    unless ($db->addMount($conf, {destination => $mount, active => $active}, $location)) {
+        print $db->{error}."\n";
         return;
     }
 }
@@ -2313,8 +2318,8 @@ sub agc {
     (my $conf) = getConfigurationsByName($configuration);
     if ($conf) {
         $conf->{active} = $active;
-        unless (addGroupConfiguration($group, $conf, $location)) {
-            print getLastError()."\n";
+        unless ($db->addGroupConfiguration($group, $conf, $location)) {
+            print $db->{error}."\n";
             return;
         }
     } else {
@@ -2348,7 +2353,7 @@ sub adc {
     (my $conf) = getConfigurationsByName($configuration);
     if ($conf) {
         $conf->{active} = $active;
-        unless (addGroupConfiguration($group, $conf, $location)) {
+        unless ($db->addGroupConfiguration($group, $conf, $location)) {
             print getLastError()."\n";
             return;
         }
@@ -2394,8 +2399,8 @@ sub ahc {
     (my $conf) = getConfigurationsByName($configuration);
     if ($conf) {
         $conf->{active} = $active;
-        unless (addGroupConfiguration($group, $conf, $location)) {
-            print getLastError()."\n";
+        unless ($db->addGroupConfiguration($group, $conf, $location)) {
+            print $db->{error}."\n";
             return;
         }
     } else {
@@ -2703,8 +2708,8 @@ sub createToken {
     }
     chomp($key);
     $value =~ s/;\n$//;
-    unless (addTokens({"$key" => {key => $key, value => $value, raw => $value, type => $type}}, $group)) {
-        print getLastError()."\n";
+    unless ($db->addTokens({"$key" => {key => $key, value => $value, raw => $value, type => $type}}, $group)) {
+        print $db->{error}."\n";
     }   
 }
 
@@ -2735,8 +2740,8 @@ sub rct {
     }
     if ((my $group) = getConfigurationsByName($configuration)) {
         ($group) = grep {$_->{name} eq $configuration} getCompleteConfigurations([$group], $distribution);
-        unless (removeTokens([$token], $group)) {
-            print getLastError()."\n";
+        unless ($db->removeTokens([$token], $group)) {
+            print $db->{error}."\n";
         }
     } else {
         print "Configuration \"$configuration\" does not exist\n";
@@ -2768,8 +2773,8 @@ sub rgt {
         return;
     }
     if ((my $group) = getGroupsByName($groupName)) {
-        unless (removeTokens([$token], $group)) {
-            print getLastError()."\n";
+        unless ($db->removeTokens([$token], $group)) {
+            print $db->{error}."\n";
         }
     } else {
         print "Group \"$groupName\" does not exist\n";
@@ -2801,8 +2806,8 @@ sub rht {
         return;
     }
     if (my $group = getHostGroup($host)) {
-        unless (removeTokens([$token], $group)) {
-            print getLastError()."\n";
+        unless ($db->removeTokens([$token], $group)) {
+            print $db->{error}."\n";
         }
     } else {
         print "Host \"$host\" does not exist\n";
@@ -2828,8 +2833,8 @@ sub rdt {
         return;
     }
     if (my $group = getDistributionGroup($distribution)) {
-        unless (removeTokens([$token], $group)) {
-            print getLastError()."\n";
+        unless ($db->removeTokens([$token], $group)) {
+            print $db->{error}."\n";
         }
     } else {
         print getLastError()."\n";
@@ -2940,7 +2945,7 @@ sub rc {
         print "distribution not set\n";
         return;
     }
-    print getLastError()."\n" unless removeConfiguration($distribution, $_[0]);
+    print $db->{error}."\n" unless $db->removeConfiguration($distribution, $_[0]);
 }
 
 sub sd {
@@ -3018,7 +3023,7 @@ sub rh {
             return;
         }
     }
-    print getLastError()."\n" unless removeHost($host);
+    print $db->{error}."\n" unless $db->removeHost($host);
 }
 
 sub gag {
@@ -3041,7 +3046,7 @@ sub ag {
 }
 
 sub rg {
-    print getLastError()."\n" unless removeGroup($_[0]);
+    print $db->{error}."\n" unless $db->removeGroup($_[0]);
 }
 
 sub gad {
@@ -3060,7 +3065,7 @@ sub ad {
 }
 
 sub rd {
-    print getLastError()."\n" unless removeDistribution($_[0]);
+    print $db->{error}."\n" unless $db->removeDistribution($_[0]);
 }
 
 sub syncctl {
@@ -3679,6 +3684,7 @@ if ($singleCommand) {
     }
     $attribs->{completion_entry_function} = sub {return ()};
     $attribs->{attempted_completion_function} = \&attempted_completion;
+    $input->ReadHistory($historyFile) if -r $historyFile;
 
     # main loop
     while (1) {
