@@ -203,7 +203,7 @@ sub removeConfiguration {
     return undef;
 }
 
-=item B<copyConfiguration(I<conf from to>)>
+=item B<copyConfiguration(I<conf, from, to>)>
 
 Copies the configuration I<conf> (a string) from distribution I<from> to
 distribution I<to>, returns 1 on success, or undef on failure (error is set).
@@ -338,9 +338,9 @@ sub addAutos {
 }
 
 
-=item B<removeAutos(I<auto [auto [...]]>)>
+=item B<removeScripts(I<script [script [...]]>)>
 
-Removes the given autos (full auto hashes).
+Removes the given scripts (full script hashes).
 
 Returns 1 or undef;
 
@@ -348,7 +348,7 @@ Returns 1 or undef;
 
 sub removeScripts {
     my $self = shift;
-    $self->{error} = "removeAutos not implemented in this database yet";
+    $self->{error} = "removeScripts not implemented in this database yet";
     return undef;
 }
 
@@ -371,9 +371,9 @@ sub addScripts {
     return undef;
 }
 
-=item B<removeScripts(I<script [script [...]]>)>
+=item B<removeAutos(I<auto [auto [...]]>)>
 
-Removes the given scripts (full script hashes).
+Removes the given autos (full auto hashes).
 
 Returns 1 or undef;
 
@@ -458,8 +458,11 @@ sub removeGroupConfigurations {
 
 =item B<addGroupGroup(I<group, group name, location>)
 
-Adds I<group name> to the list of groups in I<group> at I<location>. returns 1
-or undef.
+The first group is the receiver. The second group (name - string), is the group
+to add to the first group. The third, optional, parameter is the location in
+the gorup list, if omitted adds to the end of the list.
+
+Returns 1 on succes or undef on failure (error is set).
 
 =cut
 
@@ -471,8 +474,8 @@ sub addGroupGroup {
 
 =item B<removeGroupGroups(I<group, group name, [group name ...]>)
 
-Removes the groups list (strings) from the list of groups in I<group>. returns
-1 or undef.
+Removes the groups list (strings) from the list of groups in I<group>
+(hash). returns 1 or undef.
 
 =cut
 

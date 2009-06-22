@@ -210,8 +210,6 @@ B<Auto hash>
 
 =item getDB
 
-=item copyConfiguration(configuration name, from distribution, to distribution)
-
 =item getRawTokens(group|configuration [group|configuration [...]])
 
 =item getCompleteTokens(tokens ref [host] [distribution])
@@ -222,13 +220,7 @@ B<Auto hash>
 
 =item getLastError( )
 
-=item getAllHosts( )
-
-=item getAllGroups( )
-
 =item getAllDistributions( )
-
-=item getAllConfigurations(distribution)
 
 =item getDistributionGroup(distribution)
 
@@ -238,13 +230,7 @@ B<Auto hash>
 
 =item getGroupGroups(group [group [...]])
 
-=item addGroupGroup(group to receive, group name to add, location)
-
-=item removeGroupGroups(group, group name list)
-
 =item getGroupsConfigurations(group [group [...]])
-
-=item removeGroupConfigurations(group, configuration [configuration [...]])
 
 =item getCompleteConfigurations(configurations ref, distribution, [bad list ref])
 
@@ -264,14 +250,6 @@ B<Auto hash>
 
 =item getAutos(configuration [configuration [...]])
 
-=item removeAutos(auto [auto [...]])
-
-=item whoHasGroup(group name) 
-
-=item whoHasConfiguration(configuration name) 
-
-=item whoHasToken(token key, distribution)
-
 =back
 
 =cut
@@ -284,20 +262,13 @@ our @EXPORT = qw(
                     getRawTokens
                     getCompleteTokens
                     setDefaultTokens
-                    copyConfiguration
                     getStapleDir
                     getLastError
-                    getAllHosts
-                    getAllGroups
                     getAllDistributions
-                    getAllConfigurations
                     getDistributionGroup
                     getHostGroup
                     getCompleteGroups
                     getGroupGroups
-                    addGroupGroup
-                    removeGroupGroups
-                    removeGroupConfigurations
                     getGroupsConfigurations
                     getCompleteConfigurations
                     getConfigurationsByName
@@ -307,10 +278,6 @@ our @EXPORT = qw(
                     getTemplates
                     getScripts
                     getAutos
-                    removeAutos
-                    whoHasGroup
-                    whoHasConfiguration
-                    whoHasToken
                );
 our $VERSION = '003';
 
@@ -463,33 +430,6 @@ Returns a string representing the current database (as given via setDB)
 
 sub getDB {
     return $db->info();
-}
-
-=item B<removeConfiguration(I<distribution, configuration string>)>
-
-Deletes a configuration, returns 1 on success, and 0 on failure (and sets the error)
-
-=cut
-
-sub copyConfiguration {
-    (my $conf, my $from, my $to) = @_;
-    unless ($conf) {
-        $error = "Missing configuration name";
-        return 0;
-    }
-    unless ($from) {
-        $error = "Missing source distribution";
-        return 0;
-    }
-    unless ($to) {
-        $error = "Missing destination distribution";
-        return 0;        
-    }
-    unless ($db->copyConfiguration($conf, $from, $to)) {
-        $error = $db->{error};
-        return 0;
-    }
-    return 1;
 }
 
 =item B<getRawTokens(I<group|configuration [group|configuration [...]]>)>
@@ -727,87 +667,6 @@ sub getGroupGroups {
     return $db->getGroupsByName(@groups);
 }
 
-
-=item B<addGroupGroup(I<group, group name, location>)>
-
-The first group is the receiver. The second group (name - string), is the group
-to add to the first group. The third, optional, parameter is the location in
-the gorup list, if omitted adds to the end of the list.
-
-Returns 1 on succes or undef on failure (error is set).
-
-=cut
-
-sub addGroupGroup {
-    my $group = shift;
-    my $name = shift;
-    my $location = shift;
-    unless ($group) {
-        $error = "Missing group parameter";
-        return undef;
-    }
-    unless ($name) {
-        $error = "Missing group to add";
-        return undef;
-    }
-    unless ($db->addGroupGroup($group, $name, $location)) {
-        $error = $db->{error};
-        return undef;
-    }
-    return 1;
-}
-
-=item B<removeGroupGroups(I<group, group name [group name [...]]>)>
-
-Removes the group list (string) from the first group (hash), returns 1 on
-success, or undef on failure (and sets the error)
-
-=cut
-
-sub removeGroupGroups {
-    my $group = shift;
-    my @groups = @_;
-    unless ($group) {
-        $error = "Missing group";
-        return undef;
-    }
-    unless (@groups) {
-        $error = "Missing groups to remvoe";
-        return undef;
-    }
-    unless ($db->removeGroupGroups($group, @groups)) {
-        $error = $db->{error};
-        return undef;
-    }
-    return 1;
-}
-
-=item B<removeGroupConfigurations(I<group, configuration [configuration [...]]>)>
-
-Removes the configuration list (hashes) from the group (hash), returns 1 on
-success, or undef on failure (and sets the error)
-
-=cut
-
-sub removeGroupConfigurations {
-    my $group = shift;
-    my @configurations = @_;
-    unless ($group) {
-        $error = "Missing group";
-        return undef;
-    }
-    unless (@configurations) {
-        $error = "Missing configurations to remvoe";
-        return undef;
-    }
-    unless ($db->removeGroupConfigurations($group, @configurations)) {
-        $error = $db->{error};
-        return undef;
-    }
-    return 1;
-}
-
-
 =item B<getCompleteConfigurations(I<configurations ref, distribution, [bad list ref]>)>
 
 Receives an ordered list reference of configurations and a distribution name,
@@ -887,36 +746,6 @@ sub getGroupsByName {
     return @groups;
 }
 
-=item B<getAllHosts( )>
-
-Returns an unordered list of all hosts. returns undef on error and sets the last error;
-
-=cut
-
-sub getAllHosts {
-    my @hosts = $db->getAllHosts();
-    if (@hosts and not defined $hosts[0]) {
-        $error = $db->{error};
-        return undef;
-    }
-    return @hosts;
-}
-
-=item B<getAllGroups( )>
-
-Returns a sorted list of all groups. returns undef on error and sets the last error;
-
-=cut
-
-sub getAllGroups {
-    my @groups = $db->getAllGroups();
-    if (@groups and not defined $groups[0]) {
-        $error = $db->{error};
-        return undef;
-    }
-    return sort {$a cmp $b} @groups;
-}
-
 =item B<getAllDistributions( )>
 
 Returns an ordered list of all distributions. returns undef on error and sets the last error;
@@ -930,27 +759,6 @@ sub getAllDistributions {
         return undef;
     }
     return sort {$a cmp $b} @distributions;
-}
-
-=item B<getAllConfigurations(distribution)>
-
-Returns a list of all configurations. returns undef on error and
-sets the last error;
-
-=cut
-
-sub getAllConfigurations {
-    my $distribution = shift;
-    unless ($distribution) {
-        $error = "Missing distribution";
-        return undef;
-    }
-    my @configurations = $db->getAllConfigurations($distribution);
-    if (@configurations and not defined $configurations[0]) {
-        $error = $db->{error};
-        return undef;
-    }
-    return sort {$a cmp $b} @configurations;
 }
 
 =item B<getLastError( )>
@@ -1073,89 +881,6 @@ sub getAutos {
         return undef;
     }
     return @results;
-}
-
-=item B<removeAutos(I<auto [auto [...]]>)>
-
-Removes the given autos (full auto hashes).
-
-Returns 1 or undef;
-
-=cut
-
-sub removeAutos {
-    my @autos = @_;
-    unless (@autos) {
-        $error = "Missing autos to remove";
-        return undef;
-    }
-    unless ($db->removeAutos(@autos)) {
-        $error = $db->{error};
-        return undef;
-    }
-    return 1;
-}
-
-
-=item B<whoHasGroup(I<group name>)>
-
-Receives a single group name (string), and returns a group (hash) list, of the
-groups that are attached to the given group. The output can be a group, host,
-or distribution groups.
-On error undef is returned, and the error is set.
-
-=cut
-
-sub whoHasGroup {
-    my $group = shift;
-    my @groups = $db->whoHasGroup($group);
-    if (@groups and not defined $groups[0]) {
-        $error = $db->{error};
-        return undef;
-    }
-    return @groups;
-}
-
-=item B<whoHasConfiguration(I<configuration name>)>
-
-Receives a single configuration name (string), and returns a group (hash) list,
-of the groups that are attached to the given configuration. The output can be a
-group, host, or distribution groups. The output also includes group which
-contains a removed configurations.
-
-On error undef is returned, and the error is set.
-
-=cut
-
-sub whoHasConfiguration {
-    my @groups = $db->whoHasConfiguration(@_);
-    if (@groups and not defined $groups[0]) {
-        $error = $db->{error};
-        return undef;
-    }
-    return @groups;
-}
-
-=item B<whoHasToken(I<token key, distribution>)>
-
-Receives a single token key (string) and a distribution name, and returns a two
-list refs, first of groups (can be hosts, distributions or groups), and the
-second is configurations (for the given distribution). Both lists, contains
-groups/configurations with values for the given token.
-
-On error undef is returned, and the error is set.
-
-=cut
-
-sub whoHasToken {
-    my $key = shift;
-    my $distribution = shift;
-    (my $groups, my $configurations) = $db->whoHasToken($key, $distribution);
-    if (not defined $groups) {
-        $error = $db->{error};
-        return undef;
-    }
-    return ($groups, $configurations);
 }
 
 =back

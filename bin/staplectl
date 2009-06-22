@@ -1198,9 +1198,9 @@ sub wht {
         print "Missing token key\n";
         return;
     }
-    (my $groups, my $configurations) = whoHasToken($token, $dist);
+    (my $groups, my $configurations) = $db->whoHasToken($token, $dist);
     if (not defined $groups) {
-        print getLastError()."\n";
+        print $db->{error}."\n";
         return;
     }
     foreach my $type ("host", "distribution", "group") {
@@ -1225,9 +1225,9 @@ sub whc {
         print "Missing configuration\n";
         return;
     }
-    my @groups = whoHasConfiguration($configuration);
+    my @groups = $db->whoHasConfiguration($configuration);
     if (@groups and not defined $groups[0]) {
-        print getLastError()."\n";
+        print $db->{error}."\n";
         return;
     }
     foreach my $type ("host", "distribution", "group") {
@@ -1246,9 +1246,9 @@ sub whg {
         print "Missing group\n";
         return;
     }
-    my @groups = whoHasGroup($group);
+    my @groups = $db->whoHasGroup($group);
     if (@groups and not defined $groups[0]) {
-        print getLastError()."\n";
+        print $db->{error}."\n";
         return;
     }
     foreach my $type ("host", "distribution", "group") {
@@ -1312,8 +1312,8 @@ sub cc {
         print "Missing destination distribution\n";
         return;
     }
-    unless (copyConfiguration($configuration_name, $from, $to)) {
-        print getLastError()."\n";
+    unless ($db->copyConfiguration($configuration_name, $from, $to)) {
+        print $db->{error}."\n";
         return;
     }
 }
@@ -1367,7 +1367,7 @@ sub ggi {
         return;
     }
     my @groups_names = splitData($group_name);
-    my @groups = getGroupsByName(@groups_names);
+    my @groups = $db->getGroupsByName(@groups_names);
     foreach my $group (@groups) {
         print "$group->{name}:\n";
         print "-" x length($group->{name});
@@ -1376,9 +1376,9 @@ sub ggi {
         print "Tokens:\n";
         printgctokens($group);
         print "Groups:\n";
-        my @groupsref = getGroupGroups($group);
+        my @groupsref = $db->getGroupGroups($group);
         if (@groupsref and not defined $groupsref[0]) {
-            print getLastError()."\n";
+            print $db->{error}."\n";
             return;
         } else {
             print join "\n", map {"$_->{name}"} @groupsref;
@@ -1465,9 +1465,9 @@ sub localgetautos {
         print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n" unless $echooff;
         return undef;
     }
-    my @autos = getAutos($conf);
+    my @autos = $db->getAutos($conf);
     if (@autos and not defined $autos[0]) {
-        print getLastError()."\n" unless $echooff;
+        print $db->{error}."\n" unless $echooff;
         return undef;
     }
     return @autos;
@@ -1572,8 +1572,8 @@ sub ra {
             print "No such auto \"$auto_name\" in \"$configuration\"\n";
             return;
         }
-        unless (removeAutos($auto)) {
-            print getLastError()."\n";
+        unless ($db->removeAutos($auto)) {
+            print $db->{error}."\n";
             return;
         }
     } else {
@@ -1630,8 +1630,8 @@ sub ua {
         $newAuto{critical} = boolprompt "critical", $auto->{critical};
         $newAuto{tokens} = boolprompt "tokens", $auto->{tokens};
         $newAuto{configuration} = $auto->{configuration};
-        print getLastError()."\n" unless (removeAutos($auto));
-        print getLastError()."\n" unless ($db->addAutos(\%newAuto));
+        print $db->{errro}."\n" unless ($db->removeAutos($auto));
+        print $db->{error}."\n" unless ($db->addAutos(\%newAuto));
         unlink $tmpFile
     } else {
         print "No such auto \"$auto_name\" in \"$configuration\"\n";
@@ -1657,9 +1657,9 @@ sub localgetscripts {
         print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n" unless $echooff;
         return undef;
     }
-    my @scripts = getScripts($conf);
+    my @scripts = $db->getScripts($conf);
     if (@scripts and not defined $scripts[0]) {
-        print getLastError()."\n" unless $echooff;
+        print $db->{error}."\n" unless $echooff;
         return undef;
     }
     return @scripts;
@@ -1875,9 +1875,9 @@ sub localgettemplates {
         print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n" unless $echooff;
         return undef;
     }
-    my @templates = getTemplates($conf);
+    my @templates = $db->getTemplates($conf);
     if (@templates and not defined $templates[0]) {
-        print getLastError()."\n"  unless $echooff;
+        print $db->{error}."\n"  unless $echooff;
         return undef;
     }
     return @templates;
@@ -2152,9 +2152,9 @@ sub gm {
     if ($conf) {
         ($conf) = grep {$_->{name} eq $configuration} getCompleteConfigurations([$conf], $distribution);
         if ($conf) {
-            my @mounts = getRawMounts($conf);
+            my @mounts = $db->getMounts($conf);
             if (@mounts and not defined $mounts[0]) {
-                print getLastError()."\n";
+                print $db->{error}."\n";
                 return;
             } else {
                 print join "\n", map {($_->{active} ?  "  +" : "  -").$_->{destination}} @mounts;
@@ -2199,8 +2199,8 @@ sub rgc {
     (my $conf) = getConfigurationsByName($configuration);
     if ($conf) {
         $conf->{active} = $active;
-        unless (removeGroupConfigurations($group, $conf)) {
-            print getLastError()."\n";
+        unless ($db->removeGroupConfigurations($group, $conf)) {
+            print $db->{error}."\n";
             return;
         }
     } else {
@@ -2233,8 +2233,8 @@ sub rdc {
     (my $conf) = getConfigurationsByName($configuration);
     if ($conf) {
         $conf->{active} = $active;
-        unless (removeGroupConfigurations($group, $conf)) {
-            print getLastError()."\n";
+        unless ($db->removeGroupConfigurations($group, $conf)) {
+            print $db->{error}."\n";
             return;
         }
     } else {
@@ -2278,8 +2278,8 @@ sub rhc {
     (my $conf) = getConfigurationsByName($configuration);
     if ($conf) {
         $conf->{active} = $active;
-        unless (removeGroupConfigurations($group, $conf)) {
-            print getLastError()."\n";
+        unless ($db->removeGroupConfigurations($group, $conf)) {
+            print $db->{error}."\n";
             return;
         }
     } else {
@@ -2354,7 +2354,7 @@ sub adc {
     if ($conf) {
         $conf->{active} = $active;
         unless ($db->addGroupConfiguration($group, $conf, $location)) {
-            print getLastError()."\n";
+            print $db->{error}."\n";
             return;
         }
     } else {
@@ -2492,8 +2492,8 @@ sub agg {
     }
     (my $groupGroup) = getGroupsByName($group1);
     if ($groupGroup) {
-        unless (addGroupGroup($groupGroup, $group2, $location)) {
-            print getLastError()."\n";
+        unless ($db->addGroupGroup($groupGroup, $group2, $location)) {
+            print $db->{error}."\n";
             return;
         }
     } else {
@@ -2515,8 +2515,8 @@ sub rgg {
     }
     (my $groupGroup) = getGroupsByName($group1);
     if ($groupGroup) {
-        unless (removeGroupGroups($groupGroup, $group2)) {
-            print getLastError()."\n";
+        unless ($db->removeGroupGroups($groupGroup, $group2)) {
+            print $db->{error}."\n";
             return;
         }
     } else {
@@ -2533,8 +2533,8 @@ sub adg {
         return;
     }
     if (my $distributionGroup = getDistributionGroup($distribution)) {
-        unless (addGroupGroup($distributionGroup, $group, $location)) {
-            print getLastError()."\n";
+        unless ($db->addGroupGroup($distributionGroup, $group, $location)) {
+            print $db->{error}."\n";
             return;
         }
     } else {
@@ -2550,8 +2550,8 @@ sub rdg {
         return;
     }
     if (my $distributionGroup = getDistributionGroup($distribution)) {
-        unless (removeGroupGroups($distributionGroup, $group)) {
-            print getLastError()."\n";
+        unless ($db->removeGroupGroups($distributionGroup, $group)) {
+            print $db->{error}."\n";
             return;
         }
     } else {
@@ -2573,8 +2573,8 @@ sub ahg {
         return;
     }
     if (my $hostGroup = getHostGroup($host)) {
-        unless (addGroupGroup($hostGroup, $group, $location)) {
-            print getLastError()."\n";
+        unless ($db->addGroupGroup($hostGroup, $group, $location)) {
+            print $db->{error}."\n";
             return;
         }
     } else {
@@ -2604,8 +2604,8 @@ sub rhg {
             print "\"$host\" doesn't have the group \"$group\"\n";
             return;
         }
-        unless (removeGroupGroups($hostGroup, $group)) {
-            print getLastError()."\n";
+        unless ($db->removeGroupGroups($hostGroup, $group)) {
+            print $db->{error}."\n";
             return;
         }
     } else {
@@ -2817,10 +2817,10 @@ sub rht {
 sub adt {
     my $dist = $distribution;
     $dist = $_[0] if $_[0];
-    if (my $group = getDistributionGroup($dist)) {
+    if (my $group = $db->getDistributionGroup($dist)) {
         createToken($group);
     } else {
-        print getLastError()."\n";
+        print $db->{error}."\n";
     }
 }
 
@@ -2832,17 +2832,17 @@ sub rdt {
         print "Missing token\n";
         return;
     }
-    if (my $group = getDistributionGroup($distribution)) {
+    if (my $group = $db->getDistributionGroup($distribution)) {
         unless ($db->removeTokens([$token], $group)) {
             print $db->{error}."\n";
         }
     } else {
-        print getLastError()."\n";
+        print $db->{error}."\n";
     }
 }
 
 sub printgctokens {
-    if (my $tokens = getRawTokens($_[0])) {
+    if (my $tokens = $db->getTokens($_[0])) {
         my %tokens = %$tokens;
         foreach my $type ("static", "dynamic", "regexp") {
             my @tokens = grep {$_->{type} eq $type} values %tokens;
@@ -2853,7 +2853,7 @@ sub printgctokens {
             }
         }
     } else {
-        print getLastError()."\n";
+        print $db->{error}."\n";
     }
 }
 
@@ -2919,9 +2919,9 @@ sub gac {
         print "distribution not set\n";
         return;
     }
-    my @configurations = getAllConfigurations($distribution);
+    my @configurations = $db->getAllConfigurations($distribution);
     if (@configurations and not defined $configurations[0]) {
-        print getLastError()."\n";
+        print $db->{error}."\n";
     } else {
         if ($_[0]) {
             my $regexp = qr/$_[0]/;
@@ -2950,9 +2950,9 @@ sub rc {
 
 sub sd {
     if ($_[0]) {
-        my @distributions = getAllDistributions();
+        my @distributions = $db->getAllDistributions();
         if (@distributions and not defined $distributions[0]) {
-            print "Can't get distribution list: ".getLastError()."\n";
+            print "Can't get distribution list: ".$db->{error}."\n";
         } else {
             my %distributions = ();
             @distributions{@distributions} = @distributions;
@@ -2986,9 +2986,9 @@ sub getdb {
 }
 
 sub gah {
-    my @hosts = getAllHosts();
+    my @hosts = $db->getAllHosts();
     if (@hosts and not defined $hosts[0]) {
-        print getLastError()."\n";
+        print $db->{error}."\n";
     } else {
         if ($_[0]) {
             my $regexp = qr/$_[0]/;
@@ -3027,9 +3027,9 @@ sub rh {
 }
 
 sub gag {
-    my @groups = getAllGroups();
+    my @groups = $db->getAllGroups();
     if (@groups and not defined $groups[0]) {
-        print getLastError()."\n";
+        print $db->{error}."\n";
     } else {
         if ($_[0]) {
             my $regexp = qr/$_[0]/;
@@ -3050,9 +3050,9 @@ sub rg {
 }
 
 sub gad {
-    my @distributions = getAllDistributions();
+    my @distributions = $db->getAllDistributions();
     if (@distributions and not defined $distributions[0]) {
-        print getLastError()."\n";
+        print $db->{error}."\n";
     } else {
         @distributions = map {$distribution eq $_ ? "(*) $_" : "    $_"} @distributions;
         print join "\n", @distributions;
@@ -3527,7 +3527,7 @@ sub configuration_completion {
         unless ($distribution) {
             return ();
         }
-        my @configurations = getAllConfigurations($distribution);
+        my @configurations = $db->getAllConfigurations($distribution);
         if (@configurations and not defined $configurations[0]) {
             return ();
         } else {
@@ -3545,7 +3545,7 @@ sub group_completion {
     if ($count == 0) {
         $attribs->{completion_append_character} = " ";
         @currentCompletionList = ();
-        my @groups = getAllGroups();
+        my @groups = $db->getAllGroups();
         if (@groups and not defined $groups[0]) {
             return ();
         } else {
@@ -3563,7 +3563,7 @@ sub new_host_completion {
     if ($count == 0) {
         $attribs->{completion_append_character} = " ";
         fillDnsHostList() unless @dnsHostList;
-        my @hosts = getAllHosts();
+        my @hosts = $db->getAllHosts();
         if (@hosts and not defined $hosts[0]) {
             return ();
         }
@@ -3583,7 +3583,7 @@ sub host_completion {
     if ($count == 0) {
         $attribs->{completion_append_character} = " ";
         @currentCompletionList = ();
-        my @hosts = getAllHosts();
+        my @hosts = $db->getAllHosts();
         if (@hosts and not defined $hosts[0]) {
             return ();
         } else {
@@ -3601,7 +3601,7 @@ sub distribution_completion {
     if ($count == 0) {
         $attribs->{completion_append_character} = " ";
         @currentCompletionList = ();
-        my @distributions = getAllDistributions();
+        my @distributions = $db->getAllDistributions();
         if (@distributions and not defined $distributions[0]) {
             return ();
         }
