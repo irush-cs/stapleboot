@@ -210,8 +210,6 @@ B<Auto hash>
 
 =item getDB
 
-=item getRawTokens(group|configuration [group|configuration [...]])
-
 =item getCompleteTokens(tokens ref [host] [distribution])
 
 =item setDefaultTokens(tokens ref, default tokens ref)
@@ -259,7 +257,6 @@ our @EXPORT_OK = qw();
 our @EXPORT = qw(
                     setDB
                     getDB
-                    getRawTokens
                     getCompleteTokens
                     setDefaultTokens
                     getStapleDir
@@ -432,35 +429,9 @@ sub getDB {
     return $db->info();
 }
 
-=item B<getRawTokens(I<group|configuration [group|configuration [...]]>)>
-
-Returns a tokens hash reference (where the key is the token key, and the value
-is the token hash). The tokens are taken from the groups and configurations
-(which can be intermixed in the input list), by the same order, so if token
-appears twice it will be overridden.
-
-The tokens are returned raw from the database/filesystem, they are not
-C<initialized>. i.e. they aren't check for mistakes, no auto and default tokens
-are added, and the regexp and dynamic tokens' values are empty (not
-evaluated). To C<initialize> them, use the B<getCompleteTokens> function.
-
-If an error occurs, undef is returned, and the last error is set.
-
-=cut
-
-sub getRawTokens {
-    my @groupsAndConfigurations = @_;
-    my $tokens;
-    unless ($tokens = $db->getTokens(@groupsAndConfigurations)) {
-        $error = $db->{error};
-        return undef
-    }
-    return $tokens;
-}
-
 =item B<getCompleteTokens(I<tokens ref [host] [distribution]>)>
 
-Receives a tokens hash (as B<getRawTokens> outputs) and returns a tokens hash,
+Receives a tokens hash (as B<DB::getTokens> outputs) and returns a tokens hash,
 with simple value checking (e.g. for __STAPLE_*__ tokens), auto and default
 tokens (auto tokens that were wrongly inserted, will be removed), and dynamic
 and regexp tokens are evaluated (in that order).
@@ -501,7 +472,7 @@ sub getCompleteTokens {
 
 =item B<setDefaultTokens(I<tokens ref>, I<default tokens ref>)>
 
-Receives a tokens hash (as B<getRawTokens> outputs), and a default tokens hash,
+Receives a tokens hash (as B<DB::getTokens> outputs), and a default tokens hash,
 and returns a tokens hash. The results hash is the original hash (a copy), with
 the defaults if not set. if __STAPLE_CONF__ is set to a readable file (either
 by the tokens, or by the default tokens), than first the file is read and

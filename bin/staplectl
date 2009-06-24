@@ -132,6 +132,7 @@ my %commands = (
 my %commandMap = (
                   h                               => "help",
                   q                               => "quit",
+                  e                               => "quit",
                   "?"                             => "help",
 
                   ac                              => "ac",
@@ -1176,7 +1177,7 @@ sub printTree {
 }
 
 sub quit {
-    if ($input and -w $historyFile) {
+    if ($input and $attribs->{history_base} and -w $historyFile) {
         $input->WriteHistory($historyFile);
         $input->history_truncate_file($historyFile, 1000);
     }
@@ -2978,11 +2979,11 @@ sub setdb {
         $db = $newDB;
         print getLastError()."\n" unless setDB(split /\s+/, $db->info());
     }
-    print "Current database: ".getDB()."\n";
+    print "Current database: ".$db->info()."\n";
 }
 
 sub getdb {
-    print getDB()."\n";
+    print $db->info()."\n";
 }
 
 sub gah {
@@ -3220,7 +3221,7 @@ sub host_tokens_completion {
         return () unless $host;
         my $group = getHostGroup($host);
         return () unless $group;
-        my $tokens = getRawTokens($group);
+        my $tokens = $db->getTokens($group);
         my @tokens = keys %$tokens;
         @currentCompletionList = grep {index($_, $text) == 0} @tokens;
     }
@@ -3237,7 +3238,7 @@ sub group_tokens_completion {
         return () unless $group_name;
         (my $group) = getGroupsByName($group_name);
         return () unless $group;
-        my $tokens = getRawTokens($group);
+        my $tokens = $db->getTokens($group);
         my @tokens = keys %$tokens;
         @currentCompletionList = grep {index($_, $text) == 0} @tokens;
     }
@@ -3270,7 +3271,7 @@ sub distribution_tokens_completion {
         return () unless $dist_name;
         my $dist = getDistributionGroup($dist_name);
         return () unless $dist;
-        my $tokens = getRawTokens($dist);
+        my $tokens = $db->getTokens($dist);
         my @tokens = keys %$tokens;
         @currentCompletionList = grep {index($_, $text) == 0} @tokens;
     }
@@ -3287,7 +3288,7 @@ sub configuration_tokens_completion {
         return () unless $conf_name;
         (my $configuration) = grep {$_->{name} eq $conf_name} (getCompleteConfigurations([getConfigurationsByName($conf_name)], $distribution));
         return () unless $configuration;
-        my $tokens = getRawTokens($configuration);
+        my $tokens = $db->getTokens($configuration);
         my @tokens = keys %$tokens;
         @currentCompletionList = grep {index($_, $text) == 0} @tokens;
     }
@@ -3650,9 +3651,9 @@ while (my $arg = shift @ARGV) {
 $distribution = getDistribution();
 $db = createDB();
 unless (ref $db) {
-    
+    print "$db\n";
+    $db = undef;
 }
-
 
 if ($singleCommand) {
     (my $command, my @params) = parseline($singleCommand);
@@ -3670,7 +3671,7 @@ if ($singleCommand) {
         print "Starting without a default distribution\n";
     }
     setDB(split /\s+/, $db->info());
-    print "Starting with database: ".getDB()."\n";
+    print "Starting with database: ".$db->info()."\n";
 
     # set up readline
     $input = new Term::ReadLine 'staplectl';
@@ -3684,7 +3685,7 @@ if ($singleCommand) {
     }
     $attribs->{completion_entry_function} = sub {return ()};
     $attribs->{attempted_completion_function} = \&attempted_completion;
-    $input->ReadHistory($historyFile) if -r $historyFile;
+    $input->ReadHistory($historyFile) if -r $historyFile and $attribs->{history_base};
 
     # main loop
     while (1) {

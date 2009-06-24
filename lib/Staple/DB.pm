@@ -223,8 +223,17 @@ sub copyConfiguration {
 
 =item B<getTokens(I<group|configuration, [...]>)>
 
-Get raw tokens from the database, returns the raw tokens hash reference. On
-failure returns undef (and sets the error)
+Returns a tokens hash reference (where the key is the token key, and the value
+is the token hash). The tokens are taken from the groups and configurations
+(which can be intermixed in the input list), by the same order, so if token
+appears twice it will be overridden.
+
+The tokens are returned raw from the database/filesystem, they are not
+C<initialized>. i.e. they aren't checked for mistakes, no auto and default
+tokens are added, and the regexp and dynamic tokens' values are empty (not
+evaluated). To C<initialize> them, use the B<getCompleteTokens> function.
+
+If an error occurs, undef is returned, and the error is set.
 
 =cut
 

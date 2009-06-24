@@ -13,6 +13,7 @@ use Sys::Hostname;
 use Clone qw(clone);
 use Staple;
 use Staple::Misc;
+use Staple::DB::Factory;
 our $VERSION = '003';
 
 =head1 NAME
@@ -21,7 +22,52 @@ our $VERSION = '003';
 
 =head1 DESCRIPTION
 
-Staple::Staples module
+Staple::Application module
+
+=head1 DATA MEMBERS
+
+These data members should not be changed directly (unless otherwise
+noted). Most of them are set automatically by the member functions.
+
+=over
+
+=over
+
+=item I<host>              - Name of the host
+
+=item I<distribution>      - Name of the distribution
+
+=item I<groups>            - List ref of groups (hashes)
+
+=item I<configurations>    - List ref of configurations (full hashes)
+
+=item I<tokens>            - Hash ref of tokens
+
+=item I<scripts>           - List of scripts (hashes)
+
+=item I<mounts>            - List of mounts (hashes)
+
+=item I<templates>         - List of templates (hashes)
+
+=item I<autos>             - List of autos (hashes)
+
+=item I<badConfigurations> - List of unknown configurations (filled by the update method)
+
+=item I<stapleDir>         - Staple directory
+
+=item I<tmpDir>            - Tmp directory
+
+=item I<rootDir>           - The root directory (when applying templates)
+
+=item I<applied>           - Hash ref of "templates" and "scripts" lists (of strings).
+
+=item I<db>                - The staple database (Staple::DB).
+
+=back
+
+=back
+
+=cut
 
 ################################################################################
 #   Methods
@@ -30,6 +76,41 @@ Staple::Staples module
 =head1 METHODS
 
 =over
+
+=item B<useDB([db [parameters]])>
+
+Sets the staple database. I<db> is a Staple::DB instance, if omitted calls
+Staple::DB::Factory::createDB(). If db is a scalar (string), it is treated as a
+database type, and is sent (along with the rest of the parameters) to
+createDB. Note that it will not split the string.
+
+returns the new db ($self->{db}), or undef on error.
+
+=cut
+
+sub useDB {
+    my $self = shift;
+    my $db = shift;
+    if (defined $db) {
+        if (ref $db) {
+            $self->{db} = $db;
+        } else {
+            $self->{db} = createDB($db, @_);
+        }
+    } else {
+        $self->{db} = createDB();
+    }
+    if (ref $self->{db}) {
+        unless (setDB(split /\s+/, $self->{db}->info())) {
+            $self->{db} = undef;
+            $self->error(getLastError());
+        }
+    } else {
+        $self->error($self->{db});
+        $self->{db} = undef;
+    }
+    return $self->{db};
+}
 
 =item B<update()>
 
@@ -66,7 +147,7 @@ to the host, distribution, groups and configurations.
 
 sub updateSettings {
     my $self = shift;
-    $self->{tokens} = {getCompleteTokens(getRawTokens(@{$self->{configurations}}, @{$self->{groups}}), $self->{host}, $self->{distribution})};
+    $self->{tokens} = {getCompleteTokens($self->{db}->getTokens(@{$self->{configurations}}, @{$self->{groups}}), $self->{host}, $self->{distribution})};
     $self->updateData();
     $self->{mounts} = [getCompleteMounts([getRawMounts(@{$self->{configurations}})], $self->{tokens})];
     if (scalar(@{$self->{configurations}}) > 0) {
@@ -505,7 +586,7 @@ sub applyMounts {
             } elsif ($mount->{next}) {
                 $self->output("trying next mount from configuration: $mount->{next}", 1);
                 my @nextConfigurations = getCompleteConfigurations([getConfigurationsByName($mount->{next})], $self->{distribution});
-                my %nextTokens = getCompleteTokens(getRawTokens(@nextConfigurations), $self->{host}, $self->{distribution});
+                my %nextTokens = getCompleteTokens($self->{db}->getTokens(@nextConfigurations), $self->{host}, $self->{distribution});
                 my @nextMounts = grep {$_->{destination} eq $mount->{destination}} getCompleteMounts([getRawMounts(@nextConfigurations)], \%nextTokens);
                 my $next = clone($self);
                 $next->{configurations} = \@nextConfigurations;
@@ -608,6 +689,7 @@ sub clearAll {
     $self->{applied} = {"templates" => [],
                         "scripts" => [],
                        };
+    $self->{db} = $self->useDB();
 
     $self->{tokensToData} = {
                              "__STAPLE_VERBOSE__"     => "verbose",

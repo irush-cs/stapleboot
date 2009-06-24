@@ -172,12 +172,12 @@ usage if $help;
 # init
 my $stapler = Staple::Application::Stapler->new($host, $distribution);
 $stapler->output("version $Staple::VERSION");
-if ($database) {
-    unless (setDB(split /\s+/, $database)) {
-        $stapler->error("Error using $database: ".getLastError());
-        $stapler->doCriticalAction();
-    }
+unless ($stapler->useDB($database ? split /\s+/, $database : undef)) {
+    $stapler->error("Error using $database: ".getLastError());
+    $stapler->doCriticalAction();
 }
+$stapler->output("database: ".$stapler->{db}->info());
+
 $stapler->{tokens} = {getCompleteTokens({})};
 $stapler->{tmpDir} = "/tmp";
 $stapler->{verbose} = $verbose;
@@ -209,7 +209,6 @@ unless (grep {$_ eq $stapler->{distribution}} @distributions) {
     $stapler->doCriticalAction();
 }
 
-$stapler->output("database: ".getDB());
 my @badConfigurations = ();
 if (@groups or @configurations) {
     $doall = 1;
@@ -224,7 +223,7 @@ $stapler->{configurations} = [getCompleteConfigurations([getGroupsConfigurations
 $stapler->updateSettings();
 
 if (@groups_tokens or @configurations_tokens) {
-    $extraTokens = {getCompleteTokens(getRawTokens(getCompleteGroups(getGroupsByName(@groups_tokens)), getCompleteConfigurations([getConfigurationsByName(@configurations_tokens)], $stapler->{distribution})), $stapler->{host}, $stapler->{distribution})};
+    $extraTokens = {getCompleteTokens($stapler->{db}->getTokens(getCompleteGroups(getGroupsByName(@groups_tokens)), getCompleteConfigurations([getConfigurationsByName(@configurations_tokens)], $stapler->{distribution})), $stapler->{host}, $stapler->{distribution})};
     $stapler->addToken2($extraTokens);
 }
 
