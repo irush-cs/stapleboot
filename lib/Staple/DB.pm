@@ -9,6 +9,7 @@ package Staple::DB;
 
 use strict;
 use warnings;
+use Staple::Misc;
 our $VERSION = '003';
 
 =head1 NAME
@@ -260,6 +261,17 @@ sub getMounts {
 }
 
 
+=item B<getRawMounts(I<configuration [configuration [...]]>)>
+
+Identical to getMounts.
+
+=cut
+
+sub getRawMounts {
+    my $self = shift;
+    return $self->getMounts(@_);
+}
+
 =item B<getTemplates(I<configuration, [configuration [...]]>)>
 
 Get templates hashes from the database. Recives an ordered list of full
@@ -411,9 +423,9 @@ sub removeTemplates {
 
 =item B<getGroups(I<group>)>
 
-Gets an orderd group list associated with the given group. returns a list of
-group names (strings), which can be built using getGroupsByName. On failure
-returns undef (and sets the error).
+Gets an orderd group list associated with the given group (hash). returns a
+list of group names (strings), which can be built using getGroupsByName. On
+failure returns undef (and sets the error).
 
 =cut
 
@@ -422,6 +434,61 @@ sub getGroups {
     $self->{error} = "getGroups not implemented in this database yet";
     return undef;
 }
+
+=item B<getGroupGroups(I<group>)>
+
+Returns an ordered list of raw group (hashes, no intermediate, no recursive)
+associated with the given group (hash). In case of error, undef will be
+returned and the error will be set.
+
+=cut
+
+sub getGroupGroups {
+    my $self = shift;
+    my $group = shift;
+    my @groups = $self->getGroups($group);
+    return undef if (@groups and not defined $groups[0]);
+    return $self->getGroupsByName(@groups);
+}
+
+
+=item B<getCompleteGroups(I<group [group [...]]>)>
+
+Given a list of groups (hashes) returns a complete list of groups
+(hashes). Groups that have extra group, are computed and placed before the
+given group. Groups will be splitted into intermediate groups, and duplicate
+groups will be removed.
+
+WARNING: try to avoid circular groups dependencies 
+
+=cut
+
+sub getCompleteGroups {
+    my $self = shift;
+    my @rawGroups = @_;
+    my @groups = ();
+    my %groups = ();
+
+    @rawGroups = fillIntermediate(@rawGroups);
+    map {$_->{path} = $self->getGroupPath($_->{name}) if $_->{type} eq "group"} @rawGroups;
+
+    foreach my $rawGroup (@rawGroups) {
+        unless ($groups{$rawGroup->{name}}) {
+            my @newGroups = $self->getCompleteGroups($self->getGroupGroups($rawGroup));
+            foreach my $newGroup (@newGroups) {
+                unless ($groups{$newGroup->{name}}) {
+                    $groups{$newGroup->{name}} = 1;
+                    push @groups, $newGroup;
+                }
+            }
+            $groups{$rawGroup->{name}} = 1;
+            push @groups, $rawGroup;
+        }
+    }
+
+    return @groups;
+}
+
 
 =item B<getGroupConfigurations(I<group>)>
 
@@ -437,6 +504,78 @@ sub getGroupConfigurations {
     $self->{error} = "getGroupConfigurations not implemented in this database yet";
     return undef;
 }
+
+=item B<getGroupsConfigurations(I<group [group [...]]>)>
+
+Returns an ordered list of configurations (both active and inactive) from the
+groups list (list of hashs). The configurations aren't full, i.e. I<path> and
+I<dist> are undef. To get complete configurations, as they would appear in the
+boot process, pass them through I<getCompleteConfigurations>.  In case of
+error, undef will be returned and the error will be set.
+
+=cut
+
+sub getGroupsConfigurations {
+    my $self = shift;
+    my @groups = @_;
+    my @configurations = ();
+    foreach my $group (@groups) {
+        my @localConfs = $self->getGroupConfigurations($group);
+        return undef if (@localConfs == 1 and not defined $localConfs[0]);
+        push @configurations, @localConfs;
+    }
+    return @configurations;
+}
+
+=item B<getCompleteConfigurations(I<configurations ref, distribution, [bad list ref]>)>
+
+Receives an ordered list reference of configurations (hashes) and a
+distribution name (string), and returns a complete ordered list of
+configuration (hashes). The configurations are full (i.e. includes I<path> and
+I<dist>). The list includes:
+
+=over
+
+=item -
+
+Only active configuraitons.
+
+=item -
+
+Intermediate configurations in the path (i.e. for /a/b/c, the list will have /a, /a/b, /a/b/c). Without any duplicates.
+
+=for comment
+=item -
+Distribution variants of the same configuration.
+
+=back
+
+These filters are applied in that order. If the (empty) hash ref of bad list is
+also supplied, it will be filled with configurations that doesn't exist under
+the given distribution.
+
+=cut
+
+sub getCompleteConfigurations {
+    my $self = shift;
+    my @configurations = @{$_[0]};
+    my $distribution = $_[1];
+    my $badConfigurations = $_[2];
+
+    @configurations = cleanInactive(@configurations);
+    @configurations = fillIntermediate(@configurations);
+    my @finalConfigurations = $self->getFullConfigurations(\@configurations, $distribution);
+
+    if ($badConfigurations) {
+        my @goodConfigurations = map {$_->{name}} @finalConfigurations;
+        foreach my $conf (map {$_->{name}} @configurations) {
+            push @$badConfigurations, $conf unless grep {$_ eq $conf} @goodConfigurations;
+        }
+    }
+    
+    return @finalConfigurations;
+}
+
 
 =item B<addGroupConfiguration(I<group, configuration, location>)>
 
@@ -531,7 +670,7 @@ sub getAllConfigurations {
 =item B<getFullConfigurations(I<configuration list ref>, distribution name>)>
 
 Receives a list of configuration (hashes) without the path or dist set and a
-distribution name (string).Returns a list of configurations, with the dist and
+distribution name (string). Returns a list of configurations, with the dist and
 path field set according to the distribution given. Order is preserved, the
 returned configurations are not the same as the input (i.e. new
 references). Non existing configurations are removed.
@@ -641,7 +780,7 @@ sub getConfigurationPath {
 =item B<getGroupPath(I<group string>)
 
 Returns the path of the group. On some databases this is undefined (yet?). You
-probably shouldn't use this, as it is used internally by I<Staple.pm>. Use
+probably shouldn't use this, as it is used internally by Staple. Use
 getGroupsByName instead.
 
 Returns undef if group doesn't exists

@@ -321,7 +321,7 @@ sub initStage {
     $boot->{tokens} = {getCompleteTokens({})};
     $boot->updateData();
 
-    unless (getHostGroup($boot->{host})) {
+    unless ($boot->{db}->getHostGroup($boot->{host})) {
         $boot->error("$boot->{host} does not exist in the staple database");
         $boot->addMail("$boot->{host} does not exist in the staple database");
         $boot->doCriticalAction();
@@ -331,14 +331,14 @@ sub initStage {
         $boot->addMail("Can't determine current distribution (both /etc/staple/distribution and /proc/cmdline are missing)");
         $boot->doCriticalAction();
     }
-    my @distributions = getAllDistributions();
+    my @distributions = $boot->{db}->getAllDistributions();
     unless (grep {$_ eq $boot->{distribution}} @distributions) {
         $boot->error("\"$boot->{distribution}\" does not exist in the staple database");
         $boot->addMail("\"$boot->{distribution}\" does not exist in the staple database");
         $boot->doCriticalAction();
     }    
 
-    $boot->{groups} = [getCompleteGroups(getDistributionGroup($boot->{distribution}), getHostGroup($boot->{host}))];
+    $boot->{groups} = [$boot->{db}->getCompleteGroups($boot->{db}->getDistributionGroup($boot->{distribution}), $boot->{db}->getHostGroup($boot->{host}))];
     $boot->update();
     
     $boot->output("distribution: $boot->{distribution}", 2);
@@ -377,7 +377,7 @@ sub autoStage {
         } else { 
             $boot->output("No automatically added groups", 2);
         }
-        my @realGroups = getGroupsByName(@autoGroups);
+        my @realGroups = $boot->{db}->getGroupsByName(@autoGroups);
         if (scalar @realGroups != scalar @autoGroups) {
             my @missings = grep {my $a = $_; not grep {$a eq $_->{name}} @realGroups} @autoGroups;
             my $error = "Unknown groups from autogroup script:\n  ".join("\n  ", @missings)."\n";
@@ -385,7 +385,7 @@ sub autoStage {
             $boot->addMail("$error");
         }
 
-        $boot->{groups} = [getCompleteGroups(getDistributionGroup($boot->{distribution}), getGroupsByName(@autoGroups), getHostGroup($boot->{host}))];
+        $boot->{groups} = [$boot->{db}->getCompleteGroups($boot->{db}->getDistributionGroup($boot->{distribution}), $boot->{db}->getGroupsByName(@autoGroups), $boot->{db}->getHostGroup($boot->{host}))];
         $boot->update();
 
         #printTokens($boot);
@@ -500,7 +500,7 @@ sub finalStage {
                 $boot->error($err);
                 $boot->addMail($err);
             } else {
-                my $db = getDB();
+                my $db = $boot->{db}->info();
                 print LOG "staple finished at: ".scalar(localtime(time))."\n";
                 print LOG "host name: $boot->{host}\n";
                 print LOG "staple version: $Staple::VERSION\n";

@@ -100,12 +100,7 @@ sub useDB {
     } else {
         $self->{db} = createDB();
     }
-    if (ref $self->{db}) {
-        unless (setDB(split /\s+/, $self->{db}->info())) {
-            $self->{db} = undef;
-            $self->error(getLastError());
-        }
-    } else {
+    unless (ref $self->{db}) {
         $self->error($self->{db});
         $self->{db} = undef;
     }
@@ -127,7 +122,7 @@ are taken only from the groups, the host and distribution are for the tokens
 sub update {
     my $self = shift;
     my @badConfigurations;
-    $self->{configurations} = [getCompleteConfigurations([getGroupsConfigurations(@{$self->{groups}})], $self->{distribution}, \@badConfigurations)];
+    $self->{configurations} = [$self->{db}->getCompleteConfigurations([$self->{db}->getGroupsConfigurations(@{$self->{groups}})], $self->{distribution}, \@badConfigurations)];
     @badConfigurations = grep {my $new = $_; not grep {$new eq $_} @{$self->{badConfigurations}}} @badConfigurations;
     if (@badConfigurations) {
         my $error = "Unknown configurations for current distribution ($self->{distribution}):\n  ".join("\n  ", @badConfigurations)."\n";
@@ -149,11 +144,11 @@ sub updateSettings {
     my $self = shift;
     $self->{tokens} = {getCompleteTokens($self->{db}->getTokens(@{$self->{configurations}}, @{$self->{groups}}), $self->{host}, $self->{distribution})};
     $self->updateData();
-    $self->{mounts} = [getCompleteMounts([getRawMounts(@{$self->{configurations}})], $self->{tokens})];
+    $self->{mounts} = [getCompleteMounts([$self->{db}->getRawMounts(@{$self->{configurations}})], $self->{tokens})];
     if (scalar(@{$self->{configurations}}) > 0) {
-        $self->{templates} = [getTemplates(@{$self->{configurations}})];
-        $self->{scripts} = [getScripts(@{$self->{configurations}})];
-        $self->{autos} = [getAutos(@{$self->{configurations}})];
+        $self->{templates} = [$self->{db}->getTemplates(@{$self->{configurations}})];
+        $self->{scripts} = [$self->{db}->getScripts(@{$self->{configurations}})];
+        $self->{autos} = [$self->{db}->getAutos(@{$self->{configurations}})];
     }
 }
 
@@ -585,9 +580,9 @@ sub applyMounts {
                 $self->doCriticalAction();
             } elsif ($mount->{next}) {
                 $self->output("trying next mount from configuration: $mount->{next}", 1);
-                my @nextConfigurations = getCompleteConfigurations([getConfigurationsByName($mount->{next})], $self->{distribution});
+                my @nextConfigurations = $self->{db}->getCompleteConfigurations([getConfigurationsByName($mount->{next})], $self->{distribution});
                 my %nextTokens = getCompleteTokens($self->{db}->getTokens(@nextConfigurations), $self->{host}, $self->{distribution});
-                my @nextMounts = grep {$_->{destination} eq $mount->{destination}} getCompleteMounts([getRawMounts(@nextConfigurations)], \%nextTokens);
+                my @nextMounts = grep {$_->{destination} eq $mount->{destination}} getCompleteMounts([$self->{db}->getRawMounts(@nextConfigurations)], \%nextTokens);
                 my $next = clone($self);
                 $next->{configurations} = \@nextConfigurations;
                 $next->{tokens} = \%nextTokens;

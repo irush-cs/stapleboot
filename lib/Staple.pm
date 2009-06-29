@@ -206,47 +206,17 @@ B<Auto hash>
 
 =over
 
-=item setDB(E<lt>"fs"|"sql"E<gt> [params ...])
-
-=item getDB
-
 =item getCompleteTokens(tokens ref [host] [distribution])
 
 =item setDefaultTokens(tokens ref, default tokens ref)
 
 =item getStapleDir( )
 
-=item getLastError( )
-
-=item getAllDistributions( )
-
-=item getDistributionGroup(distribution)
-
-=item getHostGroup(host)
-
-=item getCompleteGroups(group [group [...]])
-
-=item getGroupGroups(group [group [...]])
-
-=item getGroupsConfigurations(group [group [...]])
-
-=item getCompleteConfigurations(configurations ref, distribution, [bad list ref])
-
 =for comment =item getDistributionList(distribution)
 
 =item getConfigurationsByName(configuration [configuration [...]])
 
-=item getGroupsByName(group name [group name [...]])
-
-=item getRawMounts(configuration [configuration [...]])
-
 =item getCompleteMounts(mount list ref, tokens hash ref)
-
-=item getTemplates(configuration [configuration [...]])
-
-=item getScripts(configuration [configuration [...]])
-
-=item getAutos(configuration [configuration [...]])
 
 =back
 
@@ -255,32 +225,15 @@ B<Auto hash>
 our @ISA = qw(Exporter);
 our @EXPORT_OK = qw();
 our @EXPORT = qw(
-                    setDB
-                    getDB
                     getCompleteTokens
                     setDefaultTokens
                     getStapleDir
-                    getLastError
-                    getAllDistributions
-                    getDistributionGroup
-                    getHostGroup
-                    getCompleteGroups
-                    getGroupGroups
-                    getGroupsConfigurations
-                    getCompleteConfigurations
                     getConfigurationsByName
-                    getGroupsByName
-                    getRawMounts
                     getCompleteMounts
-                    getTemplates
-                    getScripts
-                    getAutos
                );
 our $VERSION = '003';
 
 my $stapleDir;
-my $error;
-my $db;
 
 # don't use this, it's just for initializing %defaultTokens
 # SMTP_SERVER isn't localhost, as this host most likely doesn't have an mail server running...
@@ -318,21 +271,21 @@ my %allowedTokensValues = (
                           );
 
 my %mountTokenToOption = (
-                          "SOURCE"  => "source",
-                          "TYPE"    => "type",
-                          "OPTIONS" => "options",
-                          "NEXT"    => "next",
-                          "PERMISSIONS" => "permissions",
-                          "CRITICAL" => "critical",
-                          "COPY_SOURCE" => "copySource",
-                          "COPY_FILES" => "copyFiles",
+                          "SOURCE"       => "source",
+                          "TYPE"         => "type",
+                          "OPTIONS"      => "options",
+                          "NEXT"         => "next",
+                          "PERMISSIONS"  => "permissions",
+                          "CRITICAL"     => "critical",
+                          "COPY_SOURCE"  => "copySource",
+                          "COPY_FILES"   => "copyFiles",
                           "COPY_EXCLUDE" => "copyExclude",
-                          "COPY_LINKS" => "copyLinks",
-                          "MANUAL" => "manual",
+                          "COPY_LINKS"   => "copyLinks",
+                          "MANUAL"       => "manual",
                          );
 
 BEGIN {
-    $error = "";
+    #$error = "";
     
     #if (-r "/etc/staple/staple_dir") {
     #    open(FILE, "/etc/staple/staple_dir");
@@ -349,8 +302,8 @@ BEGIN {
     $stapleDir = "/boot/staple";
     #die "/boot/staple doesn't exists, can't find staple database" unless -d $stapleDir;
     
-    $db = Staple::DB::FS->new($stapleDir);
-    die "Can't open filesystem database" unless defined $db;
+    #    $db = Staple::DB::FS->new($stapleDir);
+    #    die "Can't open filesystem database" unless defined $db;
 }
 
 ################################################################################
@@ -361,73 +314,6 @@ BEGIN {
 =head1 DESCRIPTION
 
 =over
-
-=item B<setDB(I<E<lt>"fs"|"sql"E<gt> [params ...] >)>
-
-Set the database to connect to for the remainder of the session. Returns 1 on
-success, and 0 on failure (and sets the error).
-
-=over 
-
-=item * fs
-
-Use the filesystem as database (the default), with this database, there are no
-comments. The default is with /etc/staple/staple_dir. may override with 1
-parameter. This is the default database
-
-=item * sql
-
-Use an (postgre)sql database. The first parameter is the schema to use, the
-default is "staple". If an empty string is given, no schema assumed.  The
-second parameter is database connection parameters, the default is
-"dbi:Pg:dbname=staple;host=pghost;port=5432;".
-
-=back
-
-=cut
-
-sub setDB {
-    my $type = shift;
-    $type = "fs" unless $type;
-    my @params = @_;
-    my $newStapleDir;
-    my $newDb;
-    if ($type =~ m/fs/i) {
-        $newStapleDir = $params[0] if $params[0];
-        $newDb = Staple::DB::FS->new($newStapleDir);
-        if ($newDb) {
-            $db = $newDb;
-            $stapleDir = $newStapleDir;
-            return 1;
-        }
-        $error = "can't open filesystem database";
-        return 0;
-    } elsif ($type =~ m/sql/i) {
-        $params[0] = "$params[0]" if defined $params[0];
-        $params[0] = "staple" unless defined $params[0];
-        $params[1] = "dbi:Pg:dbname=staple;host=pghost;port=5432;" unless $params[1];
-        $newDb = Staple::DB::SQL->new(@params);
-        if ($newDb) {
-            $db = $newDb;
-            return 1;
-        }
-        $error = "can't open sql database";
-        return 0;
-    }
-    $error = "Unknown database $type";
-    return 0;
-}
-
-
-=item B<getDB>
-
-Returns a string representing the current database (as given via setDB)
-
-=cut
-
-sub getDB {
-    return $db->info();
-}
 
 =item B<getCompleteTokens(I<tokens ref [host] [distribution]>)>
 
@@ -526,165 +412,6 @@ sub setDefaultTokens {
 #    return @distributions;
 #}
 
-
-=item B<getHostGroup(I<host>)>
-
-Returns the group of the host. Returns undef if host doesn't exist and sets the
-error.
-
-=cut
-
-sub getHostGroup {
-    my $host = shift;
-    if (my $group = $db->getHostGroup($host)) {
-        return $group;
-    }
-    $error = $db->{error};
-    return undef;
-}
-
-=item B<getDistributionGroup(I<distribution>)>
-
-Returns the distribution group hash ref. If the distribution does not exists,
-undef is returned.
-
-=cut
-
-sub getDistributionGroup {
-    my $distribution = shift;
-    if (my $group = $db->getDistributionGroup($distribution)) {
-        return $group;
-    }
-    $error = $db->{error};
-    return undef;
-}
-
-=item B<getCompleteGroups(I<group [group [...]]>)>
-
-Returns a complete list of groups. Groups that have extra group, are computed
-and placed before the given group. Groups will be splitted into intermediate
-groups, and duplicate groups will be removed.
-
-WARNING: try to avoid circular groups dependencies 
-
-=cut
-
-sub getCompleteGroups {
-    my @rawGroups = @_;
-    my @groups = ();
-    my %groups = ();
-
-    @rawGroups = fillIntermediate(@rawGroups);
-    map {$_->{path} = $db->getGroupPath($_->{name}) if $_->{type} eq "group"} @rawGroups;
-
-    foreach my $rawGroup (@rawGroups) {
-        unless ($groups{$rawGroup->{name}}) {
-            my @newGroups = getCompleteGroups(getGroupGroups($rawGroup));
-            foreach my $newGroup (@newGroups) {
-                unless ($groups{$newGroup->{name}}) {
-                    $groups{$newGroup->{name}} = 1;
-                    push @groups, $newGroup;
-                }
-            }
-            $groups{$rawGroup->{name}} = 1;
-            push @groups, $rawGroup;
-        }
-    }
-
-    return @groups;
-}
-
-
-=item B<getGroupsConfigurations(I<group [group [...]]>)>
-
-Returns an ordered list of configurations (both active and inactive) from the
-groups list. The configurations aren't full, i.e. I<path> and I<dist> are
-undef. To get complete configurations, as they would appear in the boot
-process, pass them through I<getCompleteConfigurations>.  In case of error,
-undef will be returned and the last error will be set.
-
-=cut
-
-sub getGroupsConfigurations {
-    my @groups = @_;
-    my @configurations = ();
-    foreach my $group (@groups) {
-        my @localConfs = $db->getGroupConfigurations($group);
-        if (@localConfs == 1 and not defined $localConfs[0]) {
-            $error = $db->{error};
-            return undef;
-        }
-        push @configurations, @localConfs;
-    }
-    return @configurations;
-}
-
-
-=item B<getGroupGroups(I<group>)>
-
-Returns an ordered list of raw group (no intermediate, no recursive) associated
-with the given group. In case of error, undef will be returned and the last
-error will be set.
-
-=cut
-
-sub getGroupGroups {
-    my $group = shift;
-    my @groups = $db->getGroups($group);
-    if (@groups and not defined $groups[0]) {
-        $error = $db->{error};
-        return undef;
-    }
-    return $db->getGroupsByName(@groups);
-}
-
-=item B<getCompleteConfigurations(I<configurations ref, distribution, [bad list ref]>)>
-
-Receives an ordered list reference of configurations and a distribution name,
-and returns a complete ordered list of configuration. The configurations are
-full (i.e. includes I<path> and I<dist>). The list includes:
-
-=over
-
-=item -
-
-Only active configuraitons.
-
-=item -
-
-Intermediate configurations in the path (i.e. for /a/b/c, the list will have /a, /a/b, /a/b/c). Without any duplicates.
-
-=for comment
-=item -
-Distribution variants of the same configuration.
-
-=back
-
-These filters are applied in that order. If the (empty) hash ref of bad list is
-also supplied, it will be filled with configurations that dont' exist under the
-given distribution.
-
-=cut
-
-sub getCompleteConfigurations {
-    my @configurations = @{$_[0]};
-    my $distribution = $_[1];
-    my $badConfigurations = $_[2];
-
-    @configurations = cleanInactive(@configurations);
-    @configurations = fillIntermediate(@configurations);
-    my @finalConfigurations = $db->getFullConfigurations(\@configurations, $distribution);
-
-    if ($badConfigurations) {
-        my @goodConfigurations = map {$_->{name}} @finalConfigurations;
-        foreach my $conf (map {$_->{name}} @configurations) {
-            push @$badConfigurations, $conf unless grep {$_ eq $conf} @goodConfigurations;
-        }
-    }
-    
-    return @finalConfigurations;
-}
-
 =item B<getConfigurationsByName(I<configuration [configuration [...]]>)>
 
 Receives a list of configurations names (strings), and returns a list an
@@ -701,48 +428,6 @@ sub getConfigurationsByName {
     return @configurations;
 }
 
-=item B<getGroupsByName(I<group name [group name [...]]>)>
-
-Receives a list of groups names (strings), and returns a list of groups (order
-preserved). Only existing groups are returned.
-
-=cut
-
-sub getGroupsByName {
-    my @groups = $db->getGroupsByName(@_);
-    if (@groups and not defined $groups[0]) {
-        $error = $db->{error};
-        return undef;
-    }
-    return @groups;
-}
-
-=item B<getAllDistributions( )>
-
-Returns an ordered list of all distributions. returns undef on error and sets the last error;
-
-=cut
-
-sub getAllDistributions {
-    my @distributions = $db->getAllDistributions();
-    if (@distributions and not defined $distributions[0]) {
-        $error = $db->{error};
-        return undef;
-    }
-    return sort {$a cmp $b} @distributions;
-}
-
-=item B<getLastError( )>
-
-Returns the last error, if no error, returns the empty string. This might be set at the beginning (after use Staple), in case of an error.
-
-=cut
-
-sub getLastError {
-    return $error;
-}
-
-
 =item B<getStapleDir( )>
 
 Returns the staple directory as writen in F</etc/staple/staple_dir>. Returns C</staple> if doesn't exists.
@@ -751,26 +436,6 @@ Returns the staple directory as writen in F</etc/staple/staple_dir>. Returns C</
 
 sub getStapleDir {
     return $stapleDir;
-}
-
-=item B<getRawMounts(I<configuration [configuration [...]]>)>
-
-Returns an ordered list of mount hashes from the given configurations. The
-hashes aren't full and containes only destincation, active, and
-configuration. The order is as it appear in the given configurations.
-
-On error retures undef and sets the last error.
-
-=cut
-
-sub getRawMounts {
-    my @configurations = @_;
-    my @mounts = $db->getMounts(@configurations);
-    if (@mounts and not defined $mounts[0]) {
-        $error = $db->{error};
-        return undef;
-    }
-    return @mounts;
 }
 
 =item B<getCompleteMounts(I<mount list ref, tokens hash ref>)>
@@ -787,71 +452,6 @@ sub getCompleteMounts {
     @mounts = buildMounts(\@mounts, \%tokens);
 
     return @mounts;   
-}
-
-=item B<getTemplates(I<configuration [configuration [...]]>)>
-
-Returns an unordered list with templates hashes values. If same template (stage
-+ destination) for different configurations, last one wins.
-
-On error returns undef.
-
-=cut
-
-sub getTemplates {
-    my @configurations = @_;
-    unless (@configurations) {
-        $error = "Missing configuration";
-        return undef;
-    }
-    my @templates = $db->getTemplates(@configurations);
-    if (@templates and not defined $templates[0]) {
-        $error = $db->{error};
-        return undef;
-    }
-    return @templates;
-}
-
-=item B<getScripts(I<configuration [configuration [...]]>)>
-
-Returns an ordered list of scripts hashes. The script are ordered first by the
-configurations (with the given order) and second by the internal order per
-configuration.
-
-On error undef is returned.
-
-=cut
-
-sub getScripts {
-    my @configurations = @_;
-    my @results = ();
-    push @results, $db->getScripts(@configurations);
-    if (@results and not defined $results[0]) {
-        $error = $db->{error};
-        return undef;
-    }
-    return @results;
-}
-
-=item B<getAutos(I<configuration [configuration [...]]>)>
-
-Returns an ordered list of autos hashes. The autos are ordered first by the
-configurations (with the given order) and second by the internal order per
-configuration (like I<getScripts>).
-
-On error undef is retuned
-
-=cut
-
-sub getAutos {
-    my @configurations = @_;
-    my @results = ();
-    push @results, $db->getAutos(@configurations);
-    if (@results and not defined $results[0]) {
-        $error = $db->{error};
-        return undef;
-    }
-    return @results;
 }
 
 =back
@@ -971,7 +571,7 @@ __END__
 
 =head1 EXAMPLES
 
-The init stage from the stapleboot:
+The init stage from the stapleboot (obsolete...):
 
 =for comment @distributions = getDistributionList($distribution);
 

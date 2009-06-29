@@ -91,7 +91,7 @@ sub mail {
         (my $domain) = $res->searchlist;
         $host = "$host.".$domain;
     }
-    my $db = getDB();
+    my $db = $self->{db}->info();
     my $prefix = "Staple version: $VERSION\n";
     $prefix .= "Staple database: $db\n";
     $prefix .= "Distribution: $self->{distribution}\n";
