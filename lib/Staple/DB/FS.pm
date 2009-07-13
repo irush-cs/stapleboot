@@ -441,7 +441,7 @@ sub getTemplates {
         next unless -d "$path";
         my @raw = map {(my $a = $_) =~ s/$path//; $a} grep {! -d} getDirectoryList("$path");
         foreach my $rawTemplate (@raw) {
-            if ($rawTemplate =~ m!^/(.*?)(/.*/)([^/]*)$!) {
+            if ($rawTemplate =~ m!^/(.*?)(/.*/?)([^/]*)$!) {
                 (my $mode, my $uid, my $gid) = (stat("$path/$rawTemplate"))[2,4,5];
                 $mode &= 07777;
                 $templates{"$1.$2$3"} = {source => "$path$rawTemplate",
