@@ -225,7 +225,7 @@ $stapler->updateSettings();
 
 if (@groups_tokens or @configurations_tokens) {
     $extraTokens = {getCompleteTokens($stapler->{db}->getTokens($stapler->{db}->getCompleteGroups($stapler->{db}->getGroupsByName(@groups_tokens)), $stapler->{db}->getCompleteConfigurations([getConfigurationsByName(@configurations_tokens)], $stapler->{distribution})), $stapler->{host}, $stapler->{distribution})};
-    $stapler->addToken2($extraTokens);
+    $stapler->addTokens($extraTokens);
 }
 
 if (@badConfigurations) {
@@ -289,7 +289,7 @@ if (grep {$_ eq "auto"} @stages) {
     }
     
     if ($extraTokens) {
-        $stapler->addToken2($extraTokens);
+        $stapler->addTokens($extraTokens);
     }
 }
 

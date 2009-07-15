@@ -168,30 +168,14 @@ sub updateData {
     $self->{tokens}->{"__STAPLE_FIND_LABEL__"}->{value} = $self->{findLabelScript} if $self->{findLabelScript};
 }
 
-=item B<addToken(token hash ref)>
-
-Adds a single token (hash contains key, value, raw and type), recalculates the
-tokens database, set the internal data, and updates the mounts
-
-=cut
-
-sub addToken {
-    my $self = shift;
-    my $token = shift;
-    $self->{tokens}->{$token->{key}} = $token;
-    $self->{tokens} = {getCompleteTokens($self->{tokens}, $self->{host}, $self->{distribution})};
-    $self->updateData();
-    $self->updateMounts();
-}
-
-=item B<addToken2(token hash ref)>
+=item B<addTokens(token hash ref)>
 
 Adds the tokens (hash of hashs of key, value, raw and type), recalculates the
 tokens database, set the internal data, and updates the mounts
 
 =cut
 
-sub addToken2 {
+sub addTokens {
     my $self = shift;
     my $tokens = shift;
     foreach my $token (values %$tokens) {

@@ -68,7 +68,7 @@ sub debug {
                 if ($line =~ m/;\n$/) {
                     $line =~ s/;\n$//;
                     $tokenValue .= $line;
-                    $boot->addToken({key => "$tokenKey", value => "$tokenValue", raw => "$tokenValue", type => "static", source => "manual"});
+                    $boot->addTokens({"$tokenKey" => {key => "$tokenKey", value => "$tokenValue", raw => "$tokenValue", type => "static", source => "manual"}});
                     $tokenValue = "";
                     $tokenKey = "";
                 } else {
@@ -127,7 +127,7 @@ sub debug {
                     @SIG{("INT", "QUIT", "TSTP")} = ('IGNORE','IGNORE','IGNORE');
                     $boot->error("Failed to run $boot->{bash}: $!") if ($? == -1);
                 } elsif ($line =~ m/^token:([^=]+)=(.*);$/) {
-                    $boot->addToken({key => "$1", value => "$2", raw => "$2", type => "static", source => "manual"});
+                    $boot->addTokens({"$1" => {key => "$1", value => "$2", raw => "$2", type => "static", source => "manual"}});
                 } elsif ($line =~ m/^token:([^=]+)=(.*)$/) {
                     $tokenKey = $1;
                     $tokenValue = "$2\n";
