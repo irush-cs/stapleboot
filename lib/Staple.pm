@@ -120,6 +120,10 @@ B<mount hash>
 
 =item I<manual>         - Whether to manually mount (1) or just write an fstab entry (0)
 
+=item I<fsck>           - Whether to run fsck (1) or not (0).
+
+=item I<fsckCommand>    - Special fsck command for this mount (defaults to empty, only for manual mount)
+
 =back
 
 =back
@@ -250,6 +254,7 @@ my %DEFAULT_TOKENS = (
                       "__STAPLE_FIND_LABEL__"  => "",
                       "__STAPLE_LOG__"         => "/var/log/staple",
                       "__STAPLE_MOUNT__"       => "mount -n",
+                      "__STAPLE_FSCK_CMD__"    => "/sbin/fsck -a",
                       "__STAPLE_SYSLOG__"      => "LOG_LOCAL6",
                       "__STAPLE_CONF__"        => "/etc/staple/staple.conf",
                      );
@@ -282,7 +287,25 @@ my %mountTokenToOption = (
                           "COPY_EXCLUDE" => "copyExclude",
                           "COPY_LINKS"   => "copyLinks",
                           "MANUAL"       => "manual",
+                          "FSCK"         => "fsck",
+                          "FSCK_CMD"     => "fsckCommand",
                          );
+
+my %mountTokenDefaultValues = (
+                               "SOURCE"       => "",
+                               "TYPE"         => "",
+                               "OPTIONS"      => "",
+                               "NEXT"         => "",
+                               "PERMISSIONS"  => "",
+                               "CRITICAL"     => "",
+                               "COPY_SOURCE"  => "",
+                               "COPY_FILES"   => "",
+                               "COPY_EXCLUDE" => "",
+                               "COPY_LINKS"   => "",
+                               "MANUAL"       => "",
+                               "FSCK"         => "1",
+                               "FSCK_CMD"     => "",
+                              );
 
 BEGIN {
     #$error = "";
@@ -506,7 +529,7 @@ sub buildMounts {
             if ($tokens->{$key}) {
                 $mount{$mountTokenToOption{$option}} = $tokens->{$key}->{value}
             } else {
-                $mount{$mountTokenToOption{$option}} = "";
+                $mount{$mountTokenToOption{$option}} = $mountTokenDefaultValues{$option};
             }
         }
         $mount{manual} = 1 if $mount{critical};

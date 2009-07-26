@@ -10,6 +10,7 @@ package Staple::Misc;
 use strict;
 use warnings;
 use IPC::Open3;
+use IO::Select;
 use XML::Writer;
 use XML::Parser;
 use IO::File;
@@ -143,24 +144,40 @@ sub getDistribution {
 =item B<runCommnad(I<command>)>
 
 Executes the given commnad, and returns the exit code (wait >> 8), the command
-output, and the command error (three strings).
+output, the command error, and the command output and error combind (4 scalars).
 
 =cut
 
 sub runCommand {
     my $command = shift;
-    my $commandOutput;
-    my $commandError;
+    my $commandOutput = "";
+    my $commandError = "";
+    my $commandOutputError = "";
     my $exitCode;
     my $pid = open3(\*WTRFH, \*RDRFH, \*ERRFH, "$command");
+    close(WTRFH);
+    my $selector = IO::Select->new();
+    $selector->add(*RDRFH, *ERRFH);
+
+    my $buf;
+    while (my @ready = $selector->can_read) {
+        foreach my $fh (@ready) {
+            if (fileno($fh) == fileno(RDRFH)) {
+                $buf = <RDRFH>;
+                $commandOutput .= $buf if $buf;
+            } else {
+                $buf = <ERRFH>;
+                $commandError .= $buf if $buf;
+            }
+            $commandOutputError .= $buf if $buf;
+            $selector->remove($fh) if eof($fh);
+        }
+    }
     waitpid($pid, 0);
-    $commandOutput = join "", <RDRFH>;
-    $commandError = join "", <ERRFH>;
     $exitCode = $? >> 8;
     close(RDRFH);
-    close(WTRFH);
     close(ERRFH);
-    return ($exitCode, $commandOutput, $commandError);
+    return ($exitCode, $commandOutput, $commandError, $commandOutputError);
 }
 
 =item B<fixPath(I<path>)>

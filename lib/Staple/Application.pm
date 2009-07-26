@@ -63,6 +63,10 @@ noted). Most of them are set automatically by the member functions.
 
 =item I<db>                - The staple database (Staple::DB).
 
+=item I<mountCommand>      - The mount command to use (__STAPLE_MOUNT__)
+
+=item I<fsckCommand>       - The fsck command to use (__STAPLE_FSCK_CMD__)
+
 =back
 
 =back
@@ -465,6 +469,29 @@ sub applyMounts {
 
         # if manual, do the mount
         if ($mount->{manual}) {
+
+            # fsck, only on a proper device
+            if ($mount->{fsck} and -e $mount->{source}) {
+                my $fsckcmd = "$mount->{fsckCommand}";
+                $fsckcmd = "$self->{fsckCommand}" unless $fsckcmd;
+                $fsckcmd .= " $mount->{source}";
+                $self->output("fsck $mount->{destination}: $fsckcmd") if $self->{verbose} > 2;
+                unless ($self->{disabled}) {
+                    (my $fsckExit, my $fsckOutput, my $fsckError) = runCommand("$fsckcmd 2>&1");
+                    #(my $fsckExit, my $fsckOutput, my $fsckError) = ("","","");
+                    #system("$fsckcmd");
+                    #$fsckExit = $? >> 8;
+                    #$self->output("fsck output: $fsckOutput") if $fsckOutput and $self->{verbose} > 2;
+                    if ($fsckExit) {
+                        $status = "Error running fsck: $fsckcmd\n";
+                        $status .= "fsck output:\n$fsckOutput\n\nfsck error:\n$fsckError\n\nfsck exit code: $fsckExit\n";
+                        $self->error("error running fsck on $mount->{destination}");
+                        $self->output("fsck errors: $fsckError") if $self->{verbose} >= 1 and $fsckError;
+                        goto aftermount;
+                    }
+                }
+            }
+
             $mountcmd = "$self->{mountCommand}";
             if ($mount->{type} eq "bind") {
                 $mountcmd .= " --bind";
@@ -473,6 +500,7 @@ sub applyMounts {
             }
             $mountcmd .= " -o $mount->{options}" if $mount->{options};
             $mountcmd .= " $mount->{source} ".fixPath("$self->{rootDir}/$mount->{destination}")." 2>&1";
+            $self->output("mount $mount->{destination}: $mountcmd") if $self->{verbose} > 2;
             unless ($self->{disabled}) {
                 (my $mountExit, $status, my $mountError) = runCommand("$mountcmd");
                 if ($mountExit and not $status) {
@@ -529,7 +557,8 @@ sub applyMounts {
                 $options .= ",mode=$mount->{permissions}" if $mount->{permissions};
                 $options =~ s/^,//;
                 $options = "defaults" unless $options;
-                push @fstab, "$mount->{source}\t$mount->{destination}\t$mount->{type}\t$options\t0 0";
+                my $fsck = ($mount->{fsck} and -e $mount->{source}) ? "2" : "0";
+                push @fstab, "$mount->{source}\t$mount->{destination}\t$mount->{type}\t$options\t0 $fsck";
             }
         }
 
@@ -682,6 +711,7 @@ sub clearAll {
                              "__STAPLE_LOG__"         => "staplelog",
                              "__STAPLE_SYSLOG__"      => "syslog",
                              "__STAPLE_MOUNT__"       => "mountCommand",
+                             "__STAPLE_FSCK_CMD__"    => "fsckCommand",
                              "__STAPLE_SYSINIT__"     => "sysinit",
                              "__STAPLE_CONF__"        => "conf",
                             };
