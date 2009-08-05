@@ -685,7 +685,7 @@ sub addAutos {
             $data = join "", <FILE>;
             close(FILE);
         }
-        my @oldAutos = $self->getAutos($auto->{configurations});
+        my @oldAutos = $self->getAutos($auto->{configuration});
         $auto->{order} = scalar(@oldAutos) + 1 if not defined $auto->{order} or $auto->{order} > scalar(@oldAutos) or $auto->{order} < 1;
         unless($self->mkdirs("$auto->{configuration}->{path}/autos/")) {
             push @errors, $self->{error};

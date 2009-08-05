@@ -1034,7 +1034,7 @@ Other commands:
 ",
                    );
 
-my @singleCommandCommands = ("ahc", "rhc", "gag", "ghc", "wht", "whc", "whg", "ghi", "ggi", "gci", "bad", "badcommandorfilename", "gt", "gdt", "gct", "gah");
+my @singleCommandCommands = ("ahc", "rhc", "gag", "ghc", "wht", "whc", "whg", "ghi", "ggi", "gci", "bad", "badcommandorfilename", "gt", "gdt", "gct", "gah", "gac");
 
 sub help {
     my %topics = (a              => "helpall",
@@ -1549,16 +1549,23 @@ sub aa {
         unlink $tmpFile;
         return;
     }
-    my %auto;
-    $auto{name} = prompt "name";
-    $auto{source} = $tmpFile;
-    $auto{configuration} = $conf;
-    $auto{order} = prompt "location", "end";
-    $auto{order} = undef unless $auto{order} =~ m/^\d+$/;
-    $auto{critical} = boolprompt "critical", "no";
-    $auto{tokens} = boolprompt "tokens", "no";
-    print $db->{error}."\n" unless ($db->addAutos(\%auto));
-    unlink $tmpFile
+    eval {
+        local $SIG{INT} = sub {die "SIGINT"};
+        my %auto;
+        $auto{name} = prompt "name";
+        $auto{source} = $tmpFile;
+        $auto{configuration} = $conf;
+        $auto{order} = prompt "location", "end";
+        $auto{order} = undef unless $auto{order} =~ m/^\d+$/;
+        $auto{critical} = boolprompt "critical", "no";
+        $auto{tokens} = boolprompt "tokens", "no";
+        print $db->{error}."\n" unless ($db->addAutos(\%auto));
+    };
+    if ($@) {
+        print "\n";
+        print "$@" if index($@,"SIGINT") != 0;
+    }
+    unlink $tmpFile;
 }
 
 sub ra {
@@ -1625,16 +1632,23 @@ sub ua {
             unlink $tmpFile;
             return;
         }
-        my %newAuto;
-        $newAuto{source} = $tmpFile;
-        $newAuto{name} = prompt "name", $auto->{name};
-        $newAuto{order} = prompt "order", $auto->{order};
-        $newAuto{order} = undef unless $newAuto{order} =~ m/^\d+$/;
-        $newAuto{critical} = boolprompt "critical", $auto->{critical};
-        $newAuto{tokens} = boolprompt "tokens", $auto->{tokens};
-        $newAuto{configuration} = $auto->{configuration};
-        print $db->{errro}."\n" unless ($db->removeAutos($auto));
-        print $db->{error}."\n" unless ($db->addAutos(\%newAuto));
+        eval {
+            local $SIG{INT} = sub {die "SIGINT"};
+            my %newAuto;
+            $newAuto{source} = $tmpFile;
+            $newAuto{name} = prompt "name", $auto->{name};
+            $newAuto{order} = prompt "order", $auto->{order};
+            $newAuto{order} = undef unless $newAuto{order} =~ m/^\d+$/;
+            $newAuto{critical} = boolprompt "critical", $auto->{critical};
+            $newAuto{tokens} = boolprompt "tokens", $auto->{tokens};
+            $newAuto{configuration} = $auto->{configuration};
+            print $db->{errro}."\n" unless ($db->removeAutos($auto));
+            print $db->{error}."\n" unless ($db->addAutos(\%newAuto));
+        };
+        if ($@) {
+            print "\n";
+            print "$@" if index($@,"SIGINT") != 0;
+        }
         unlink $tmpFile
     } else {
         print "No such auto \"$auto_name\" in \"$configuration\"\n";
@@ -1742,20 +1756,27 @@ sub us {
             unlink $tmpFile;
             return;
         }
-        my %newScript;
-        $newScript{source} = $tmpFile;
-        $newScript{name} = prompt "name", $script->{name};
-        do {
-            $newScript{stage} = prompt "stage (auto, mount, sysinit, final)", $script->{stage};
-        } until ($newScript{stage} =~ m/^(?:auto|mount|sysinit|final)$/);
-        $newScript{order} = prompt "order", $script->{order};
-        $newScript{order} = undef unless $newScript{order} =~ m/^\d+$/;
-        $newScript{critical} = boolprompt "critical", $script->{critical};
-        $newScript{tokens} = boolprompt "tokens", $script->{tokens};
-        $newScript{tokenScript} = boolprompt "tokenScript", $script->{tokenScript};
-        $newScript{configuration} = $script->{configuration};
-        print $db->{error}."\n" unless ($db->removeScripts($script));
-        print $db->{error}."\n" unless ($db->addScripts(\%newScript));
+        eval {
+            local $SIG{INT} = sub {die "SIGINT"};
+            my %newScript;
+            $newScript{source} = $tmpFile;
+            $newScript{name} = prompt "name", $script->{name};
+            do {
+                $newScript{stage} = prompt "stage (auto, mount, sysinit, final)", $script->{stage};
+            } until ($newScript{stage} =~ m/^(?:auto|mount|sysinit|final)$/);
+            $newScript{order} = prompt "order", $script->{order};
+            $newScript{order} = undef unless $newScript{order} =~ m/^\d+$/;
+            $newScript{critical} = boolprompt "critical", $script->{critical};
+            $newScript{tokens} = boolprompt "tokens", $script->{tokens};
+            $newScript{tokenScript} = boolprompt "tokenScript", $script->{tokenScript};
+            $newScript{configuration} = $script->{configuration};
+            print $db->{error}."\n" unless ($db->removeScripts($script));
+            print $db->{error}."\n" unless ($db->addScripts(\%newScript));
+        };
+        if ($@) {
+            print "\n";
+            print "$@" if index($@,"SIGINT") != 0;
+        }
         unlink $tmpFile
     } else {
         print "No such script \"$script_name\" in \"$configuration\"\n";
@@ -1789,19 +1810,26 @@ sub as {
         unlink $tmpFile;
         return;
     }
-    my %script;
-    $script{name} = prompt "name";
-    $script{source} = $tmpFile;
-    $script{configuration} = $conf;
-    do {
-        $script{stage} = prompt "stage (auto, mount, sysinit, final)";
-    } until ($script{stage} =~ m/^(?:auto|mount|sysinit|final)$/);
-    $script{order} = prompt "location", "end";
-    $script{order} = undef unless $script{order} =~ m/^\d+$/;
-    $script{critical} = boolprompt "critical", "no";
-    $script{tokens} = boolprompt "tokens", "no";
-    $script{tokenScript} = boolprompt "tokenScript", "no";
-    print $db->{error}."\n" unless ($db->addScripts(\%script));
+    eval {
+        local $SIG{INT} = sub {die "SIGINT"};
+        my %script;
+        $script{name} = prompt "name";
+        $script{source} = $tmpFile;
+        $script{configuration} = $conf;
+        do {
+            $script{stage} = prompt "stage (auto, mount, sysinit, final)";
+        } until ($script{stage} =~ m/^(?:auto|mount|sysinit|final)$/);
+        $script{order} = prompt "location", "end";
+        $script{order} = undef unless $script{order} =~ m/^\d+$/;
+        $script{critical} = boolprompt "critical", "no";
+        $script{tokens} = boolprompt "tokens", "no";
+        $script{tokenScript} = boolprompt "tokenScript", "no";
+        print $db->{error}."\n" unless ($db->addScripts(\%script));
+    };
+    if ($@) {
+        print "\n";
+        print "$@" if index($@,"SIGINT") != 0;
+    }
     unlink $tmpFile
 }
 
@@ -1941,17 +1969,24 @@ sub at {
         unlink $tmpFile;
         return;
     }
-    my %template;
-    $template{source} = $tmpFile;
-    $template{uid} = prompt "uid", $UID;
-    $template{gid} = prompt "gid", $GID + 0;
-    $template{mode} = oct(prompt "mode", 644);
-    do {
-        $template{stage} = prompt "stage (mount, sysinit, final)";
-    } until ($template{stage} =~ m/^(?:mount|sysinit|final)$/);
-    $template{destination} = prompt "destination";
-    $template{configuration} = $conf;
-    print $db->{error}."\n" unless ($db->addTemplates(\%template));
+    eval {
+        local $SIG{INT} = sub {die "SIGINT"};
+        my %template;
+        $template{source} = $tmpFile;
+        $template{uid} = prompt "uid", $UID;
+        $template{gid} = prompt "gid", $GID + 0;
+        $template{mode} = oct(prompt "mode", 644);
+        do {
+            $template{stage} = prompt "stage (mount, sysinit, final)";
+        } until ($template{stage} =~ m/^(?:mount|sysinit|final)$/);
+        $template{destination} = prompt "destination";
+        $template{configuration} = $conf;
+        print $db->{error}."\n" unless ($db->addTemplates(\%template));
+    };
+    if ($@) {
+        print "\n";
+        print "$@" if index($@,"SIGINT") != 0;
+    }
     unlink $tmpFile
 }
 
@@ -2000,18 +2035,25 @@ sub ut {
             unlink $tmpFile;
             return;
         }
-        my %newTemplate;
-        $newTemplate{source} = $tmpFile;
-        $newTemplate{uid} = prompt "uid", $template->{uid};
-        $newTemplate{gid} = prompt "gid", $template->{gid};
-        $newTemplate{mode} = oct(prompt "mode", sprintf("%04o", $template->{mode}));
-        do {
-            $newTemplate{stage} = prompt "stage (mount, sysinit, final)", $template->{stage};
-        } until ($newTemplate{stage} =~ m/^(?:mount|sysinit|final)$/);
-        $newTemplate{destination} = prompt "destination", $template->{destination};
-        $newTemplate{configuration} = $template->{configuration};
-        print $db->{error}."\n" unless ($db->removeTemplates($template));
-        print $db->{error}."\n" unless ($db->addTemplates(\%newTemplate));
+        eval {
+            local $SIG{INT} = sub {die "SIGINT"};
+            my %newTemplate;
+            $newTemplate{source} = $tmpFile;
+            $newTemplate{uid} = prompt "uid", $template->{uid};
+            $newTemplate{gid} = prompt "gid", $template->{gid};
+            $newTemplate{mode} = oct(prompt "mode", sprintf("%04o", $template->{mode}));
+            do {
+                $newTemplate{stage} = prompt "stage (mount, sysinit, final)", $template->{stage};
+            } until ($newTemplate{stage} =~ m/^(?:mount|sysinit|final)$/);
+            $newTemplate{destination} = prompt "destination", $template->{destination};
+            $newTemplate{configuration} = $template->{configuration};
+            print $db->{error}."\n" unless ($db->removeTemplates($template));
+            print $db->{error}."\n" unless ($db->addTemplates(\%newTemplate));
+        };
+        if ($@) {
+            print "\n";
+            print "$@" if index($@,"SIGINT") != 0;
+        }
         unlink $tmpFile
     } else {
         print "No such template \"$template_name\" in \"$configuration\"\n";
