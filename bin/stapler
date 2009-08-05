@@ -185,6 +185,10 @@ $stapler->{verbose} = $verbose;
 $stapler->{disabled} = 0;
 $stapler->updateData();
 
+unless (-e $stapler->{conf}) {
+    $stapler->error("$stapler->{conf} does not exists.");
+}
+
 $doall = 1 if ($withdist or $withhost);
 
 if (not @groups and not @configurations) {

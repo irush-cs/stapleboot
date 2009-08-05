@@ -321,6 +321,11 @@ sub initStage {
     $boot->{tokens} = {getCompleteTokens({})};
     $boot->updateData();
 
+    unless (-e $boot->{conf}) {
+        $boot->error("$boot->{conf} does not exists.");
+        $boot->addMail("$boot->{conf} does not exists.");
+    }
+
     unless ($boot->{db}->getHostGroup($boot->{host})) {
         $boot->error("$boot->{host} does not exist in the staple database");
         $boot->addMail("$boot->{host} does not exist in the staple database");

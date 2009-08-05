@@ -240,7 +240,7 @@ our $VERSION = '003';
 my $stapleDir;
 
 # don't use this, it's just for initializing %defaultTokens
-# SMTP_SERVER isn't localhost, as this host most likely doesn't have an mail server running...
+# SMTP_SERVER isn't localhost, as this host most likely doesn't have a mail server running...
 my %DEFAULT_TOKENS = (
                       "__STAPLE_SYSINIT__"     => "/etc/init.d/rcS",
                       "__STAPLE_VERBOSE__"     => "1",

@@ -9,6 +9,8 @@
 
 use warnings;
 use strict;
+use English;
+use Getopt::Long;
 
 BEGIN {
     my $file = $0;
@@ -1941,8 +1943,8 @@ sub at {
     }
     my %template;
     $template{source} = $tmpFile;
-    $template{uid} = prompt "uid", 0;
-    $template{gid} = prompt "gid", 0;
+    $template{uid} = prompt "uid", $UID;
+    $template{gid} = prompt "gid", $GID + 0;
     $template{mode} = oct(prompt "mode", 644);
     do {
         $template{stage} = prompt "stage (mount, sysinit, final)";
@@ -3054,7 +3056,7 @@ sub gad {
     if (@distributions and not defined $distributions[0]) {
         print $db->{error}."\n";
     } else {
-        @distributions = map {$distribution eq $_ ? "(*) $_" : "    $_"} @distributions;
+        @distributions = map {$distribution eq $_ ? "(*) $_" : "    $_"} @distributions if $distribution;
         print join "\n", @distributions;
         print "\n";
     }
@@ -3637,18 +3639,40 @@ sub attempted_completion {
 #   main
 ###
 
-$ENV{ANSI_COLORS_DISABLED} = 1;
-while (my $arg = shift @ARGV) {
-    delete $ENV{ANSI_COLORS_DISABLED} if ($arg eq '--color');
-    if ($arg eq '-c') {
-        $singleCommand = join (" ", @ARGV);
-        @ARGV = ();
-        last;
-    }
+sub usage {
+    my $exitCode = shift;
+    $exitCode = 0 unless $exitCode;
+    print "usage: staplectl [options]
+options are:
+  -h    | --help\t\t Print this help message and exit
+        | --color\t\t Colored prompt
+  -c    | --command\t Executes the rest of argv as a command and exits
+  -dist | --distribution <dist>\t Start with the given distribution
+  -db   | --database <db>\t Connects to <db> instead of the default (a Staple::DB::Factory::CreateDB parameter).
+";
+    exit $exitCode;
 }
 
-$distribution = getDistribution();
-$db = createDB();
+my $coloredPrompt;
+
+unless (GetOptions('help|h|?'            => sub {usage(0);},
+                   'color!'              => \$coloredPrompt,
+                   'c|command'           => \$singleCommand,
+                   'dist|distribution=s' => \$distribution,
+                   'database|db=s'       => \$db,
+                  )) {
+    usage(1);
+}
+
+$ENV{ANSI_COLORS_DISABLED} = 1;
+if ($coloredPrompt) {
+    delete $ENV{ANSI_COLORS_DISABLED};
+}
+
+$singleCommand = join (" ", @ARGV) if $singleCommand;
+
+$distribution = getDistribution() unless ($distribution);
+$db = createDB($db ? split /\s+/, $db : undef);
 unless (ref $db) {
     print "$db\n";
     $db = undef;
