@@ -150,6 +150,8 @@ output, the command error, and the command output and error combind (4 scalars).
 
 sub runCommand {
     my $command = shift;
+    my $outputStream = shift;
+    local $| = 1;
     my $commandOutput = "";
     my $commandError = "";
     my $commandOutputError = "";
@@ -169,7 +171,10 @@ sub runCommand {
                 $buf = <ERRFH>;
                 $commandError .= $buf if $buf;
             }
-            $commandOutputError .= $buf if $buf;
+            if ($buf) {
+                $commandOutputError .= $buf;
+                print $outputStream $buf if $outputStream;
+            }
             $selector->remove($fh) if eof($fh);
         }
     }

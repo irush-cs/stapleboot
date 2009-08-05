@@ -259,11 +259,10 @@ sub applyScripts {
         }
         #$runnable .= " >/dev/null" if $verbose == 0;
         $self->output("Running script: $script->{name}", 2);
-        my ($scriptExit, $scriptOutput, $scriptError) = runCommand($runnable);
+        my ($scriptExit, $scriptOutput, $scriptError) = runCommand($runnable, $self->{verbose} >= 2 ? \*STDOUT : undef);
         chomp $scriptOutput if $scriptOutput;
         chomp $scriptError if $scriptError;
-        $self->output("$script->{name} output:\n$scriptOutput", 2, 0) if $scriptOutput;
-        $self->output("$script->{name} error:\n$scriptError", 1, 0) if $scriptError;
+        $self->output("$script->{name} error:\n$scriptError") if $scriptError and $self->{verbose} == 1;
         if ($scriptExit) {
             $self->error("$script->{configuration}->{name}/$script->{name} failed ($scriptExit)");
             my $body = "$script->{configuration}->{name}/$script->{name} failed with exit code: $scriptExit\n\n";
