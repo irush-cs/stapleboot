@@ -51,6 +51,7 @@ options are:
         \t\t already running machine).
  --gt | --group-tokens\t add tokens from group
  --ct | --configuration-tokens\t\t add tokens from configurations
+ --ht | --host-tokens\t\t add tokens from the host
   -g  | --group\t\t apply group
   -c  | --configuration\t apply configuration
   -a  | --all\t\t If no -g -c are present, execute all instead of
@@ -132,6 +133,7 @@ my @configurations;
 my @groups;
 my @configurations_tokens;
 my @groups_tokens;
+my $hosttokens = 0;
 unless (GetOptions('help|h|?'                  => \$help,
                    'stage|s=s'                 => \@stages,
                    'host=s'                    => \$host,
@@ -144,7 +146,7 @@ unless (GetOptions('help|h|?'                  => \$help,
                    'group|g=s'                 => \@groups,
                    'group-tokens|gt=s'         => \@groups_tokens,
                    'configuration-tokens|ct=s' => \@configurations_tokens,
-#                   'host-tokens|ht=s'          => \$hosttokens,
+                   'host-tokens|ht!'           => \$hosttokens,
                    'all|a'                     => \$doall,
                    'database|db=s'             => \$database,
                   )) {
@@ -196,7 +198,7 @@ if (not @groups and not @configurations) {
     $withhost = 1;
 }
 
-if (not $stapler->{db}->getHostGroup($stapler->{host}) and $withhost) {
+if (not $stapler->{db}->getHostGroup($stapler->{host}) and ($withhost or $hosttokens)) {
     $stapler->error("$stapler->{host} does not exist in the staple database");
     $stapler->doCriticalAction();
 }
@@ -227,8 +229,8 @@ $stapler->{groups} = [$stapler->{db}->getCompleteGroups(@g)];
 $stapler->{configurations} = [$stapler->{db}->getCompleteConfigurations([$stapler->{db}->getGroupsConfigurations(@{$stapler->{groups}}), getConfigurationsByName(@configurations)], $stapler->{distribution}, \@badConfigurations)];
 $stapler->updateSettings();
 
-if (@groups_tokens or @configurations_tokens) {
-    $extraTokens = {getCompleteTokens($stapler->{db}->getTokens($stapler->{db}->getCompleteGroups($stapler->{db}->getGroupsByName(@groups_tokens)), $stapler->{db}->getCompleteConfigurations([getConfigurationsByName(@configurations_tokens)], $stapler->{distribution})), $stapler->{host}, $stapler->{distribution})};
+if (@groups_tokens or @configurations_tokens or $hosttokens) {
+    $extraTokens = {getCompleteTokens($stapler->{db}->getTokens($stapler->{db}->getCompleteConfigurations([getConfigurationsByName(@configurations_tokens)], $stapler->{distribution}), $stapler->{db}->getCompleteGroups($stapler->{db}->getGroupsByName(@groups_tokens)), $hosttokens ? $stapler->{db}->getHostGroup($stapler->{host}) : ()), $stapler->{host}, $stapler->{distribution})};
     $stapler->addTokens($extraTokens);
 }
 
