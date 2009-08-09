@@ -2726,36 +2726,43 @@ sub ghg {
 }
 
 sub createToken {
-    my $group = shift;
-    print "type ([static], dynamic, regexp): ";
-    my $type = <>;
-    chomp($type);
-    $type = lc($type);
-    $type = "static" unless $type;
-    if ($type !~ m/^static|dynamic|regexp$/) {
-        print "Unknown type\n";
-        return;
-    }
-    print "key: ";
-    my $key = <>;
-    my $value;
-    if ($key =~ m/=/) {
-        ($key, $value) = $key =~ m/^([^=]+)=(.*)$/s;
-        while ($value !~ m/;\n$/) {
-            $value .= <>;
+    eval {
+        local $SIG{INT} = sub {die "SIGINT"};
+        my $group = shift;
+        print "type ([static], dynamic, regexp): ";
+        my $type = <>;
+        chomp($type);
+        $type = lc($type);
+        $type = "static" unless $type;
+        if ($type !~ m/^static|dynamic|regexp$/) {
+            print "Unknown type\n";
+            return;
         }
-    } else {
-        print "value (end with ;): ";
-        $value = "";
-        do {
+        print "key: ";
+        my $key = <>;
+        my $value;
+        if ($key =~ m/=/) {
+            ($key, $value) = $key =~ m/^([^=]+)=(.*)$/s;
+            while ($value !~ m/;\n$/) {
+                $value .= <>;
+            }
+        } else {
+            print "value (end with ;): ";
+            $value = "";
+            do {
             $value .= <>;
         } until ($value =~ m/;\n$/);
+        }
+        chomp($key);
+        $value =~ s/;\n$//;
+        unless ($db->addTokens({"$key" => {key => $key, value => $value, raw => $value, type => $type}}, $group)) {
+            print $db->{error}."\n";
+        }
+    };
+    if ($@) {
+        print "\n";
+        print "$@" if index($@,"SIGINT") != 0;
     }
-    chomp($key);
-    $value =~ s/;\n$//;
-    unless ($db->addTokens({"$key" => {key => $key, value => $value, raw => $value, type => $type}}, $group)) {
-        print $db->{error}."\n";
-    }   
 }
 
 sub act {
