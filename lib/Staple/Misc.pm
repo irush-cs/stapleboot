@@ -448,7 +448,7 @@ sub tokensToXML {
         my $cattr = $attr;
         $cattr = [keys %$token] unless $cattr;
         for my $elem (sort {$a cmp $b} @$cattr) {
-            $writer->dataElement($elem, $token->{$elem}) if $token->{$elem};
+            $writer->dataElement($elem, $token->{$elem}) if exists $token->{$elem};
         }
         $writer->endTag("token");
     }

@@ -2750,8 +2750,8 @@ sub createToken {
             print "value (end with ;): ";
             $value = "";
             do {
-            $value .= <>;
-        } until ($value =~ m/;\n$/);
+                $value .= <>;
+            } until ($value =~ m/;\n$/);
         }
         chomp($key);
         $value =~ s/;\n$//;
