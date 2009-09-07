@@ -311,7 +311,7 @@ sub addTokens {
     my $self = shift;
     my $tokens = shift;
     my $group = shift;
-    if ($group->{type}) {
+    if ($group->{type} and $group->{type} ne "configuration") {
         #group
         my $table;
         if ($group->{type} eq "host") {
@@ -341,7 +341,7 @@ sub removeTokens {
     my $tokens = shift;
     my $group = shift;
     my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
-    if ($group->{type}) {
+    if ($group->{type} and $group->{type} ne "configuration") {
         #group
         my $stmt = "DELETE FROM $self->{schema}$group->{type}_tokens WHERE key = ? AND ";
         if ($group->{type} eq "host") {
@@ -380,8 +380,8 @@ sub getTokens {
     my %tokens = ();    
     foreach my $gorc (@groupsAndConfigurations) {
         my $prefix;
-        if (defined $gorc->{type}) {
-            # only groups have types
+        if (defined $gorc->{type} and $gorc->{type} ne "configuration") {
+            # in the past, only groups had types
             $prefix = $gorc->{type};
             if ($gorc->{type} eq "group") {
                 $sth = $dbh->prepare_cached("SELECT key, value, type FROM $self->{schema}group_tokens WHERE group_name = ?");

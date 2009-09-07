@@ -35,7 +35,7 @@ B<group hash>
 
 =item I<name>   - The name of the group
 
-=item I<type>   - The type of the group (group, distribution, host, or auto)
+=item I<type>   - The type of the group (group, distribution, or host)
 
 =item I<path>   - The path of the group in the filesystem
 
@@ -46,9 +46,6 @@ B<group hash>
 =back
 
 B<configuration hash>
-
-=for comment
-Don't add "type" to configuration as some distinguish between group and configuration by the availability of the "type" key
 
 =over
 

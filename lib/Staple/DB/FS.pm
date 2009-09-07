@@ -268,7 +268,7 @@ sub addTokens {
     my $tokens = shift;
     my $group = shift;
     unless (-d $group->{path}) {
-        if ($group->{type}) {
+        if ($group->{type} and $group->{type} ne "configuration") {
             $self->{error} = "Group $group->{name} does not exist";
         } else {
             $self->{error} = "Configuration $group->{name} does not exist";
@@ -310,7 +310,7 @@ sub removeTokens {
     my $tokens = shift;
     my $group = shift;
     unless (-d $group->{path}) {
-        if ($group->{type}) {
+        if ($group->{type} and $group->{type} ne "configuration") {
             $self->{error} = "Group $group->{name} does not exist";
         } else {
             $self->{error} = "Configuration $group->{name} does not exist";
@@ -361,10 +361,10 @@ sub getTokensXML {
         my %currentTokens = readTokensXMLFile($tokenFile);
         my $prefix;
         if ($gorc->{type}) {
-            # only group has type
+            # only group had type
             $prefix = $gorc->{type};
         } else {
-            # configuration has no type
+            # configuration had no type
             $prefix = "configuration";
         }
         map {$_->{source} = "$prefix:$gorc->{name}";} values %currentTokens;
