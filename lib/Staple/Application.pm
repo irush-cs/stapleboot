@@ -638,7 +638,7 @@ sub applyMounts {
                 $self->doCriticalAction();
             } elsif ($mount->{next}) {
                 $self->output("trying next mount from configuration: $mount->{next}", 1);
-                my @nextConfigurations = $self->{db}->getCompleteConfigurations([getConfigurationsByName($mount->{next})], $self->{distribution});
+                my @nextConfigurations = $self->{db}->getCompleteConfigurations([$self->{db}->getConfigurationsByName($mount->{next})], $self->{distribution});
                 my %nextTokens = getCompleteTokens($self->{db}->getTokens(@nextConfigurations), $self->{host}, $self->{distribution});
                 my @nextMounts = grep {$_->{destination} eq $mount->{destination}} getCompleteMounts([$self->{db}->getRawMounts(@nextConfigurations)], \%nextTokens);
                 my $next = clone($self);

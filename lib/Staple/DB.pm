@@ -577,6 +577,23 @@ sub getCompleteConfigurations {
 }
 
 
+=item B<getConfigurationsByName(I<configuration [configuration [...]]>)>
+
+Receives a list of configurations names (strings), and returns a list an
+incomplete (missing path, distribution, and group), active configuration hash
+refs (order preserved).
+
+=cut
+
+sub getConfigurationsByName {
+    my @configurations = ();
+    while (my $configuration = shift) {
+        push @configurations, {name => $configuration, path => undef, dist => undef, active => 1, group => undef, type => "configuration"};
+    }
+    return @configurations;
+}
+
+
 =item B<addGroupConfiguration(I<group, configuration, location>)>
 
 Adds I<configuration> (name, and active should be set) to I<group>'s

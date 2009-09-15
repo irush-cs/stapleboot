@@ -226,11 +226,11 @@ unshift @g, $stapler->{db}->getHostGroup($host) if ($withhost);
 unshift @g, $stapler->{db}->getDistributionGroup($distribution) if ($withdist);
 $stapler->setGroups(@g);
 
-$stapler->{configurations} = [$stapler->{db}->getCompleteConfigurations([$stapler->{db}->getGroupsConfigurations(@{$stapler->{groups}}), getConfigurationsByName(@configurations)], $stapler->{distribution}, \@badConfigurations)];
+$stapler->{configurations} = [$stapler->{db}->getCompleteConfigurations([$stapler->{db}->getGroupsConfigurations(@{$stapler->{groups}}), $stapler->{db}->getConfigurationsByName(@configurations)], $stapler->{distribution}, \@badConfigurations)];
 $stapler->updateSettings();
 
 if (@groups_tokens or @configurations_tokens or $hosttokens) {
-    $extraTokens = {getCompleteTokens($stapler->{db}->getTokens($stapler->{db}->getCompleteConfigurations([getConfigurationsByName(@configurations_tokens)], $stapler->{distribution}), $stapler->{db}->getCompleteGroups($stapler->{db}->getGroupsByName(@groups_tokens)), $hosttokens ? $stapler->{db}->getHostGroup($stapler->{host}) : ()), $stapler->{host}, $stapler->{distribution})};
+    $extraTokens = {getCompleteTokens($stapler->{db}->getTokens($stapler->{db}->getCompleteConfigurations([$stapler->{db}->getConfigurationsByName(@configurations_tokens)], $stapler->{distribution}), $stapler->{db}->getCompleteGroups($stapler->{db}->getGroupsByName(@groups_tokens)), $hosttokens ? $stapler->{db}->getHostGroup($stapler->{host}) : ()), $stapler->{host}, $stapler->{distribution})};
     $stapler->addTokens($extraTokens);
 }
 
@@ -286,7 +286,7 @@ if (grep {$_ eq "auto"} @stages) {
     unshift @g, $stapler->{db}->getDistributionGroup($distribution) if ($withdist);
     $stapler->setGroups(@g);
     
-    $stapler->{configurations} = [$stapler->{db}->getCompleteConfigurations([$stapler->{db}->getGroupsConfigurations(@{$stapler->{groups}}), getConfigurationsByName(@configurations)], $stapler->{distribution}, \@badConfigurations)];
+    $stapler->{configurations} = [$stapler->{db}->getCompleteConfigurations([$stapler->{db}->getGroupsConfigurations(@{$stapler->{groups}}), $stapler->{db}->getConfigurationsByName(@configurations)], $stapler->{distribution}, \@badConfigurations)];
     $stapler->updateSettings();
 
     if (@badConfigurations) {

@@ -215,8 +215,6 @@ B<Auto hash>
 
 =for comment =item getDistributionList(distribution)
 
-=item getConfigurationsByName(configuration [configuration [...]])
-
 =item getCompleteMounts(mount list ref, tokens hash ref)
 
 =back
@@ -229,7 +227,6 @@ our @EXPORT = qw(
                     getCompleteTokens
                     setDefaultTokens
                     getStapleDir
-                    getConfigurationsByName
                     getCompleteMounts
                );
 our $VERSION = '003';
@@ -431,22 +428,6 @@ sub setDefaultTokens {
 #    }
 #    return @distributions;
 #}
-
-=item B<getConfigurationsByName(I<configuration [configuration [...]]>)>
-
-Receives a list of configurations names (strings), and returns a list an
-incomplete (missing path, distribution, and group), active configuration hash
-refs (order preserved).
-
-=cut
-
-sub getConfigurationsByName {
-    my @configurations = ();
-    while (my $configuration = shift) {
-        push @configurations, {name => $configuration, path => undef, dist => undef, active => 1, group => undef};
-    }
-    return @configurations;
-}
 
 =item B<getStapleDir( )>
 
