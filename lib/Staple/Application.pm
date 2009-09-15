@@ -190,6 +190,52 @@ sub addTokens {
     $self->updateMounts();
 }
 
+=item B<setTokens(token hash ref)>
+
+Sets the tokens to the given hash ref (hash of hashs of key, value, raw and
+type). recalculate the tokens database, sets the internal data and update the
+mounts. The hash ref is not duplicated.
+
+=cut
+
+sub setTokens {
+    my $self = shift;
+    my $tokens = shift;
+    $self->{tokens} = $tokens;
+    $self->updateData();
+    $self->updateMounts();
+}
+
+=item B<setDefaultGroups([group names list])>
+
+Sets the default groups according to the host and distribution. If list of
+group names is not empty (list of strings), assumes it's the auto groups and
+adds it between the distribution and the host groups.
+
+=cut
+
+sub setDefaultGroups {
+    my $self = shift;
+    $self->setGroups(
+                     $self->{db}->getDistributionGroup($self->{distribution}),
+                     $self->{db}->getGroupsByName(@_),
+                     $self->{db}->getHostGroup($self->{host})
+                    );
+}
+
+=item B<setGroups(groups hash list)
+
+Sets the internal groups to the given list of groups (hashes). More groups are
+added using getCompleteGroups.
+
+=cut
+
+sub setGroups {
+    my $self = shift;
+    $self->{groups} = [$self->{db}->getCompleteGroups(@_)];
+}
+
+
 =item B<applyScripts(I<stage>)>
 
 Given a stage (string: auto, mount, sysinit or final). Applies the scripts in

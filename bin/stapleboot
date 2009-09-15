@@ -342,8 +342,8 @@ sub initStage {
         $boot->addMail("\"$boot->{distribution}\" does not exist in the staple database");
         $boot->doCriticalAction();
     }    
-
-    $boot->{groups} = [$boot->{db}->getCompleteGroups($boot->{db}->getDistributionGroup($boot->{distribution}), $boot->{db}->getHostGroup($boot->{host}))];
+    
+    $boot->setDefaultGroups();
     $boot->update();
     
     $boot->output("distribution: $boot->{distribution}", 2);
@@ -390,7 +390,7 @@ sub autoStage {
             $boot->addMail("$error");
         }
 
-        $boot->{groups} = [$boot->{db}->getCompleteGroups($boot->{db}->getDistributionGroup($boot->{distribution}), $boot->{db}->getGroupsByName(@autoGroups), $boot->{db}->getHostGroup($boot->{host}))];
+        $boot->setDefaultGroups(@autoGroups);
         $boot->update();
 
         #printTokens($boot);

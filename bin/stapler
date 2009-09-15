@@ -224,7 +224,7 @@ if (@groups or @configurations) {
 my @g = $stapler->{db}->getGroupsByName(@groups);
 unshift @g, $stapler->{db}->getHostGroup($host) if ($withhost);
 unshift @g, $stapler->{db}->getDistributionGroup($distribution) if ($withdist);
-$stapler->{groups} = [$stapler->{db}->getCompleteGroups(@g)];
+$stapler->setGroups(@g);
 
 $stapler->{configurations} = [$stapler->{db}->getCompleteConfigurations([$stapler->{db}->getGroupsConfigurations(@{$stapler->{groups}}), getConfigurationsByName(@configurations)], $stapler->{distribution}, \@badConfigurations)];
 $stapler->updateSettings();
@@ -284,7 +284,7 @@ if (grep {$_ eq "auto"} @stages) {
     unshift @g, $stapler->{db}->getHostGroup($host) if ($withhost);
     unshift @g, $stapler->{db}->getGroupsByName(@autoGroups);
     unshift @g, $stapler->{db}->getDistributionGroup($distribution) if ($withdist);
-    $stapler->{groups} = [$stapler->{db}->getCompleteGroups(@g)];
+    $stapler->setGroups(@g);
     
     $stapler->{configurations} = [$stapler->{db}->getCompleteConfigurations([$stapler->{db}->getGroupsConfigurations(@{$stapler->{groups}}), getConfigurationsByName(@configurations)], $stapler->{distribution}, \@badConfigurations)];
     $stapler->updateSettings();
