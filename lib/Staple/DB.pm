@@ -586,6 +586,7 @@ refs (order preserved).
 =cut
 
 sub getConfigurationsByName {
+    my $self = shift;
     my @configurations = ();
     while (my $configuration = shift) {
         push @configurations, {name => $configuration, path => undef, dist => undef, active => 1, group => undef, type => "configuration"};
@@ -692,6 +693,9 @@ path field set according to the distribution given. Order is preserved, the
 returned configurations are not the same as the input (i.e. new
 references). Non existing configurations are removed.
 
+Input can have configuration names, in which case they are set to active
+configurations with no originating group.
+
 Can also accept list of configurations names (strings).
 
 =cut
@@ -706,7 +710,7 @@ sub getFullConfigurations {
         if (ref $conf) {
             %newConf = %$conf;
         } else {
-            %newConf = (name => $conf, active => 1, group => undef, path => undef, dist => undef);
+            %newConf = (name => $conf, active => 1, group => undef, path => undef, dist => undef, type => "configurations");
         }
         $newConf{dist} = $distribution;
         $newConf{path} = $self->getConfigurationPath($newConf{name}, $distribution);

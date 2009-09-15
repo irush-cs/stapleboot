@@ -1034,7 +1034,7 @@ Other commands:
 ",
                    );
 
-my @singleCommandCommands = ("ahc", "rhc", "gag", "ghc", "wht", "whc", "whg", "ghi", "ggi", "gci", "bad", "badcommandorfilename", "gt", "gdt", "gct", "gah", "gac", "gas", "gss", "gts");
+my @singleCommandCommands = ("ahc", "rhc", "gag", "ghc", "wht", "whc", "whg", "ghi", "ggi", "gci", "bad", "badcommandorfilename", "gt", "gdt", "gct", "gah", "gac", "gas", "gss", "gts", "gm");
 
 sub help {
     my %topics = (a              => "helpall",
@@ -1410,7 +1410,7 @@ sub gci {
         print "Missing configurations\n";
         return;
     }
-    (my $conf) = grep {$_->{name} eq $configuration_name} $db->getCompleteConfigurations([$db->getConfigurationsByName($configuration_name)], $distribution);
+    (my $conf) = $db->getFullConfigurations([$configuration_name], $distribution);
     unless ($conf) {
         print "No such configuration \"$configuration_name\"\n";
         return;
@@ -1420,7 +1420,6 @@ sub gci {
         print "$configuration_name\n";
         print "-" x length($configuration_name);
         print "\n";
-        (my $configuration) = grep {$_->{name} eq $configuration_name} $db->getCompleteConfigurations([$db->getConfigurationsByName($configuration_name)], $distribution);
         print "Tokens:\n";
         gct($configuration_name);
         print "Mounts:\n";
@@ -1463,7 +1462,7 @@ sub localgetautos {
         print "unknown configuration \"$configuration\"\n" unless $echooff;
         return undef;
     }
-    ($conf) = grep {$_->{name} eq $configuration} $db->getCompleteConfigurations([$conf], $distribution);
+    ($conf) = $db->getFullConfigurations([$conf], $distribution);
     unless ($conf) {
         print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n" unless $echooff;
         return undef;
@@ -1534,7 +1533,7 @@ sub aa {
         print "unknown configuration \"$configuration\"\n";
         return undef;
     }
-    ($conf) = grep {$_->{name} eq $configuration} $db->getCompleteConfigurations([$conf], $distribution);
+    ($conf) = $db->getFullConfigurations([$conf], $distribution);
     unless ($conf) {
         print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n";
         return undef;
@@ -1669,7 +1668,7 @@ sub localgetscripts {
         print "unknown configuration \"$configuration\"\n" unless $echooff;
         return undef;
     }
-    ($conf) = grep {$_->{name} eq $configuration} $db->getCompleteConfigurations([$conf], $distribution);
+    ($conf) = $db->getFullConfigurations([$conf], $distribution);
     unless ($conf) {
         print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n" unless $echooff;
         return undef;
@@ -1795,7 +1794,7 @@ sub as {
         print "unknown configuration \"$configuration\"\n";
         return undef;
     }
-    ($conf) = grep {$_->{name} eq $configuration} $db->getCompleteConfigurations([$conf], $distribution);
+    ($conf) = $db->getFullConfigurations([$conf], $distribution);
     unless ($conf) {
         print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n";
         return undef;
@@ -1901,7 +1900,7 @@ sub localgettemplates {
         print "unknown configuration \"$configuration\"\n"  unless $echooff;
         return undef;
     }
-    ($conf) = grep {$_->{name} eq $configuration} $db->getCompleteConfigurations([$conf], $distribution);
+    ($conf) = $db->getFullConfigurations([$conf], $distribution);
     unless ($conf) {
         print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n" unless $echooff;
         return undef;
@@ -1954,7 +1953,7 @@ sub at {
         print "unknown configuration \"$configuration\"\n";
         return undef;
     }
-    ($conf) = grep {$_->{name} eq $configuration} $db->getCompleteConfigurations([$conf], $distribution);
+    ($conf) = $db->getFullConfigurations([$conf], $distribution);
     unless ($conf) {
         print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n";
         return undef;
@@ -2138,7 +2137,7 @@ sub rm {
         print "unknown configuration \"$configuration\"\n";
         return;
     }
-    ($conf) = grep {$_->{name} eq $configuration} $db->getCompleteConfigurations([$conf], $distribution);
+    ($conf) = $db->getFullConfigurations([$conf], $distribution);
     unless ($conf) {
         print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n";
         return;
@@ -2176,7 +2175,7 @@ sub am {
         print "unknown configuration \"$configuration\"\n";
         return;
     }
-    ($conf) = grep {$_->{name} eq $configuration} $db->getCompleteConfigurations([$conf], $distribution);
+    ($conf) = $db->getFullConfigurations([$conf], $distribution);
     unless ($conf) {
         print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n";
         return;
@@ -2195,7 +2194,7 @@ sub gm {
     }
     (my $conf) = $db->getConfigurationsByName($configuration);
     if ($conf) {
-        ($conf) = grep {$_->{name} eq $configuration} $db->getCompleteConfigurations([$conf], $distribution);
+        ($conf) = $db->getFullConfigurations([$conf], $distribution);
         if ($conf) {
             my @mounts = $db->getMounts($conf);
             if (@mounts and not defined $mounts[0]) {
@@ -2771,9 +2770,9 @@ sub act {
         print "Missing configuration\n";
         return;
     }
-    if ((my $group) = $db->getConfigurationsByName($configuration)) {
-        ($group) = grep {$_->{name} eq $configuration} $db->getCompleteConfigurations([$group], $distribution);
-        createToken($group);
+    if ((my $conf) = $db->getConfigurationsByName($configuration)) {
+        ($conf) = $db->getFullConfigurations([$conf], $distribution);
+        createToken($conf);
     } else {
         print "Configuration \"$configuration\" does no exist\n";
     }
@@ -2790,9 +2789,9 @@ sub rct {
         print "Missing token\n";
         return;
     }
-    if ((my $group) = $db->getConfigurationsByName($configuration)) {
-        ($group) = grep {$_->{name} eq $configuration} $db->getCompleteConfigurations([$group], $distribution);
-        unless ($db->removeTokens([$token], $group)) {
+    if ((my $conf) = $db->getConfigurationsByName($configuration)) {
+        ($conf) = $db->getFullConfigurations([$conf], $distribution);
+        unless ($db->removeTokens([$token], $conf)) {
             print $db->{error}."\n";
         }
     } else {
@@ -2911,8 +2910,7 @@ sub printgctokens {
 
 sub gct {
     if ($_[0]) {
-        my @configurations = $db->getCompleteConfigurations([$db->getConfigurationsByName($_[0])], $distribution);
-        (my $configuration) = grep {$_->{name} eq $_[0]} @configurations;
+        (my $configuration) = $db->getFullConfigurations([$_[0]], $distribution);
         if ($configuration) {
             printgctokens($configuration);
         } else {
@@ -3336,7 +3334,7 @@ sub configuration_tokens_completion {
         @currentCompletionList = ();
         my $conf_name = (split(/\s+/, $currentCommand))[-1];
         return () unless $conf_name;
-        (my $configuration) = grep {$_->{name} eq $conf_name} ($db->getCompleteConfigurations([$db->getConfigurationsByName($conf_name)], $distribution));
+        (my $configuration) = $db->getFullConfigurations([$conf_name], $distribution);
         return () unless $configuration;
         my $tokens = $db->getTokens($configuration);
         my @tokens = keys %$tokens;
@@ -3499,7 +3497,7 @@ sub mount_completion {
         return () unless $configuration;
         (my $conf) = $db->getConfigurationsByName($configuration);
         return () unless $conf;
-        ($conf) = grep {$_->{name} eq $configuration} $db->getCompleteConfigurations([$conf], $distribution);
+        ($conf) = $db->getFullConfigurations([$conf], $distribution);
         return () unless $conf;
         my @mounts = $db->getRawMounts($conf);
         return () if @mounts and not defined $mounts[0];
