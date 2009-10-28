@@ -1237,7 +1237,7 @@ sub whc {
         my @subset = grep {$_->{type} eq $type} @groups;
         if (@subset) {
             print "${type}s:\n";
-            print join("", map {"  $_->{name}\n"} @subset);
+            print join("", map {"  $_->{name}\n"} sort {$a->{name} cmp $b->{name}}  @subset);
             print "\n";
         }
     }

@@ -878,6 +878,12 @@ sub removeGroupGroups {
     foreach my $group (@groups) {
         push @results, $group unless $toRemove{$group};
     }
+    foreach my $toremove (keys %toRemove) {
+        unless (grep {$_ eq $toremove} @groups) {
+            $self->{error} = "group \"$toremove\" not in group \"$group->{name}\"";
+            return undef;
+        }
+    }
     return $self->setGroupGroups($group, @results);
 }
 
