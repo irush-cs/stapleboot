@@ -321,7 +321,7 @@ sub applyScripts {
                 $self->addMail("$body");
             }
         } elsif ($scriptError) {
-            my $err = "$script->{configuration}->{name}/$script->{name} gave some errors:\n\n";
+            my $err = "$script->{configuration}->{name}/$script->{stage}/$script->{name} gave some errors:\n\n";
             $err .= "output:\n-------\n$scriptOutput\n\n" if $scriptOutput;
             $err .= "error:\n------\n$scriptError\n\n" if $scriptError;
             $self->addMail($err);
