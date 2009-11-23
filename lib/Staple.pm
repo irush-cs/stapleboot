@@ -231,7 +231,7 @@ our @EXPORT = qw(
                     getStapleDir
                     getCompleteMounts
                );
-our $VERSION = '003';
+our $VERSION = '004';
 
 my $stapleDir;
 

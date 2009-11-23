@@ -10,7 +10,7 @@ package Staple::DB;
 use strict;
 use warnings;
 use Staple::Misc;
-our $VERSION = '003';
+our $VERSION = '004';
 
 =head1 NAME
 

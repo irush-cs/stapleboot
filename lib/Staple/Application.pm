@@ -14,7 +14,7 @@ use Clone qw(clone);
 use Staple;
 use Staple::Misc;
 use Staple::DB::Factory;
-our $VERSION = '003';
+our $VERSION = '004';
 
 =head1 NAME
 

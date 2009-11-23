@@ -99,7 +99,7 @@ our @EXPORT = qw(
                     invalidConfiguration
                     invalidTokenKey
                );
-our $VERSION = '003';
+our $VERSION = '004';
 
 
 ################################################################################

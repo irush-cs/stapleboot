@@ -18,7 +18,7 @@ use Staple::Application;
 use Term::ANSIColor qw(:constants color);
 use Net::DNS;
 our @ISA = ("Staple::Application");
-our $VERSION = '003';
+our $VERSION = '004';
 
 use constant LINUX_REBOOT_MAGIC1 => 0xFEE1DEAD;
 use constant LINUX_REBOOT_MAGIC2 => 0x20112000;
