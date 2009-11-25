@@ -152,6 +152,7 @@ sub debug {
 
 sub doCriticalAction {
     my $self = shift;
+    $self->addMail("Critical failure\nPerforming critical action: \"$self->{critical}\"... ");
     $self->mail("boot errors summary (critical)", $self->{mailBody}) if $self->{mailBody};
     $self->error("Critical error");
     if ($self->{critical} eq "bash" or $self->{critical} eq "prompt") {
