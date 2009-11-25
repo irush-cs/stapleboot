@@ -2724,10 +2724,11 @@ sub ghg {
     }
 }
 
+# returns the tokens hash (with a single token), or undef
 sub createToken {
+    my $token;
     eval {
         local $SIG{INT} = sub {die "SIGINT"};
-        my $group = shift;
         print "type ([static], dynamic, regexp): ";
         my $type = <>;
         chomp($type);
@@ -2754,13 +2755,25 @@ sub createToken {
         }
         chomp($key);
         $value =~ s/;\n$//;
-        unless ($db->addTokens({"$key" => {key => $key, value => $value, raw => $value, type => $type}}, $group)) {
-            print $db->{error}."\n";
-        }
+        $token = {"$key" => {key => $key, value => $value, raw => $value, type => $type}};
     };
     if ($@) {
         print "\n";
         print "$@" if index($@,"SIGINT") != 0;
+    } else {
+        return $token;
+    }
+}
+
+sub addToken {
+    my $group = shift;
+    my $token = createToken();
+    unless ($token) {
+        print "no token added\n";
+    } else {
+        unless ($db->addTokens($token, $group)) {
+            print $db->{error}."\n";
+        }
     }
 }
 
@@ -2772,7 +2785,7 @@ sub act {
     }
     if ((my $conf) = $db->getConfigurationsByName($configuration)) {
         ($conf) = $db->getFullConfigurations([$conf], $distribution);
-        createToken($conf);
+        addToken($conf);
     } else {
         print "Configuration \"$configuration\" does no exist\n";
     }
@@ -2806,7 +2819,7 @@ sub agt {
         return;
     }
     if ((my $group) = $db->getGroupsByName($groupName)) {
-        createToken($group);
+        addToken($group);
     } else {
         print "Group \"$groupName\" does not exist\n";
     }
@@ -2838,10 +2851,23 @@ sub aht {
         print "Missing host\n";
         return;
     }
-    if (my $group = $db->getHostGroup($host)) {
-        createToken($group);
+    my @hosts = ($host);
+    if (isRange($host)) {
+        @hosts = parseRange($host);
+    }
+    my $token = createToken();
+    unless ($token) {
+        print "no token added\n";
     } else {
-        print "Host \"$host\" doesn't exist\n";
+        foreach my $rhost (@hosts) { 
+            if (my $group = $db->getHostGroup($rhost)) {
+                unless ($db->addTokens($token, $group)) {
+                    print $db->{error}."\n";
+                }
+            } else {
+                print "Host \"$rhost\" doesn't exist\n";
+            }
+        }
     }
 }
 
@@ -2856,12 +2882,16 @@ sub rht {
         print "Missing token\n";
         return;
     }
-    if (my $group = $db->getHostGroup($host)) {
-        unless ($db->removeTokens([$token], $group)) {
-            print $db->{error}."\n";
+    my @hosts = ($host);
+    @hosts = parseRange($host) if isRange($host);
+    foreach my $rhost (@hosts) {
+        if (my $group = $db->getHostGroup($rhost)) {
+            unless ($db->removeTokens([$token], $group)) {
+                print $db->{error}."\n";
+            }
+        } else {
+            print "Host \"$rhost\" does not exist\n";
         }
-    } else {
-        print "Host \"$host\" does not exist\n";
     }
 }
 
@@ -2869,7 +2899,7 @@ sub adt {
     my $dist = $distribution;
     $dist = $_[0] if $_[0];
     if (my $group = $db->getDistributionGroup($dist)) {
-        createToken($group);
+        addToken($group);
     } else {
         print $db->{error}."\n";
     }
