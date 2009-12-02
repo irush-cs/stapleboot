@@ -181,7 +181,7 @@ unless ($stapler->useDB($database ? split /\s+/, $database : undef)) {
 }
 $stapler->output("database: ".$stapler->{db}->info());
 
-$stapler->{tokens} = {getCompleteTokens({})};
+$stapler->{tokens} = {$stapler->{db}->getCompleteTokens({})};
 $stapler->{tmpDir} = "/tmp";
 $stapler->{verbose} = $verbose;
 $stapler->{disabled} = 0;
@@ -230,7 +230,7 @@ $stapler->{configurations} = [$stapler->{db}->getCompleteConfigurations([$staple
 $stapler->updateSettings();
 
 if (@groups_tokens or @configurations_tokens or $hosttokens) {
-    $extraTokens = {getCompleteTokens($stapler->{db}->getTokens($stapler->{db}->getCompleteConfigurations([$stapler->{db}->getConfigurationsByName(@configurations_tokens)], $stapler->{distribution}), $stapler->{db}->getCompleteGroups($stapler->{db}->getGroupsByName(@groups_tokens)), $hosttokens ? $stapler->{db}->getHostGroup($stapler->{host}) : ()), $stapler->{host}, $stapler->{distribution})};
+    $extraTokens = {$stapler->{db}->getCompleteTokens($stapler->{db}->getTokens($stapler->{db}->getCompleteConfigurations([$stapler->{db}->getConfigurationsByName(@configurations_tokens)], $stapler->{distribution}), $stapler->{db}->getCompleteGroups($stapler->{db}->getGroupsByName(@groups_tokens)), $hosttokens ? $stapler->{db}->getHostGroup($stapler->{host}) : ()), $stapler->{host}, $stapler->{distribution})};
     $stapler->addTokens($extraTokens);
 }
 

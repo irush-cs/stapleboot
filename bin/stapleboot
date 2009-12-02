@@ -318,7 +318,7 @@ sub printTokens {
 
 sub initStage {
     my $boot = shift;
-    $boot->{tokens} = {getCompleteTokens({})};
+    $boot->{tokens} = {$boot->{db}->getCompleteTokens({})};
     $boot->updateData();
 
     unless (-e $boot->{conf}) {

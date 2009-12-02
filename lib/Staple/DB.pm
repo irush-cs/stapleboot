@@ -895,7 +895,145 @@ sub getHostPath {
     return undef;
 }
 
-  
+
+=over
+
+=item B<getCompleteTokens(I<tokens ref [host] [distribution]>)>
+
+Receives a tokens hash (as B<DB::getTokens> outputs) and returns a tokens hash,
+with simple value checking (e.g. for __STAPLE_*__ tokens), auto and default
+tokens (auto tokens that were wrongly inserted, will be removed), and dynamic
+and regexp tokens are evaluated (in that order).
+
+The optional I<host> and I<distribution> parameters are for the
+__AUTO_HOSTNAME__ and __AUTO_DISTRIBUTION__ tokens. If host is omitted, this
+token will not be included in the results
+
+=cut
+
+sub getCompleteTokens {
+    my $self = shift;
+    my %tokens = %{$_[0]};
+    my $host;
+    my $distribution;
+    $host = $_[1] if $_[1];
+    $distribution = $_[2] if $_[2];
+    
+    my @delete = ();
+    foreach my $key (keys %tokens) {
+        push @delete, $key if $key =~ m/^__AUTO_/;
+    }
+    delete @tokens{@delete};
+    $tokens{__AUTO_DISTRIBUTION__} = {key => "__AUTO_DISTRIBUTION__", value => $distribution, raw => $distribution, type => "static", source => "auto"} if $distribution;
+    $tokens{__AUTO_HOSTNAME__} = {key => "__AUTO_HOSTNAME__", value => $host, raw => $host, type => "static", source => "auto"} if $host;
+    $tokens{__AUTO_TMP__} = {key => "__AUTO_TMP__", value => $self->getStapleDir()."tmp", raw => $self->getStapleDir()."/tmp", type => "static", source => "auto"};
+    #$tokens{__AUTO_IP__} = $ip;
+    %tokens = setDefaultTokens(\%tokens, \%Staple::defaultTokens);
+    %tokens = verifyTokens(\%tokens, \%Staple::allowedTokensValues);
+    for (my $i = 0; $i < 2; $i++) {
+        %tokens = setDynamicTokens(%tokens);
+        %tokens = setRegexpTokens(%tokens);
+    }
+    #setVariablesFromTokens(\%tokens, \%tokensToVariables);
+    return %tokens;
+}
+
+
+=item B<getStapleDir( )>
+
+Returns the staple directory.
+
+=cut
+
+sub getStapleDir {
+    my $self = shift;
+    return "/boot/staple";
+}
+
+################################################################################
+#   Internals
+################################################################################
+
+################################################################################
+#   Tokens Internals
+################################################################################
+
+# =item B<setDefaultTokens(I<tokens ref>, I<default tokens ref>)>
+# 
+# Receives a tokens hash (as B<DB::getTokens> outputs), and a default tokens hash,
+# and returns a tokens hash. The results hash is the original hash (a copy), with
+# the defaults if not set. if __STAPLE_CONF__ is set to a readable file (either
+# by the tokens, or by the default tokens), than first the file is read and
+# applied (not recursivally). The tokens read from file are ignored if not valid.
+# 
+# =cut
+
+
+# input: tokens hash ref, default hash ref
+# output: token hashes list (with defaults, if undefined)
+sub setDefaultTokens {
+    my %tokens = %{$_[0]};
+    my %defaults = %{$_[1]};
+    my $conf = "";
+    $conf = $tokens{__STAPLE_CONF__}->{value} if $tokens{__STAPLE_CONF__};
+    $conf = $defaults{__STAPLE_CONF__}->{value} if $defaults{__STAPLE_CONF__} and (not $conf or not -r $conf);
+    if (-r $conf) {
+        my %files = readTokensFile($conf, "static");
+        map {exists $_->{source} and $_->{source} = "default:$_->{source}" or $_->{source} = "default"} values %files;
+        %files = verifyTokens(\%files, \%Staple::allowedTokensValues);
+        foreach my $key (keys %files) {
+            $tokens{$key} = $files{$key} unless exists $tokens{$key};
+        }
+    }
+
+    foreach my $key (keys %defaults) {
+        $tokens{$key} = {key => $key, value => $defaults{$key}->{value}, raw => $defaults{$key}->{raw}, type => "static", source => "default"} unless exists $tokens{$key};
+    }
+    return %tokens;
+}
+
+
+# input: tokens hash ref, allowed hash ref
+# output: tokens hash list (without bad tokens)
+sub verifyTokens {
+    my %tokens = %{$_[0]};
+    my %allowed = %{$_[1]};
+    foreach my $key (keys %allowed) {
+        if ($tokens{$key}) {
+            delete $tokens{$key} unless $tokens{$key}->{value} =~ m/^$allowed{$key}$/;
+        }
+    }
+    return %tokens;
+}
+
+# input: tokens hash
+# output: same hashes with dynamic evaluated
+sub setDynamicTokens {
+    my %tokens = @_;
+    foreach my $tokenName (grep {$tokens{$_}->{type} eq "dynamic"} keys %tokens) {
+        my $token = $tokens{$tokenName};
+        my %currentTokens = %tokens;
+        delete $currentTokens{$tokenName};
+        my $value;
+        $token->{value} = $token->{raw};
+        do {
+            $value = $token->{value};
+            $token->{value} = applyTokens($value, \%currentTokens);
+        } while ($token->{value} ne $value);
+    }
+    return %tokens;
+}
+
+# input: tokens hash
+# output: same hash with regexp evaluated
+sub setRegexpTokens {
+    my %tokens = @_;
+    foreach my $token (sort {$a cmp $b} grep {$tokens{$_}->{type} eq "regexp"} keys %tokens) {
+        $tokens{$token}->{value} = join $tokens{$token}->{raw}, map {$tokens{$_}->{value}} sort {$a cmp $b} grep {/^$token$/ and $tokens{$_}->{type} ne "regexp"} keys %tokens;
+    }
+    return %tokens;
+}
+
 ################################################################################
 #   The end
 ################################################################################

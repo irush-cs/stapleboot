@@ -14,6 +14,7 @@ use Clone qw(clone);
 use Staple;
 use Staple::Misc;
 use Staple::DB::Factory;
+use Net::DNS;
 our $VERSION = '004';
 
 =head1 NAME
@@ -146,7 +147,7 @@ to the host, distribution, groups and configurations.
 
 sub updateSettings {
     my $self = shift;
-    $self->{tokens} = {getCompleteTokens($self->{db}->getTokens(@{$self->{configurations}}, @{$self->{groups}}), $self->{host}, $self->{distribution})};
+    $self->{tokens} = {$self->{db}->getCompleteTokens($self->{db}->getTokens(@{$self->{configurations}}, @{$self->{groups}}), $self->{host}, $self->{distribution})};
     $self->updateData();
     $self->{mounts} = [getCompleteMounts([$self->{db}->getRawMounts(@{$self->{configurations}})], $self->{tokens})];
     if (scalar(@{$self->{configurations}}) > 0) {
@@ -185,7 +186,7 @@ sub addTokens {
     foreach my $token (values %$tokens) {
         $self->{tokens}->{$token->{key}} = $token;
     }
-    $self->{tokens} = {getCompleteTokens($self->{tokens}, $self->{host}, $self->{distribution})};
+    $self->{tokens} = {$self->{db}->getCompleteTokens($self->{tokens}, $self->{host}, $self->{distribution})};
     $self->updateData();
     $self->updateMounts();
 }
@@ -347,7 +348,7 @@ sub applyScripts {
             }
             map {$_->{source} = "script:$script->{configuration}->{name}/$script->{stage}/$script->{name}"} values %newTokens;
             @$tokens{keys %newTokens} = values %newTokens;
-            %$tokens = getCompleteTokens($tokens, $self->{host}, $self->{distribution});
+            %$tokens = $self->{db}->getCompleteTokens($tokens, $self->{host}, $self->{distribution});
             #setVariablesFromTokens($tokens, \%tokensToVariables);
             $self->updateData();
             #@mounts = getCompleteMounts(\@mounts, $tokens);
@@ -639,7 +640,7 @@ sub applyMounts {
             } elsif ($mount->{next}) {
                 $self->output("trying next mount from configuration: $mount->{next}", 1);
                 my @nextConfigurations = $self->{db}->getCompleteConfigurations([$self->{db}->getConfigurationsByName($mount->{next})], $self->{distribution});
-                my %nextTokens = getCompleteTokens($self->{db}->getTokens(@nextConfigurations), $self->{host}, $self->{distribution});
+                my %nextTokens = $self->{db}->getCompleteTokens($self->{db}->getTokens(@nextConfigurations), $self->{host}, $self->{distribution});
                 my @nextMounts = grep {$_->{destination} eq $mount->{destination}} getCompleteMounts([$self->{db}->getRawMounts(@nextConfigurations)], \%nextTokens);
                 my $next = clone($self);
                 $next->{configurations} = \@nextConfigurations;
@@ -735,14 +736,18 @@ sub clearAll {
     $self->{badConfigurations} = [];
 
     $self->{host} = hostname unless defined $self->{host};
+    if (my $res = new Net::DNS::Resolver) {
+        (my $domain) = $res->searchlist;
+        $self->{host} =~ s/\.${domain}$//;
+    }
     $self->{distribution} = getDistribution() unless defined $self->{distribution};
-    $self->{stapleDir} = getStapleDir();
+    $self->{db} = $self->useDB();
+    $self->{stapleDir} = $self->{db}->getStapleDir();
     $self->{tmpDir} = "$self->{stapleDir}/tmp";
     $self->{rootDir} = "/";
     $self->{applied} = {"templates" => [],
                         "scripts" => [],
                        };
-    $self->{db} = $self->useDB();
 
     $self->{tokensToData} = {
                              "__STAPLE_VERBOSE__"     => "verbose",
