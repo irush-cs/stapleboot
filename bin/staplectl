@@ -916,10 +916,12 @@ fs - receives a single parameter: the directory of the database. When omitted,
      uses the default (as set by Staple.pm, which is currently
      /boot/staple). This is the default when staplectl starts.
 
-sql - can receive 2 parameters:
+sql - can receive 4 parameters:
       1. The database schema to use. If omitted, defaults to \"staple\".
       2. The database connection parameters, as given to DBI->connect perl
          function. Defaults to 'dbi:Pg:dbname=staple;host=pghost;port=5432;'
+      3. username (optional)
+      4. password (optional)
 ",
                     getdb   => "
 name: gdb | getdb

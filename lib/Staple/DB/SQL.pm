@@ -30,11 +30,12 @@ our $VERSION = '004';
 
 =over
 
-=itme B<new(params, schema)>
+=itme B<new(params, schema [,username, password])>
 
 creates a new instance. First parameter is the schema name string (defaults to
 staple). second parameter is the database parameters (defaults to
-dbi:Pg:dbname=staple;host=pghost;port=5432;)
+dbi:Pg:dbname=staple;host=pghost;port=5432;). Third and forth parameters are
+username and password (can be undef).
 
 =cut
 
@@ -48,12 +49,12 @@ sub new {
     $params[1] = "dbi:Pg:dbname=staple;host=pghost;port=5432;" unless $params[1];
     $self->{error} = "";
     $self->{schema} = $params[0];
-    $self->{connectionParams} = [$params[1], undef, undef, {
-                                                         #HandleError => \&sigDBError,
-                                                         PrintError => 0,
-                                                         AutoCommit => 1,
-                                                         RaiseError => 0,
-                                                         pg_server_prepare => 1}];
+    $self->{connectionParams} = [$params[1], $params[2], $params[3], {
+                                                                      #HandleError => \&sigDBError,
+                                                                      PrintError => 0,
+                                                                      AutoCommit => 1,
+                                                                      RaiseError => 0,
+                                                                      pg_server_prepare => 1}];
     $self->{schema} .= "." if $self->{schema};
     return undef unless DBI->connect_cached(@{$self->{connectionParams}});
     bless ($self, $class);
@@ -64,7 +65,9 @@ sub info {
     my $self = shift;
     my $schema = $self->{schema};
     $schema =~ s/\.$//;
-    return "sql $schema $self->{connectionParams}->[0]"
+    my $username = $self->{connectionParams}->[1];
+    $username = "" unless $username;
+    return "sql $schema $self->{connectionParams}->[0] $username"
 }
 
 sub addHost {

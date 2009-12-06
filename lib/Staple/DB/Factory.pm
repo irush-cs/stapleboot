@@ -79,7 +79,8 @@ defaults to "/boot/staple".
 Use Staple::DB::SQL as the staple database. The first parameter is the schema
 to use, the default is "staple". If an empty string is given, no schema
 assumed.  The second parameter is database connection parameters, the default
-is "dbi:Pg:dbname=staple;host=pghost;port=5432;".
+is "dbi:Pg:dbname=staple;host=pghost;port=5432;". The third and forth are the
+username and password (defaults to undef).
 
 =back
 

@@ -3,6 +3,7 @@
 
 -- CREATE SCHEMA staple;
 -- ALTER SCHEMA staple OWNER TO irush
+-- CREATE ROLE staple_user LOGIN PASSWORD 'staple_user'
 
 SET search_path TO staple;
 
@@ -223,6 +224,30 @@ CREATE TABLE group_configurations (
        FOREIGN KEY (groupid) REFERENCES groups(name) ON DELETE CASCADE,
        FOREIGN KEY (configuration, distribution) REFERENCES configurations(name, distribution) ON DELETE CASCADE
 );
+
+
+GRANT SELECT ON hosts                        TO staple_user;
+GRANT SELECT ON distributions                TO staple_user;
+GRANT SELECT ON group_types                  TO staple_user;
+GRANT SELECT ON groups                       TO staple_user;
+GRANT SELECT ON configurations               TO staple_user;
+GRANT SELECT ON token_types                  TO staple_user;
+GRANT SELECT ON mounts                       TO staple_user;
+GRANT SELECT ON stages                       TO staple_user;
+GRANT SELECT ON templates                    TO staple_user;
+GRANT SELECT ON scripts                      TO staple_user;
+GRANT SELECT ON autos                        TO staple_user;
+GRANT SELECT ON configuration_tokens         TO staple_user;
+GRANT SELECT ON distribution_tokens          TO staple_user;
+GRANT SELECT ON distribution_groups          TO staple_user;
+GRANT SELECT ON distribution_configurations  TO staple_user;
+GRANT SELECT ON host_tokens                  TO staple_user;
+GRANT SELECT ON host_groups                  TO staple_user;
+GRANT SELECT ON host_configurations          TO staple_user;
+GRANT SELECT ON group_tokens                 TO staple_user;
+GRANT SELECT ON group_groups                 TO staple_user;
+GRANT SELECT ON group_configurations         TO staple_user;
+GRANT SELECT ON configuration_configurations TO staple_user;
 
 COMMIT;
 

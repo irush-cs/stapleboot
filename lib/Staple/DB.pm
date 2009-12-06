@@ -947,7 +947,15 @@ Returns the staple directory.
 
 sub getStapleDir {
     my $self = shift;
-    return "/boot/staple";
+    if (-d "/boot/staple") {
+        return "/boot/staple";
+    } elsif (-d "/private/staple") {
+        return "/private/staple";
+    } elsif (-d "/staple") {
+        return "/staple";
+    } else {
+        return "/tmp/staple";
+    }
 }
 
 ################################################################################
