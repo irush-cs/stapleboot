@@ -413,7 +413,8 @@ sub getTokens {
             return undef;
         }
     }
-    map {$_->{value} = "" if $_->{type} eq "static"} values %tokens;
+    # why is this here???
+    # map {$_->{value} = "" if $_->{type} eq "static"} values %tokens;
     return \%tokens;
 }
 
