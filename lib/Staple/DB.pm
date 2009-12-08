@@ -710,7 +710,7 @@ sub getFullConfigurations {
         if (ref $conf) {
             %newConf = %$conf;
         } else {
-            %newConf = (name => $conf, active => 1, group => undef, path => undef, dist => undef, type => "configurations");
+            %newConf = (name => $conf, active => 1, group => undef, path => undef, dist => undef, type => "configuration");
         }
         $newConf{dist} = $distribution;
         $newConf{path} = $self->getConfigurationPath($newConf{name}, $distribution);

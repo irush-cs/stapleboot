@@ -53,7 +53,7 @@ B<configuration hash>
 
 =item I<name>   - The name of the configuration
 
-=item I<type>   - "configuration" (under development)
+=item I<type>   - "configuration"
 
 =item I<path>   - The full path of the configuration (filesystem)
 
