@@ -71,8 +71,7 @@ sub updateData {
     my $self = shift;
     $self->SUPER::updateData();
     if ($self->{debug} and !$self->{sentDebugMail}) {
-        $self->mail("booting in debug mode", "Warnings: $self->{host} is in debug mode: $self->{debug}");
-        $self->{sentDebugMail} = 1;
+        $self->{sentDebugMail} = not $self->mail("booting in debug mode", "Warnings: $self->{host} is in debug mode: $self->{debug}");
     }
 }
 
@@ -87,6 +86,10 @@ sub mail {
     my $self = shift;
     (my $subject, my $body) = @_;
     my $host = $self->{host};
+    unless ($self->{mailto}) {
+        $self->error("No mail recipient, not sending mail...");
+        return 1;
+    }
     if (my $res = new Net::DNS::Resolver) {
         (my $domain) = $res->searchlist;
         $host = "$host.".$domain;

@@ -427,6 +427,8 @@ sub mountStage {
             print FSTAB join "\n", @fstab;
             print FSTAB "\n";
             close(FSTAB);
+        } elsif (!@fstab and ! -e "/etc/fstab") {
+            $boot->output("no entires to add to non-existing /etc/fstab, ignoring...");
         } else {
             my $err = "Can't open /etc/fstab: $!";
             $boot->error($err);
