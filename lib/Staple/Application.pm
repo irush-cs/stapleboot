@@ -264,6 +264,7 @@ sub applyScripts {
         my $runnable;
         if ($script->{source}) {
             $runnable = $script->{source};
+            push @{$self->{applied}->{scripts}}, $runnable;
         } else {
             $runnable = `mktemp $self->{tmpDir}/script.XXXXXXXX 2>/dev/null`;
             chomp($runnable);
@@ -272,8 +273,8 @@ sub applyScripts {
             close(FILE);
             push @toDelete, $runnable;
             chmod 0755, $runnable;
+            push @{$self->{applied}->{scripts}}, "$self->{distribution}:$script->{configuration}->{name}/$script->{stage}/$script->{name}";
         }
-        push @{$self->{applied}->{scripts}}, $runnable;
         if ($script->{tokens}) {
             open(FILE, "<$runnable");
             my $data = join "", <FILE>;
@@ -296,6 +297,7 @@ sub applyScripts {
             $data = applyTokens($data, $tokens);
             delete $tokens->{__AUTO_SCRIPT__};
             delete $tokens->{__AUTO_CONFIGURATION__};
+            delete $tokens->{__AUTO_STAGE__};
             $runnable = `mktemp $self->{tmpDir}/script.XXXXXXXX 2>/dev/null`;
             chomp($runnable);
             push @toDelete, $runnable;
