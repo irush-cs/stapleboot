@@ -259,7 +259,7 @@ foreach my $key (keys %DEFAULT_TOKENS) {
 my %allowedTokensValues = (
                            "__STAPLE_VERBOSE__" => qr/^\d+$/,
                            "__STAPLE_DEBUG__" => qr/^(0|bash|prompt)$/,
-                           "__STAPLE_CRITICAL__" => qr/^(0|bash|prompt|halt(\.\d+)?|reboot(\.\d+)?|poweroff(\.\d+)?)$/,
+                           "__STAPLE_CRITICAL__" => qr/^(0|ignore|bash|prompt|halt(\.\d+)?|reboot(\.\d+)?|poweroff(\.\d+)?)$/,
                            "__STAPLE_SYSLOG__" => qr/^(LOG_AUTHPRIV|LOG_CRON|LOG_DAEMON|LOG_FTP|LOG_KERN|LOG_LOCAL[0-7]|LOG_LPR|LOG_MAIL|LOG_NEWS|LOG_SYSLOG|LOG_USER|LOG_UUCP|)$/,
                           );
 

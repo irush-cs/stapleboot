@@ -158,7 +158,9 @@ sub doCriticalAction {
     $self->addMail("Critical failure\nPerforming critical action: \"$self->{critical}\"... ");
     $self->mail("boot errors summary (critical)", $self->{mailBody}) if $self->{mailBody};
     $self->error("Critical error");
-    if ($self->{critical} eq "bash" or $self->{critical} eq "prompt") {
+    if ($self->{critical} eq "ignore") {
+        $self->error("Ignoring critical error...");
+    } elsif ($self->{critical} eq "bash" or $self->{critical} eq "prompt") {
         $self->debug($self->{critical});
     } elsif ($self->{critical} =~ m/^(halt|reboot|poweroff)(\.(\d*))?$/) {
         my $action = $1;
