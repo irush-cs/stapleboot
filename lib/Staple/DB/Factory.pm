@@ -90,7 +90,7 @@ sub createDB {
     my $type = shift;
     my @params = @_;
     unless ($type) {
-        my %tokens = readTokensFile("/etc/staple/staple.conf", "static");
+        my %tokens = readTokensFile($Staple::defaultTokens{__STAPLE_CONF__}->{value}, "static");
         ($type, @params) = split /\s+/, $tokens{__STAPLE_DB__}->{value} if ($tokens{__STAPLE_DB__});
     }
     $type = "fs" unless $type;

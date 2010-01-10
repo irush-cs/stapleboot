@@ -3,6 +3,36 @@
 stty -isig
 trap ":" INT QUIT TSTP
 
+slow() {
+    while read line; do
+        sleep 1
+        echo $line
+    done
+}
+
+nogo() {
+    msg=$1
+    domain=`hostname -d`
+    echo $msg 1>&2
+    echo "EHLO ${HOSTNAME}.${domain}
+MAIL FROM: <root>
+RCPT TO: <root@${domain}>
+DATA
+From: root
+To: root@${domain}
+Subject: ${HOSTNAME}: staple failed
+
+Staple failed on host $HOSTNAME
+$msg
+rebooting in 300 seconds...
+.
+QUIT
+" | slow | telnet smtp smtp > /dev/null 2>&1
+    echo "rebooting in 300 seconds..."
+    sleep 300
+    /sbin/reboot -f
+}
+
 stapledir=/boot/staple
 
 echo "Trying to load staple from \"$staplesrc\"..."
@@ -10,30 +40,27 @@ echo "Trying to load staple from \"$staplesrc\"..."
 if [ ! -e "$stapledir" ]; then
     mkdir $stapledir
     if [ ! -e "$stapledir" ]; then
-	echo "$stapledir doesn't exits, can't mount staple filesystem"
-	echo "sleeping 300 seconds..."
-	sleep 300
-	/sbin/reboot -f
+        nogo "$stapledir doesn't exits, can't mount staple database"
     fi
 fi
 
 if [ "$staplesrc" = "" ]; then
-    echo "staplesrc variable isn't set, don't know from where to mount staple database"
-    echo "sleeping 300 seconds..."
-    sleep 300
-    /sbin/reboot -f
+    nogo "staplesrc variable isn't set, don't know from where to mount staple database"
 fi
 
 mount -n -o nolock,ro -t nfs $staplesrc $stapledir
+code=$?
+
+if [ "$code" != "0" ]; then
+    nogo "Can't mount staple database from $staplesrc"
+fi
 
 PERL5LIB=$stapledir/lib $stapledir/bin/stapleboot-dev
+code=$?
 
-if [ "$?" != "0" ]; then
+if [ "$code" != "0" ]; then
     echo "stapleboot failed, please notify the system administrator"
-    echo "rebooting in 300 seconds..."
-    sleep 300
-    /sbin/reboot -f
+    nogo "stapleboot failed, exit status $code"
 fi
 
 stty isig
-
