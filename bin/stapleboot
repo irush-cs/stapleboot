@@ -17,8 +17,6 @@ use Staple::Application::Boot;
 #use Sys::Syslog;
 #use Sys::Syslog qw(:macros);
 
-require 'syscall.ph';
-
 my $sysinitoutput = "";
 
 my $currentStage = "init";
@@ -570,4 +568,4 @@ while ($currentStage) {
 
 $boot->mail("boot errors summary", $boot->{mailBody}) if $boot->{mailBody};
 
-exit(0);
+exit($boot->exitCode());

@@ -68,6 +68,12 @@ noted). Most of them are set automatically by the member functions.
 
 =item I<fsckCommand>       - The fsck command to use (__STAPLE_FSCK_CMD__)
 
+=item I<haltCommand>       - The halt command to is if critical is halt
+
+=item I<rebootCommand>     - The reboot command to is if critical is reboot
+
+=item I<poweroffCommand>   - The poweroff command to is if critical is poweroff
+
 =back
 
 =back
@@ -716,6 +722,17 @@ sub printTemplates {
     $self->output($output);
 }
 
+=item B<exitCode()>
+
+exit status. 0 if all ok, != 0 otherwise (used with "ignore" critical action).
+
+=cut
+
+sub exitCode {
+    my $self = shift;
+    return $self->{exitCode};
+}
+
 
 ################################################################################
 #   Internals
@@ -736,6 +753,7 @@ sub clearAll {
     $self->{templates} = [];
     $self->{autos} = [];
     $self->{badConfigurations} = [];
+    $self->{exitCode} = 0;
 
     $self->{host} = hostname unless defined $self->{host};
     if (my $res = new Net::DNS::Resolver) {
@@ -752,20 +770,23 @@ sub clearAll {
                        };
 
     $self->{tokensToData} = {
-                             "__STAPLE_VERBOSE__"     => "verbose",
-                             "__STAPLE_DEBUG__"       => "debug",
-                             "__STAPLE_MAILTO__"      => "mailto",
-                             "__STAPLE_CRITICAL__"    => "critical",
-                             "__STAPLE_SMTP_SERVER__" => "smtpServer",
-                             "__STAPLE_BASH__"        => "bash",
-                             "__STAPLE_DISABLE__"     => "disabled",
-                             "__STAPLE_FIND_LABEL__"  => "findLabelScript",
-                             "__STAPLE_LOG__"         => "staplelog",
-                             "__STAPLE_SYSLOG__"      => "syslog",
-                             "__STAPLE_MOUNT__"       => "mountCommand",
-                             "__STAPLE_FSCK_CMD__"    => "fsckCommand",
-                             "__STAPLE_SYSINIT__"     => "sysinit",
-                             "__STAPLE_CONF__"        => "conf",
+                             "__STAPLE_VERBOSE__"           => "verbose",
+                             "__STAPLE_DEBUG__"             => "debug",
+                             "__STAPLE_MAILTO__"            => "mailto",
+                             "__STAPLE_CRITICAL__"          => "critical",
+                             "__STAPLE_SMTP_SERVER__"       => "smtpServer",
+                             "__STAPLE_BASH__"              => "bash",
+                             "__STAPLE_DISABLE__"           => "disabled",
+                             "__STAPLE_FIND_LABEL__"        => "findLabelScript",
+                             "__STAPLE_LOG__"               => "staplelog",
+                             "__STAPLE_SYSLOG__"            => "syslog",
+                             "__STAPLE_MOUNT__"             => "mountCommand",
+                             "__STAPLE_FSCK_CMD__"          => "fsckCommand",
+                             "__STAPLE_SYSINIT__"           => "sysinit",
+                             "__STAPLE_CONF__"              => "conf",
+                             "__STAPLE_CRITICAL_halt__"     => "haltCommand",
+                             "__STAPLE_CRITICAL_reboot__"   => "rebootCommand",
+                             "__STAPLE_CRITICAL_poweroff__" => "poweroffCommand",
                             };
 
     foreach my $token (keys %Staple::defaultTokens) {

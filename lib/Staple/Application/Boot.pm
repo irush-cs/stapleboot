@@ -169,40 +169,25 @@ sub doCriticalAction {
         $wait = 0 unless $wait;
         $self->error("Sleeping $wait seconds before $action");
         $| = 1;
-        for (my $i = 0; $i < $wait; $i++) {
+        system("sync &");
+        for (my $i = 0; $i < $wait - 1; $i++) {
             sleep 1;
             print ".";
         }
         print "\n";
-        $! = 0;
         $self->output("syncing");
-        syscall(&SYS_sync);
-        $self->error("Can't sync: $!") if $!;
-        if ($action eq "halt") {
-            exec("/sbin/shutdown -hHnf now");
-        } else {
-            $self->shutDownSystem($action);
+        system("sync &");
+        sleep 1;
+        $! = 0;
+        unless (exec($self->{$action."Command"})) {
+            $self->error("Can't die: $!");
+            $self->output("Why won't you let me die? :-(");
+            exit(3);
         }
-        $self->error("Can't die: $!");
     }
-}
-   
-
-# input: (boot), action ("reboot" (default), "poweroff", or "halt")
-# output: undef
-# shuts down the system using the given action
-sub shutDownSystem {
-    my $self = shift;
-    my $action = shift;
-    $action = "reboot" unless ($action =~ /^reboot|poweroff|halt$/);
-    $! = 0;
-    $self->output("${action}ing");
-    syscall(&SYS_reboot, LINUX_REBOOT_MAGIC1, LINUX_REBOOT_MAGIC2,
-            { "reboot"   => LINUX_REBOOT_CMD_RESTART,
-              "poweroff" => LINUX_REBOOT_CMD_POWER_OFF,
-              "halt"     => LINUX_REBOOT_CMD_HALT }->{$action});
-    $self->error("Can't $action: $!") if $!;
-    return undef;
+    # don't send same mail twice...
+    $self->{mailBody} = "";
+    $self->{exitCode} = 4;
 }
 
 # input: (boot), message
