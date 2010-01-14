@@ -556,6 +556,11 @@ if ($< != 0) {
 }
 
 $boot->output("Version: $Staple::VERSION");
+my $dbversion = $boot->{db}->getDistributionVersion($boot->{distribution});
+if (versionCompare($Staple::VERSION, $dbversion) < 0) {
+    $boot->error("Warning: database version is higher than stapleboot version ($dbversion vs. $Staple::VERSION)");
+    $boot->addMail("Warning: database version is higher than stapleboot version ($dbversion vs. $Staple::VERSION)");
+}
 $boot->output("Starting: $boot->{host}", 1);
 
 while ($currentStage) {

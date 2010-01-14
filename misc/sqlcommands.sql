@@ -17,7 +17,8 @@ CREATE TABLE hosts (
 );
 
 CREATE TABLE distributions (
-       name          TEXT PRIMARY KEY
+       name          TEXT PRIMARY KEY,
+       version       TEXT
 );
 
 CREATE TABLE group_types (
@@ -247,7 +248,6 @@ GRANT SELECT ON host_configurations          TO staple_user;
 GRANT SELECT ON group_tokens                 TO staple_user;
 GRANT SELECT ON group_groups                 TO staple_user;
 GRANT SELECT ON group_configurations         TO staple_user;
-GRANT SELECT ON configuration_configurations TO staple_user;
 
 COMMIT;
 

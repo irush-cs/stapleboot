@@ -34,6 +34,8 @@ Staple::Misc module
 
 =over
 
+=item versionCompare(v1, v2)
+
 =item fixPath(path)
 
 =item splitData(<path like string>)
@@ -79,6 +81,7 @@ Staple::Misc module
 our @ISA = qw(Exporter);
 our @EXPORT_OK = qw();
 our @EXPORT = qw(
+                    versionCompare
                     getDistribution
                     fixPath
                     splitData
@@ -110,6 +113,25 @@ our $VERSION = '004';
 =head1 DESCRIPTION
 
 =over
+
+=item V<versionCompare(I<version1>, I<version2>)
+
+Compares between 2 versions of staple and returns -1, 0, or 1 if version1 is
+lower than, equal to, or greater than version2. "none" is lower than
+everything. "none" is equal to "none".
+
+=cut
+
+sub versionCompare {
+    my $v1 = shift;
+    my $v2 = shift;
+    return 0 if $v1 eq $v2;
+    return 1 if $v1 eq "none";
+    return -1 if $v2 eq "none";
+    my $c = $v1 <=> $v2;
+    return $c / abs($c);
+}
+
 
 =item B<getDistribution( )>
 

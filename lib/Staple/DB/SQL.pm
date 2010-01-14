@@ -1064,6 +1064,43 @@ sub getAllDistributions {
     return sort {$a cmp $b} $self->getList("SELECT name FROM $self->{schema}distributions");
 }
 
+sub getDistributionVersion {
+    my $self = shift;
+    my $dist = shift;
+    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $schema = $self->{schema};
+    $schema =~ s/\.$//;
+    my $sth = $dbh->column_info(undef, $schema, "distributions", undef);
+    my $result = $sth->fetchall_hashref("COLUMN_NAME");
+    if ($sth->err) {
+        $self->{error} = $sth->errstr;
+        chomp ($self->{error});
+        return undef;
+    }
+    if (exists $result->{version}) {
+        my $ver = $self->count("SELECT version FROM $self->{schema}distributions WHERE name = ?", $dist);
+        return undef if ($self->{error});
+        return "none" unless defined $ver;
+        return $ver;
+    }
+    return "none";
+}
+
+sub setDistributionVersion {
+    my $self = shift;
+    my $dist = shift;
+    my $ver = shift;
+    $ver = "none" unless defined $ver;
+    my $old = $self->getDistributionVersion($dist);
+    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $sth = $dbh->prepare_cached("UPDATE $self->{schema}distributions SET version = ? WHERE name = ?");
+    unless ($sth->execute($ver, $dist)) {
+        $self->{error} = $sth->errstr;
+        return undef;
+    }
+    return $old;
+}
+
 sub getConfigurationPath {
     my $self = shift;
     my $configuration = shift;

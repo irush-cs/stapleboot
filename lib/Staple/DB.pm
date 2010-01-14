@@ -731,6 +731,31 @@ sub getAllDistributions {
     return undef;
 }
 
+=item B<getDistributionVersion(I<distribution string>)>
+
+Returns the distribution version on this database, "none" if not available,
+undef on error.
+
+=cut
+
+sub getDistributionVersion {
+    my $self = shift;
+    $self->{error} = "getDistributionVersion not implemented in this database yet";
+    return undef;
+}
+
+=item B<setDistributionVersion(I<distribution string>, I<version>)>
+
+Sets the distribution version on this database. version can be either version
+number or "none"/undef. Returns the old version or undef on error.
+
+=cut
+
+sub setDistributionVersion {
+    my $self = shift;
+    $self->{error} = "setDistributionVersion not implemented in this database yet";
+    return undef;
+}
 
 =item B<whoHasGroup(I<group name>)>
 
@@ -830,7 +855,7 @@ sub getDistributionPath {
     return undef;
 }
 
-=item B<getDistributionGroup(I<distribution string>)
+=item B<getDistributionGroup(I<distribution string>)>
 
 Returns the distribution group hash ref. If the distribution does not exists,
 undef is returned and the error is set

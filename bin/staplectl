@@ -115,6 +115,8 @@ my %commands = (
                 whg => \&whg,
                 whc => \&whc,
                 wht => \&wht,
+                gdv => \&gdv,
+                sdv => \&sdv,
 
                 sd  => \&sd,
                 sync => \&syncctl,
@@ -206,6 +208,8 @@ my %commandMap = (
                   whg                             => "whg",
                   whc                             => "whc",
                   wht                             => "wht",
+                  gdv                             => "gdv",
+                  sdv                             => "sdv",
 
                   sd                              => "sd",
                   sdb                             => "setdb",
@@ -289,6 +293,8 @@ my %commandMap = (
                   whohasgroup                     => "whg",
                   whohasconfiguration             => "whc",
                   whohastoken                     => "wht",
+                  getdistributionversion          => "gdv",
+                  setdistributionversion          => "sdv",
                   
                   badcommandorfilename            => "bad",
                   " "                             => " ",
@@ -378,6 +384,8 @@ my %commandCompletionMap =
    whg       => [\&group_completion],
    whc       => [\&configuration_completion],
    wht       => [],
+   gdv       => [\&distribution_completion],
+   sdv       => [undef, \&distribution_completion],
   );
 
 my %commandsHelp = (
@@ -960,6 +968,8 @@ Distribution commands:
   gdc | get distribution configurations [<dist>]   
   adc | add distribution configuration {+|-}<conf> [<location>] 
   rdc | remove distribution configuration {+|-}<conf>
+  gdv | get distribution version [<dist>]
+  sdv | set distribution version <version> [<dist>]
 ",
                     helphosts          => "
 Host commands:
@@ -1033,6 +1043,18 @@ Other commands:
    sync
    debug <host>
    undebug <host>
+",
+                    gdv => "
+name: gdv | get distribution version
+parameters: [<distribution>]
+
+Gets <distribution>'s version.
+",
+                    sdv => "
+name: sdv | set distribution version
+parameters: <version> [<distribution>]
+
+Sets <distribution>'s version to <version>.
 ",
                    );
 
@@ -1193,6 +1215,34 @@ sub bad {
 }
 
 sub empty {
+}
+
+sub gdv {
+    my $dist = shift;
+    $dist = $distribution unless $dist;
+    my $version = $db->getDistributionVersion($dist);
+    if (defined $version) {
+        print "$version\n";
+    } else {
+        print $db->{error}."\n";
+    }
+}
+
+sub sdv {
+    my $version = shift;
+    my $dist = shift;
+    $dist = $distribution unless defined $dist;
+    $version = "none" unless defined $version;
+    my $old = $db->setDistributionVersion($dist, $version);
+    if (defined $old) {
+        if ($old eq $version) {
+            print "no change\n";
+        } else {
+            print "changed \"$dist\" version: $old -> $version\n";
+        }
+    } else {
+        print $db->{error}."\n";
+    }
 }
 
 sub wht {

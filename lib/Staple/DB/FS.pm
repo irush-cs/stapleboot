@@ -1118,6 +1118,45 @@ sub getAllDistributions {
     return sort {$a cmp $b} @distributions;
 }
 
+sub getDistributionVersion {
+    my $self = shift;
+    my $dist = shift;
+    my $path = $self->getDistributionPath($dist);
+    if ($path) {
+        if (open(VER, "$path/version")) {
+            my $version = <VER>;
+            close(VER);
+            chomp($version);
+            return $version;
+        } else {
+            return "none"
+        }
+    }
+    $self->{error} = "no such distribution \"$dist\"";
+    return undef;
+}
+
+sub setDistributionVersion {
+    my $self = shift;
+    my $dist = shift;
+    my $ver = shift;
+    $ver = "none" unless defined $ver;
+    my $path = $self->getDistributionPath($dist);
+    if ($path) {
+        my $old = $self->getDistributionVersion($dist);
+        return $old if $old eq $ver;
+        if (open(VER, ">$path/version")) {
+            print VER "$ver\n";
+            close(VER);
+            return $old;
+        }
+        $self->{error} = "Can't open $path/version for writing: $!";
+        return undef;
+    }
+    $self->{error} = "no such distribution \"$dist\"";
+    return undef;
+}
+
 sub getConfigurationPath {
     my $self = shift;
     my $configuration = shift;
