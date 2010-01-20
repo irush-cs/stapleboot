@@ -951,7 +951,7 @@ sub getCompleteTokens {
     delete @tokens{@delete};
     $tokens{__AUTO_DISTRIBUTION__} = {key => "__AUTO_DISTRIBUTION__", value => $distribution, raw => $distribution, type => "static", source => "auto"} if $distribution;
     $tokens{__AUTO_HOSTNAME__} = {key => "__AUTO_HOSTNAME__", value => $host, raw => $host, type => "static", source => "auto"} if $host;
-    $tokens{__AUTO_TMP__} = {key => "__AUTO_TMP__", value => $self->getStapleDir()."tmp", raw => $self->getStapleDir()."/tmp", type => "static", source => "auto"};
+    $tokens{__AUTO_TMP__} = {key => "__AUTO_TMP__", value => $self->getStapleDir()."/tmp", raw => $self->getStapleDir()."/tmp", type => "static", source => "auto"};
     #$tokens{__AUTO_IP__} = $ip;
     %tokens = setDefaultTokens(\%tokens, \%Staple::defaultTokens);
     %tokens = verifyTokens(\%tokens, \%Staple::allowedTokensValues);
