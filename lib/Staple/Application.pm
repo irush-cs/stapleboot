@@ -68,6 +68,8 @@ noted). Most of them are set automatically by the member functions.
 
 =item I<fsckCommand>       - The fsck command to use (__STAPLE_FSCK_CMD__)
 
+=item I<fsckExitOK>        - OK exits status for fsck (1 should be ok)
+
 =item I<haltCommand>       - The halt command to is if critical is halt
 
 =item I<rebootCommand>     - The reboot command to is if critical is reboot
@@ -532,16 +534,23 @@ sub applyMounts {
                 $self->output("fsck $mount->{destination}: $fsckcmd") if $self->{verbose} > 2;
                 unless ($self->{disabled}) {
                     (my $fsckExit, my $fsckOutput, my $fsckError) = runCommand("$fsckcmd 2>&1");
-                    #(my $fsckExit, my $fsckOutput, my $fsckError) = ("","","");
-                    #system("$fsckcmd");
-                    #$fsckExit = $? >> 8;
-                    #$self->output("fsck output: $fsckOutput") if $fsckOutput and $self->{verbose} > 2;
-                    if ($fsckExit) {
+                    my $fsckExitOK = $mount->{fsckExitOK};
+                    $fsckExitOK = $self->{fsckExitOK} unless $fsckExitOK;
+                    if (0 == grep {$fsckExit == $_} split /,/, $fsckExitOK) {
                         $status = "Error running fsck: $fsckcmd\n";
                         $status .= "fsck output:\n$fsckOutput\n\nfsck error:\n$fsckError\n\nfsck exit code: $fsckExit\n";
                         $self->error("error running fsck on $mount->{destination}");
                         $self->output("fsck errors: $fsckError") if $self->{verbose} >= 1 and $fsckError;
                         goto aftermount;
+                    } elsif ($fsckError) {
+                        my $body = "fsck succeeded with errors\n\n";
+                        $body .= "Mount: $mount->{source} -> $mount->{destination}\n";
+                        $body .= "Command: $fsckcmd\n";
+                        $body .= "Exit status: $fsckExit\n";
+                        $body .= "Output:\n$fsckOutput\n";
+                        $body .= "Errors:\n$fsckError\n";
+                        $self->output("fsck errors: $fsckError") if $self->{verbose} >= 1;
+                        $self->addMail($body);
                     }
                 }
             }
@@ -782,6 +791,7 @@ sub clearAll {
                              "__STAPLE_SYSLOG__"            => "syslog",
                              "__STAPLE_MOUNT__"             => "mountCommand",
                              "__STAPLE_FSCK_CMD__"          => "fsckCommand",
+                             "__STAPLE_FSCK_EXIT_OK__"      => "fsckExitOK",
                              "__STAPLE_SYSINIT__"           => "sysinit",
                              "__STAPLE_CONF__"              => "conf",
                              "__STAPLE_CRITICAL_halt__"     => "haltCommand",

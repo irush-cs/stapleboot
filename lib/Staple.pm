@@ -123,6 +123,8 @@ B<mount hash>
 
 =item I<fsckCommand>    - Special fsck command for this mount (defaults to empty, only for manual mount)
 
+=item I<fsckExitOK>     - Special fsck exit status for this mount
+
 =back
 
 =back
@@ -248,6 +250,7 @@ my %DEFAULT_TOKENS = (
                       "__STAPLE_CRITICAL_halt__"     => "/sbin/halt -f",
                       "__STAPLE_CRITICAL_reboot__"   => "/sbin/reboot -f",
                       "__STAPLE_CRITICAL_poweroff__" => "/sbin/poweroff -f",
+                      "__STAPLE_FSCK_EXIT_OK__"      => "0,1",
                      );
 
 
@@ -280,6 +283,7 @@ my %mountTokenToOption = (
                           "MANUAL"       => "manual",
                           "FSCK"         => "fsck",
                           "FSCK_CMD"     => "fsckCommand",
+                          "FSCK_EXIT_OK" => "fsckExitOK",
                          );
 
 my %mountTokenDefaultValues = (
@@ -296,6 +300,7 @@ my %mountTokenDefaultValues = (
                                "MANUAL"       => "",
                                "FSCK"         => "1",
                                "FSCK_CMD"     => "",
+                               "FSCK_EXIT_OK" => "",
                               );
 
 BEGIN {
