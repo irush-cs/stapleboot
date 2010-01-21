@@ -1253,7 +1253,17 @@ sub wht {
         print "Missing token key\n";
         return;
     }
-    (my $groups, my $configurations) = $db->whoHasToken($token, $dist);
+    my $groups;
+    my $configurations;
+    eval {
+        local $SIG{INT} = sub {die "SIGINT"};
+        ($groups, $configurations) = $db->whoHasToken($token, $dist);
+    };
+    if ($@) {
+        print "\n";
+        print "$@" if index($@,"SIGINT") != 0;
+        return;
+    }
     if (not defined $groups) {
         print $db->{error}."\n";
         return;
@@ -1280,7 +1290,16 @@ sub whc {
         print "Missing configuration\n";
         return;
     }
-    my @groups = $db->whoHasConfiguration($configuration);
+    my @groups;
+    eval {
+        local $SIG{INT} = sub {die "SIGINT"};
+        @groups = $db->whoHasConfiguration($configuration);
+    };
+    if ($@) {
+        print "\n";
+        print "$@" if index($@,"SIGINT") != 0;
+        return;
+    }
     if (@groups and not defined $groups[0]) {
         print $db->{error}."\n";
         return;
@@ -1301,7 +1320,16 @@ sub whg {
         print "Missing group\n";
         return;
     }
-    my @groups = $db->whoHasGroup($group);
+    my @groups;
+ eval {
+        local $SIG{INT} = sub {die "SIGINT"};
+        @groups = $db->whoHasGroup($group);
+    };
+    if ($@) {
+        print "\n";
+        print "$@" if index($@,"SIGINT") != 0;
+        return;
+    }      
     if (@groups and not defined $groups[0]) {
         print $db->{error}."\n";
         return;
