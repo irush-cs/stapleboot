@@ -120,14 +120,16 @@ Compares between 2 versions of staple and returns -1, 0, or 1 if version1 is
 lower than, equal to, or greater than version2. "none" is lower than
 everything. "none" is equal to "none".
 
+Currently supports \d{3} and "none" versions.
+
 =cut
 
 sub versionCompare {
     my $v1 = shift;
     my $v2 = shift;
     return 0 if $v1 eq $v2;
-    return 1 if $v1 eq "none";
-    return -1 if $v2 eq "none";
+    return -1 if $v1 eq "none";
+    return 1 if $v2 eq "none";
     my $c = $v1 <=> $v2;
     return $c / abs($c);
 }

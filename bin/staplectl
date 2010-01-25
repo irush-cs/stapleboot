@@ -1058,7 +1058,7 @@ Sets <distribution>'s version to <version>.
 ",
                    );
 
-my @singleCommandCommands = ("ahc", "rhc", "gag", "ghc", "wht", "whc", "whg", "ghi", "ggi", "gci", "bad", "badcommandorfilename", "gt", "gdt", "gct", "gah", "gac", "gas", "gss", "gts", "gm", "ah");
+my @singleCommandCommands = ("ahc", "rhc", "gag", "ghc", "wht", "whc", "whg", "ghi", "ggi", "gci", "bad", "badcommandorfilename", "gt", "gdt", "gct", "gah", "gac", "gas", "gss", "gts", "gm", "ah", "gad");
 
 sub help {
     my %topics = (a              => "helpall",
@@ -3213,7 +3213,12 @@ sub gad {
     if (@distributions and not defined $distributions[0]) {
         print $db->{error}."\n";
     } else {
+        my @versions = map{$db->getDistributionVersion($_)} @distributions;
         @distributions = map {$distribution eq $_ ? "(*) $_" : "    $_"} @distributions if $distribution;
+        my $len = 0;
+        map {$len = length($_) if $len < length($_)} @distributions;
+        @distributions = map {sprintf("\%-${len}s  \%s", $_, "(".(shift @versions).")")} @distributions;
+
         print join "\n", @distributions;
         print "\n";
     }
