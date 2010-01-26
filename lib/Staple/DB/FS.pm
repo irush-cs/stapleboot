@@ -276,22 +276,6 @@ sub addTokens {
         return undef;
     }
 
-    # old tokens style
-    return undef unless ($self->mkdirs("$group->{path}/tokens"));
-    foreach my $type ("static", "dynamic", "regexp") {
-        my @tokens = map {$_->{key}} grep {$_->{type} eq $type} values %$tokens;
-        next unless @tokens;
-        my %newTokens = ();
-        @newTokens{@tokens} = @{$tokens}{@tokens};
-        my $file = "$group->{path}/tokens/$type";
-        my %oldTokens = readTokensFile($file, $type);
-        @oldTokens{keys %newTokens} = values %newTokens;
-        unless (writeTokensFile($file, \%oldTokens)) {
-            $self->{error} = "Can't write tokens file $file: $!\n";
-            return undef;
-        }
-    }
-
     # new xml style
     my $file = "$group->{path}/tokens.xml";
     my @read = readTokensXMLFile($file);
@@ -301,6 +285,26 @@ sub addTokens {
     unless (writeTokensXMLFile($file, \%newTokens)) {
         $self->{error} = "Can't write tokens file $file: $!\n";
         return undef;
+    }
+
+    # old tokens style, only before 004
+    if (($group->{type} eq "configuration" and versionCompare($self->getDistributionVersion($group->{dist}), "004") < 0) or
+        ($group->{type} eq "distribution" and versionCompare($self->getDistributionVersion($group->{name}), "004") < 0) or
+        ($group->{type} ne "configuration" and $group->{type} ne "distribution")) {
+        return undef unless ($self->mkdirs("$group->{path}/tokens"));
+        foreach my $type ("static", "dynamic", "regexp") {
+            my @tokens = map {$_->{key}} grep {$_->{type} eq $type} values %$tokens;
+            next unless @tokens;
+            my %newTokens = ();
+            @newTokens{@tokens} = @{$tokens}{@tokens};
+            my $file = "$group->{path}/tokens/$type";
+            my %oldTokens = readTokensFile($file, $type);
+            @oldTokens{keys %newTokens} = values %newTokens;
+            unless (writeTokensFile($file, \%oldTokens)) {
+                $self->{error} = "Can't write tokens file $file: $!\n";
+                return undef;
+            }
+        }
     }
     return 1;
 }
@@ -1145,9 +1149,20 @@ sub setDistributionVersion {
     if ($path) {
         my $old = $self->getDistributionVersion($dist);
         return $old if $old eq $ver;
+        if (versionCompare($old, $ver) > 0) {
+            $self->{error} = "Can't change to older configuration ($ver from $old)";
+            return undef;
+        }
         if (open(VER, ">$path/version")) {
             print VER "$ver\n";
             close(VER);
+            # fix tokens
+            if (versionCompare($ver, "004") >= 0 and
+                versionCompare($old, "004") < 0) {
+                # let's hope there's no configuration named tokens...
+                `find \`find $path -name tokens -type d\` -maxdepth 1 \\( -name static -o -name dynamic -o -name regexp \\) -delete`;
+                `find $path -name tokens -type d -delete`
+            }
             return $old;
         }
         $self->{error} = "Can't open $path/version for writing: $!";
