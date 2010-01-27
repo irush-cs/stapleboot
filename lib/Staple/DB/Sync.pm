@@ -13,6 +13,7 @@ require Exporter;
 use Staple;
 use Staple::DB::FS;
 use Staple::DB::SQL;
+use Staple::Misc;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = qw();
 our @EXPORT = qw(
@@ -440,7 +441,19 @@ sub syncDistributions {
     
     for my $distribution (@to) {
         if ($from{$distribution}) {
-            delete $from{$distribution};
+            # can't downgrade, need to delete. Otherwise, just upgrade version
+            if (versionCompare($from->getDistributionVersion($distribution), $to->getDistributionVersion($distribution)) < 0) {
+                unless ($to->removeDistribution($distribution)) {
+                    $error = $to->{error};
+                    return 0;
+                }
+            } else {
+                unless (defined $to->setDistributionVersion($distribution, $from->getDistributionVersion($distribution))) {
+                    $error = $to->{error};
+                    return 0;
+                }
+                delete $from{$distribution};
+            }
         } else {
             unless ($to->removeDistribution($distribution)) {
                 $error = $to->{error};
@@ -451,6 +464,10 @@ sub syncDistributions {
     
     for my $distribution (keys %from) {
         unless ($to->addDistribution($distribution)) {
+            $error = $to->{error};
+            return 0;
+        }
+        unless ($to->setDistributionVersion($distribution, $from->getDistributionVersion($distribution))) {
             $error = $to->{error};
             return 0;
         }

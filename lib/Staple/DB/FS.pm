@@ -290,7 +290,7 @@ sub addTokens {
     # old tokens style, only before 004
     if (($group->{type} eq "configuration" and versionCompare($self->getDistributionVersion($group->{dist}), "004") < 0) or
         ($group->{type} eq "distribution" and versionCompare($self->getDistributionVersion($group->{name}), "004") < 0) or
-        ($group->{type} ne "configuration" and $group->{type} ne "distribution")) {
+        ($group->{type} ne "configuration" and $group->{type} ne "distribution" and versionCompare($self->getMinimumDistributionVersion(), "004") < 0)) {
         return undef unless ($self->mkdirs("$group->{path}/tokens"));
         foreach my $type ("static", "dynamic", "regexp") {
             my @tokens = map {$_->{key}} grep {$_->{type} eq $type} values %$tokens;
@@ -322,18 +322,6 @@ sub removeTokens {
         return undef;
     }
 
-    # old tokens style
-    foreach my $type ("static", "dynamic", "regexp") {
-        my $file = "$group->{path}/tokens/$type";
-        my %oldTokens = readTokensFile($file);
-        if (delete @oldTokens{@$tokens}) {
-            unless (writeTokensFile($file, \%oldTokens)) {
-                $self->{error} = "Can't write tokens file $file: $!\n";
-                return undef;
-            }
-        }
-    }
-
     # new xml style
     my $file = "$group->{path}/tokens.xml";
     my @read = readTokensXMLFile($file);
@@ -343,6 +331,22 @@ sub removeTokens {
         unless (writeTokensXMLFile($file, \%oldTokens)) {
             $self->{error} = "Can't write tokens to file $file: $!\n";
             return undef;
+        }
+    }
+
+    # old tokens style, only before 004
+    if (($group->{type} eq "configuration" and versionCompare($self->getDistributionVersion($group->{dist}), "004") < 0) or
+        ($group->{type} eq "distribution" and versionCompare($self->getDistributionVersion($group->{name}), "004") < 0) or
+        ($group->{type} ne "configuration" and $group->{type} ne "distribution" and versionCompare($self->getMinimumDistributionVersion(), "004") < 0)) {
+        foreach my $type ("static", "dynamic", "regexp") {
+            my $file = "$group->{path}/tokens/$type";
+            my %oldTokens = readTokensFile($file);
+            if (delete @oldTokens{@$tokens}) {
+                unless (writeTokensFile($file, \%oldTokens)) {
+                    $self->{error} = "Can't write tokens file $file: $!\n";
+                    return undef;
+                }
+            }
         }
     }
     
@@ -982,7 +986,6 @@ sub whoHasGroup {
     return @hosts, @distributions, @groups;
 }
 
-
 sub whoHasConfiguration {
     my $self = shift;
     my $configuration = shift;
@@ -1021,78 +1024,6 @@ sub whoHasConfiguration {
     return undef if (grep {not defined $_} @groups);
 
     return @hosts, @distributions, @groups;
-}
-
-sub whoHasToken {
-    my $self = shift;
-    my $key = shift;
-    my $distribution = shift;
-    
-    if (not defined $self->getDistributionGroup($distribution)) {
-        # error is already set by $self
-        return undef;
-    }
-    
-    # hosts
-    my $cmd = "find ".$self->{stapleDir}."/hosts -type f \\( -path \\*/tokens/static -o -path \\*/tokens/dynamic -o -path \\*/tokens/regexp \\)  -print0 | xargs -0 grep -l '^".$key."='";
-    my @hosts = `$cmd`;
-    chomp @hosts;
-    # grep returns an error if nothing is found
-    #if ($? >> 8) {
-    #    $self->{error} = "Error executing \"$cmd\": ".($? >> 8);
-    #    return undef;
-    #}
-    @hosts = map {$a = $_; $a =~ s,^.*/([^/]+)/tokens/(?:static|dynamic|regexp)$,$1,;$a} @hosts;
-    @hosts = map {$self->getHostGroup($_)} @hosts;
-    return undef if (grep {not defined $_} @hosts);
-
-    # distributions
-    #$cmd = "find ".$self->{stapleDir}."/distributions -type f \\( -path \\*/tokens/static -o -path \\*/tokens/dynamic -o -path \\*/tokens/regexp \\) -print0 | xargs -0 grep -l '^".$key."='";
-    $cmd = "find ".$self->{stapleDir}."/distributions/*/tokens/{static,dynamic,regexp} -print0 2>/dev/null | xargs -0 grep -l '^".$key."='";
-    my @distributions = `$cmd`;
-    chomp @distributions;
-    #if ($? >> 8) {
-    #    $self->{error} = "Error executing \"$cmd\": ".($? >> 8);
-    #    return undef;
-    #}
-    
-    @distributions = map {$a = $_; $a =~ s,^.*/([^/]+)/tokens/(?:static|dynamic|regexp)$,$1,;$a} @distributions;
-    @distributions = map {$self->getDistributionGroup($_)} @distributions;
-    return undef if (grep {not defined $_} @distributions);
-
-    # groups
-    $cmd = "find ".$self->{stapleDir}."/groups -type f \\( -path \\*/tokens/static -o -path \\*/tokens/dynamic -o -path \\*/tokens/regexp \\) -print0 | xargs -0 grep -l '^".$key."='";
-    my @groups = `$cmd`;
-    chomp @groups;
-    #if ($? >> 8) {
-    #    $self->{error} = "Error executing \"$cmd\": ".($? >> 8);
-    #    return undef;
-    #}
-    
-    @groups = map {$a = $_; $a =~ s,^$self->{stapleDir}/groups(/.+)/tokens/(?:static|dynamic|regexp)$,$1,; $a =~ s,/subgroups/,/,g; $a} @groups;
-    @groups = $self->getGroupsByName(@groups);
-    return undef if (grep {not defined $_} @groups);
-    
-    # configurations
-    $cmd = "find ".$self->{stapleDir}."/distributions/$distribution/confs -type f \\( -path */tokens/static -o -path */tokens/dynamic -o -path */tokens/regexp \\) -print0 | xargs -0 grep -l '^".$key."='";
-    my @configurations = `$cmd`;
-    chomp @configurations;
-    #if ($? >> 8) {
-    #    $self->{error} = "Error executing \"$cmd\": ".($? >> 8);
-    #    return undef;
-    #}
-    
-    @configurations = map {
-        $a = $_;
-        $a =~ s,^$self->{stapleDir}/distributions/${distribution}/confs(/.+)/tokens/(?:static|dynamic|regexp)$,$1,;
-        $a =~ s,/configurations/,/,g;
-        $a} @configurations;
-
-    @configurations = map {{name => $_, path => undef, dist => undef, active => 1, group => undef}} @configurations;
-    @configurations = $self->getFullConfigurations(\@configurations, $distribution);
-    return undef if (grep {not defined $_} @configurations);
-
-    return ([@hosts, @distributions, @groups], [@configurations])
 }
 
 sub getAllConfigurations {
@@ -1146,6 +1077,10 @@ sub setDistributionVersion {
     my $ver = shift;
     $ver = "none" unless defined $ver;
     my $path = $self->getDistributionPath($dist);
+    if (versionCompare($ver, $Staple::VERSION) > 0) {
+        $self->{error} = "Don't know version $ver, max version is $Staple::VERSION";
+        return undef;
+    }
     if ($path) {
         my $old = $self->getDistributionVersion($dist);
         return $old if $old eq $ver;

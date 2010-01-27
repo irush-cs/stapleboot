@@ -757,6 +757,25 @@ sub setDistributionVersion {
     return undef;
 }
 
+=item B<getMinimumDistributionVersion()>
+
+Gets the minimum version of all distributions.
+
+=cut
+
+sub getMinimumDistributionVersion {
+    my $self = shift;
+    my @distributions = $self->getAllDistributions();
+    return undef if (@distributions and not defined $distributions[0]);
+    my $min = $Staple::VERSION;
+    for my $dist (@distributions) {
+        my $version = $self->getDistributionVersion($dist);
+        return undef unless $version;
+        $min = $version if versionCompare($version, $min) < 0;
+    }
+    return $min;
+}
+
 =item B<whoHasGroup(I<group name>)>
 
 Receives a single group name (string), and returns a group (hash) list, of the
@@ -785,8 +804,30 @@ On error undef is returned, and the error is set.
 
 sub whoHasToken {
     my $self = shift;
-    $self->{error} = "whoHasToken not implemented in this database yet";
-    return undef;
+    my $key = shift;
+    my $distribution = shift;
+    
+    if (not defined $self->getDistributionGroup($distribution)) {
+        # error is already set by $self
+        return undef;
+    }
+    
+    # hosts, distributions, groups, configurations
+    my @groups;
+    foreach my $group ((map {$self->getHostGroup($_)} $self->getAllHosts()),
+                       (map {$self->getDistributionGroup($_)} $self->getAllDistributions()),
+                       $self->getGroupsByName($self->getAllGroups()),
+                       $self->getFullConfigurations([$self->getAllConfigurations($distribution)], $distribution)) {
+        my $tokens = $self->getTokens($group);
+        push @groups, $group if grep /^${key}$/, keys %$tokens;
+    }
+    return undef if (grep {not defined $_} @groups);
+
+    
+    my @configurations = grep {$_->{type} eq "configuration"} @groups;
+    @groups = grep {$_->{type} ne "configuration"} @groups;
+
+    return ([@groups], [@configurations])
 }
 
 =item B<whoHasConfiguration(I<configuration name>)>
