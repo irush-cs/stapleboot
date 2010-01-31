@@ -117,6 +117,9 @@ my %commands = (
                 wht => \&wht,
                 gdv => \&gdv,
                 sdv => \&sdv,
+                acc => \&acc,
+                gcc => \&gcc,
+                rcc => \&rcc,
 
                 sd  => \&sd,
                 sync => \&syncctl,
@@ -134,170 +137,176 @@ my %commands = (
                );
 
 my %commandMap = (
-                  h                               => "help",
-                  q                               => "quit",
-                  e                               => "quit",
-                  "?"                             => "help",
+                  h                                => "help",
+                  q                                => "quit",
+                  e                                => "quit",
+                  "?"                              => "help",
 
-                  ac                              => "ac",
-                  ad                              => "ad",
-                  ag                              => "ag",
-                  ah                              => "ah",
-                  rc                              => "rc",
-                  rd                              => "rd",
-                  rg                              => "rg",
-                  rh                              => "rh",
-                  gm                              => "gm",
-                  am                              => "am",
-                  rm                              => "rm",
-                  gt                              => "gt",
-                  at                              => "at",
-                  rt                              => "rt",
-                  ut                              => "ut",
-                  gs                              => "gs",
-                  as                              => "as",
-                  rs                              => "rs",
-                  us                              => "us",
-                  ga                              => "ga",
-                  aa                              => "aa",
-                  ra                              => "ra",
-                  ua                              => "ua",
-                  cc                              => "cc",
+                  ac                               => "ac",
+                  ad                               => "ad",
+                  ag                               => "ag",
+                  ah                               => "ah",
+                  rc                               => "rc",
+                  rd                               => "rd",
+                  rg                               => "rg",
+                  rh                               => "rh",
+                  gm                               => "gm",
+                  am                               => "am",
+                  rm                               => "rm",
+                  gt                               => "gt",
+                  at                               => "at",
+                  rt                               => "rt",
+                  ut                               => "ut",
+                  gs                               => "gs",
+                  as                               => "as",
+                  rs                               => "rs",
+                  us                               => "us",
+                  ga                               => "ga",
+                  aa                               => "aa",
+                  ra                               => "ra",
+                  ua                               => "ua",
+                  cc                               => "cc",
 
-                  act                             => "act",
-                  adt                             => "adt",
-                  agt                             => "agt",
-                  aht                             => "aht",
-                  ahg                             => "ahg",
-                  adg                             => "adg",
-                  rdg                             => "rdg",
-                  agg                             => "agg",
-                  rgg                             => "rgg",
-                  gac                             => "gac",
-                  gad                             => "gad",
-                  gag                             => "gag",
-                  gah                             => "gah",
-                  gct                             => "gct",
-                  gdt                             => "gdt",
-                  ggt                             => "ggt",
-                  gdg                             => "gdg",
-                  ggg                             => "ggg",
-                  ght                             => "ght",
-                  ghg                             => "ghg",
-                  rct                             => "rct",
-                  rdt                             => "rdt",
-                  rgt                             => "rgt",
-                  rht                             => "rht",
-                  rhg                             => "rhg",
-                  ggc                             => "ggc",
-                  ghc                             => "ghc",
-                  gdc                             => "gdc",
-                  ahc                             => "ahc",
-                  adc                             => "adc",
-                  agc                             => "agc",
-                  rhc                             => "rhc",
-                  rdc                             => "rdc",
-                  rgc                             => "rgc",
-                  gts                             => "gts",
-                  gss                             => "gss",
-                  gas                             => "gas",
-                  ghi                             => "ghi",
-                  ggi                             => "ggi",
-                  gci                             => "gci",
-                  gdi                             => "gdi",
-                  whg                             => "whg",
-                  whc                             => "whc",
-                  wht                             => "wht",
-                  gdv                             => "gdv",
-                  sdv                             => "sdv",
+                  act                              => "act",
+                  adt                              => "adt",
+                  agt                              => "agt",
+                  aht                              => "aht",
+                  ahg                              => "ahg",
+                  adg                              => "adg",
+                  rdg                              => "rdg",
+                  agg                              => "agg",
+                  rgg                              => "rgg",
+                  gac                              => "gac",
+                  gad                              => "gad",
+                  gag                              => "gag",
+                  gah                              => "gah",
+                  gct                              => "gct",
+                  gdt                              => "gdt",
+                  ggt                              => "ggt",
+                  gdg                              => "gdg",
+                  ggg                              => "ggg",
+                  ght                              => "ght",
+                  ghg                              => "ghg",
+                  rct                              => "rct",
+                  rdt                              => "rdt",
+                  rgt                              => "rgt",
+                  rht                              => "rht",
+                  rhg                              => "rhg",
+                  ggc                              => "ggc",
+                  ghc                              => "ghc",
+                  gdc                              => "gdc",
+                  ahc                              => "ahc",
+                  adc                              => "adc",
+                  agc                              => "agc",
+                  rhc                              => "rhc",
+                  rdc                              => "rdc",
+                  rgc                              => "rgc",
+                  gts                              => "gts",
+                  gss                              => "gss",
+                  gas                              => "gas",
+                  ghi                              => "ghi",
+                  ggi                              => "ggi",
+                  gci                              => "gci",
+                  gdi                              => "gdi",
+                  whg                              => "whg",
+                  whc                              => "whc",
+                  wht                              => "wht",
+                  gdv                              => "gdv",
+                  sdv                              => "sdv",
+                  acc                              => "acc",
+                  gcc                              => "gcc",
+                  rcc                              => "rcc",
 
-                  sd                              => "sd",
-                  sdb                             => "setdb",
-                  gdb                             => "getdb",
-                  sync                            => "sync",
+                  sd                               => "sd",
+                  sdb                              => "setdb",
+                  gdb                              => "getdb",
+                  sync                             => "sync",
 
-                  quit                            => "quit",
-                  help                            => "help",
-                  exit                            => "quit",
-                  setdb                           => "setdb",
-                  getdb                           => "getdb",
-                  setdistribution                 => "sd",
-                  getallhosts                     => "gah",
-                  getallgroups                    => "gag",
-                  getalldistributions             => "gad",
-                  getallconfigurations            => "gac",
-                  getconfigurationtokens          => "gct",
-                  getgrouptokens                  => "ggt",
-                  getdistributiontokens           => "gdt",
-                  gethosttokens                   => "ght",
-                  gethostgroups                   => "ghg",
-                  getdistributiongroups           => "gdg",
-                  getgroupgroups                  => "ggg",
-                  addhost                         => "ah",
-                  addgroup                        => "ag",
-                  adddistribution                 => "ad",
-                  addconfiguration                => "ac",
-                  adddistributiontoken            => "adt",
-                  addhosttoken                    => "aht",
-                  addhostgroup                    => "ahg",
-                  addgrouptoken                   => "agt",
-                  addconfigurationtoken           => "act",
-                  removedistribution              => "rd",
-                  removehost                      => "rh",
-                  removegroup                     => "rg",
-                  removeconfiguration             => "rc",
-                  removedistributiontoken         => "adt",
-                  removeconfigurationtoken        => "rct",
-                  removehosttoken                 => "rht",
-                  removegrouptoken                => "rgt",
-                  removehostgroup                 => "rhg",
-                  adddistributiongroup            => "adg",
-                  removedistributiongroup         => "rdg",
-                  addgroupgroup                   => "agg",
-                  removegroupgroup                => "rgg",
-                  getgroupconfigurations          => "ggc",
-                  gethostconfigurations           => "ghc",
-                  getdistributionconfigurations   => "gdc",
-                  addhostconfiguration            => "ahc",
-                  adddistributionconfiguration    => "adc",
-                  addgroupconfiguration           => "agc",
-                  removehostconfiguration         => "rhc",
-                  removedistributionconfiguration => "rdc",
-                  removegroupconfiguration        => "rgc",
-                  getmounts                       => "gm",
-                  addmount                        => "am",
-                  removeMount                     => "rm",
-                  gettemplates                    => "gtm",
-                  gettemplatesource               => "gts",
-                  addtemplate                     => "at",
-                  removetemplate                  => "rt",
-                  updatetemplate                  => "ut",
-                  getscripts                      => "gs",
-                  getscriptsource                 => "gss",
-                  addscript                       => "as",
-                  removescript                    => "rs",
-                  updatescript                    => "us",
-                  getautos                        => "ga",
-                  getautosource                   => "gas",
-                  addauto                         => "aa",
-                  removeauto                      => "ra",
-                  updateauto                      => "ua",
-                  gethostinfo                     => "ghi",
-                  getgroupinfo                    => "ggi",
-                  getconfigurationinfo            => "gci",
-                  getdistributioninfo             => "gdi",
-                  copyconfiguration               => "cc",
-                  hangman                         => "hangman",
-                  debug                           => "debug",
-                  undebug                         => "undebug",
-                  whohasgroup                     => "whg",
-                  whohasconfiguration             => "whc",
-                  whohastoken                     => "wht",
-                  getdistributionversion          => "gdv",
-                  setdistributionversion          => "sdv",
-                  
-                  badcommandorfilename            => "bad",
-                  " "                             => " ",
+                  quit                             => "quit",
+                  help                             => "help",
+                  exit                             => "quit",
+                  setdb                            => "setdb",
+                  getdb                            => "getdb",
+                  setdistribution                  => "sd",
+                  getallhosts                      => "gah",
+                  getallgroups                     => "gag",
+                  getalldistributions              => "gad",
+                  getallconfigurations             => "gac",
+                  getconfigurationtokens           => "gct",
+                  getgrouptokens                   => "ggt",
+                  getdistributiontokens            => "gdt",
+                  gethosttokens                    => "ght",
+                  gethostgroups                    => "ghg",
+                  getdistributiongroups            => "gdg",
+                  getgroupgroups                   => "ggg",
+                  addhost                          => "ah",
+                  addgroup                         => "ag",
+                  adddistribution                  => "ad",
+                  addconfiguration                 => "ac",
+                  adddistributiontoken             => "adt",
+                  addhosttoken                     => "aht",
+                  addhostgroup                     => "ahg",
+                  addgrouptoken                    => "agt",
+                  addconfigurationtoken            => "act",
+                  removedistribution               => "rd",
+                  removehost                       => "rh",
+                  removegroup                      => "rg",
+                  removeconfiguration              => "rc",
+                  removedistributiontoken          => "adt",
+                  removeconfigurationtoken         => "rct",
+                  removehosttoken                  => "rht",
+                  removegrouptoken                 => "rgt",
+                  removehostgroup                  => "rhg",
+                  adddistributiongroup             => "adg",
+                  removedistributiongroup          => "rdg",
+                  addgroupgroup                    => "agg",
+                  removegroupgroup                 => "rgg",
+                  getgroupconfigurations           => "ggc",
+                  gethostconfigurations            => "ghc",
+                  getdistributionconfigurations    => "gdc",
+                  addhostconfiguration             => "ahc",
+                  adddistributionconfiguration     => "adc",
+                  addgroupconfiguration            => "agc",
+                  removehostconfiguration          => "rhc",
+                  removedistributionconfiguration  => "rdc",
+                  removegroupconfiguration         => "rgc",
+                  getmounts                        => "gm",
+                  addmount                         => "am",
+                  removeMount                      => "rm",
+                  gettemplates                     => "gtm",
+                  gettemplatesource                => "gts",
+                  addtemplate                      => "at",
+                  removetemplate                   => "rt",
+                  updatetemplate                   => "ut",
+                  getscripts                       => "gs",
+                  getscriptsource                  => "gss",
+                  addscript                        => "as",
+                  removescript                     => "rs",
+                  updatescript                     => "us",
+                  getautos                         => "ga",
+                  getautosource                    => "gas",
+                  addauto                          => "aa",
+                  removeauto                       => "ra",
+                  updateauto                       => "ua",
+                  gethostinfo                      => "ghi",
+                  getgroupinfo                     => "ggi",
+                  getconfigurationinfo             => "gci",
+                  getdistributioninfo              => "gdi",
+                  copyconfiguration                => "cc",
+                  hangman                          => "hangman",
+                  debug                            => "debug",
+                  undebug                          => "undebug",
+                  whohasgroup                      => "whg",
+                  whohasconfiguration              => "whc",
+                  whohastoken                      => "wht",
+                  getdistributionversion           => "gdv",
+                  setdistributionversion           => "sdv",
+                  addconfigurationconfiguration    => "acc",
+                  getconfigurationconfigurations   => "gcc",
+                  removeconfigurationconfiguration => "rcc",
+
+                  badcommandorfilename             => "bad",
+                  " "                              => " ",
                  );
 
 my %commandCompletionMap =
@@ -385,7 +394,10 @@ my %commandCompletionMap =
    whc       => [\&configuration_completion],
    wht       => [],
    gdv       => [\&distribution_completion],
-   sdv       => [undef, \&distribution_completion],
+   sdv       => [\&version_completion, \&distribution_completion],
+   acc       => [\&configuration_completion, \&sign_configuration_completion],
+   gcc       => [\&configuration_completion],
+   rcc       => [\&configuration_completion, \&configuration_configurations_completion], 
   );
 
 my %commandsHelp = (
@@ -1032,7 +1044,10 @@ Configuration commands:
    ra  | remove auto <conf> <auto> 
    ua  | update auto <conf> <auto> 
    cc  | copy configuration <conf> <from> <to> 
-   whc | who has configuration <conf> 
+   whc | who has configuration <conf>
+   acc | add configuration configuration <conf> {+|-}<conf> [<location>]
+   gcc | get configuration configurations <conf>
+   rcc | remove configuration configuration <conf1> {+|-}<conf2>
 ",
                     helpothers         => "
 Other commands:
@@ -1056,7 +1071,28 @@ parameters: <version> [<distribution>]
 
 Sets <distribution>'s version to <version>.
 ",
-                   );
+                    acc => "
+name: acc | add configuration configuration
+parameters: <configuration1> {+|-}<configuration2> [<location>]
+
+Adds <configuration2> (either active or inactive) to <configuration1>'s list of
+configurations at <location>. If <location> is omitted, add to the end of the
+list.
+",
+                    gcc => "
+name: gcc | get configuration configurations
+parameters: <configuration>
+
+Prints the list of configurations (active and inactive) for the given
+<configuration>. Also prints the configurations for the <configuration>'s parents
+",
+                    rcc => "
+name: rcc | remove configuration configuration
+parameters: <configuration1> {+|-}<configuration2>
+
+Removes {+|-}<configuration2> from <configuration1>'s list of configurations.
+",
+);
 
 my @singleCommandCommands = ("ahc", "rhc", "gag", "ghc", "wht", "whc", "whg", "ghi", "ggi", "gci", "bad", "badcommandorfilename", "gt", "gdt", "gct", "gah", "gac", "gas", "gss", "gts", "gm", "ah", "gad");
 
@@ -1499,7 +1535,19 @@ sub gci {
     foreach my $configuration_name (@configurations_names) {
         print "$configuration_name\n";
         print "-" x length($configuration_name);
-        print "\n";
+        print "\nConfigurations:\n";
+        (my $aconf) = $db->getFullConfigurations([$configuration_name], $distribution);
+        my @configurations = $db->getConfigurationConfigurations($aconf);
+        if (@configurations and not defined $configurations[0]) {
+            print $db->{error}."\n";
+        } else {
+            if (@configurations) {
+                print "  ";
+                print join "\n  ", map {($_->{active} ?  "+" : "-").$_->{name}} @configurations;
+                print "\n";
+            }
+            print "\n";
+        }
         print "Tokens:\n";
         gct($configuration_name);
         print "Mounts:\n";
@@ -2452,6 +2500,120 @@ sub agc {
     }
 }
 
+sub rcc {
+    my $conf_name = shift;
+    my $configuration = shift;
+    unless ($conf_name) {
+        print "Missing configuration to remove from\n";
+        return;
+    }
+    unless ($configuration) {
+        print "Missing configuration to remove\n";
+        return;
+    }
+    if ($configuration !~ m,^([+-])(.*)$,) {
+        print "The configuration should be preceded with + or -\n";
+        return;
+    }
+    (my $conf) = $db->getFullConfigurations([$conf_name], $distribution);
+    unless ($conf) {
+        print "Unknown configuration \"$conf_name\"\n";
+        return;
+    }
+    my $active = $1 eq '+' ? 1 : 0;
+    $configuration = $2;
+    unless ($configuration) {
+        print "Missing configuration to remove\n";
+        return;
+    }
+    (my $conf2rm) = $db->getConfigurationsByName($configuration);
+    if ($conf2rm) {
+        $conf2rm->{active} = $active;
+        unless ($db->removeConfigurationConfigurations($conf, $conf2rm)) {
+            print $db->{error}."\n";
+            return;
+        }
+    } else {
+        print "No such configuration \"$configuration\"\n";
+        return;
+    }
+}
+
+sub gcc {
+    my $configuration_name = shift;
+    unless ($configuration_name) {
+        print "Missing configuration\n";
+        return;
+    }
+    my @configurations_names = splitData($configuration_name);
+    (my $conf) = $db->getConfigurationsByName($configuration_name);
+    unless ($conf) {
+        print "No such configuration \"$configuration_name\"\n";
+        return;
+    }
+    my @confs = $db->getFullConfigurations([$db->getConfigurationsByName(@configurations_names)], $distribution);
+    foreach my $conf (@confs) {
+        print "$conf->{name}:\n";
+        my @configurations = $db->getConfigurationConfigurations($conf);
+        if (@configurations and not defined $configurations[0]) {
+            print $db->{error}."\n";
+            return;
+        } else {
+            if (@configurations) {
+                print "  ";
+                print join "\n  ", map {($_->{active} ?  "+" : "-").$_->{name}} @configurations;
+                print "\n";
+            }
+            print "\n";
+        }
+    }
+}
+
+sub acc {
+    my $configuration_name = shift;
+    my $configuration = shift;
+    my $location = shift;
+    unless ($configuration_name) {
+        print "Missing configuration to add to\n";
+        return;
+    }
+    unless ($configuration) {
+        print "Missing configuration to add\n";
+        return;
+    }
+    if ($configuration !~ m,^([+-])(.*)$,) {
+        print "The configurations to add should be preceded with + or -\n";
+        return;
+    }
+    my $active = $1 eq '+' ? 1 : 0;
+    $configuration = $2;
+    unless ($configuration) {
+        print "Missing configuration to add\n";
+        return;
+    }
+    (my $conf) = $db->getConfigurationsByName($configuration_name);
+    unless ($conf) {
+        print "unknown configuration \"$configuration_name\"\n";
+        return;
+    }
+    ($conf) = $db->getFullConfigurations([$conf], $distribution);
+    unless ($conf) {
+        print "No such configuration \"$configuration_name\" under the \"$distribution\" distribution\n";
+        return;
+    }
+    (my $conf2) = $db->getConfigurationsByName($configuration);
+    if ($conf2) {
+        $conf2->{active} = $active;
+        unless ($db->addConfigurationConfiguration($conf, $conf2, $location)) {
+            print $db->{error}."\n";
+            return;
+        }
+    } else {
+        print "No such configuration \"$configuration\"\n";
+        return;
+    }
+}
+
 sub adc {
     my $configuration = shift;
     my $location = shift;
@@ -3225,7 +3387,11 @@ sub gad {
 }
 
 sub ad {
-    print $db->{error}."\n" unless $db->addDistribution($_[0]);
+    unless ($db->addDistribution($_[0])) {
+        print $db->{error}."\n"
+    } else {
+        print $db->{error}."\n" unless $db->setDistributionVersion($_[0], $Staple::VERSION);
+    }
 }
 
 sub rd {
@@ -3335,7 +3501,23 @@ sub host_configurations_completion {
         @currentCompletionList = grep {index($_, $text) == 0} map {($_->{active} ?  "+" : "-").$_->{name}} @confs;
     }
     return $currentCompletionList[$count];
+}
 
+# completes last group configurations, assumes last word was a configuration
+sub configuration_configurations_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = " ";
+        @currentCompletionList = ();
+        my $conf_name = (split(/\s+/, $currentCommand))[-1];
+        return () unless $conf_name;
+        (my $conf) = $db->getFullConfigurations([$conf_name], $distribution);
+        return () unless $conf;
+        my @confs = $db->getConfigurationConfigurations($conf);
+        return () if (@confs and not defined $confs[0]);
+        @currentCompletionList = grep {index($_, $text) == 0} map {($_->{active} ?  "+" : "-").$_->{name}} @confs;
+    }
+    return $currentCompletionList[$count];
 }
 
 # completes singed configuration
@@ -3771,8 +3953,16 @@ sub distribution_completion {
         }
         @currentCompletionList = grep {index($_, $text) == 0} @distributions;
     }
-
     return $currentCompletionList[$count];
+}
+
+# complete version
+sub version_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        return $Staple::VERSION if index($Staple::VERSION, $text) == 0;
+    }
+    return ();
 }
 
 sub attempted_completion {

@@ -589,11 +589,53 @@ sub getConfigurationsByName {
     my $self = shift;
     my @configurations = ();
     while (my $configuration = shift) {
+        next if invalidConfiguration($configuration);
         push @configurations, {name => $configuration, path => undef, dist => undef, active => 1, group => undef, type => "configuration"};
     }
     return @configurations;
 }
 
+=item B<addConfigurationConfiguration(I<configuration1, configuration2, [location]>)>
+
+Adds I<configuration2> (name, and active should be set) to I<configuration1>'s
+configuration list at I<location> (or at the end if omitted). Returns 1 or
+undef.
+
+=cut
+
+sub addConfigurationConfiguration {
+    my $self = shift;
+    $self->{error} = "addConfigurationConfiguration not implemented in this database yet";
+    return undef;
+}
+
+=item B<getConfigurationConfigurations(I<configuration>)>
+
+Gets a full configuration hash (with dist), Returns an ordered configuration
+list associated with the given configuration. The returned list is of raw
+configurations (i.e. no path, no distribution, and includes inactive
+configurations). On failure returns undef (and sets the error).
+
+=cut
+
+sub getConfigurationConfigurations {
+    my $self = shift;
+    $self->{error} = "getConfigurationConfigurations not implemented in this database yet";
+    return undef;
+}
+
+=item B<removeConfigurationConfigurations(I<conf1, configuration, [configuration [...]]>)>
+
+Removes the configuration list (configuration hashes) from the list of
+configurations of I<conf1>. Returns 1 or undef.
+
+=cut
+
+sub removeConfigurationConfigurations {
+    my $self = shift;
+    $self->{error} = "removeConfigurationConfigurations not implemented in this database yet";
+    return undef;
+}
 
 =item B<addGroupConfiguration(I<group, configuration, location>)>
 

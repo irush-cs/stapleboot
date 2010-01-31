@@ -791,6 +791,100 @@ sub removeMounts {
     return 1;
 }
 
+sub removeConfigurationConfigurations {
+    my $self = shift;
+    my $conf = shift;
+    my @configurations = @_;
+    my $version = $self->getDistributionVersion($conf->{dist});
+    if (versionCompare($version, "004") < 0) {
+        $self->{error} = "distribution \"$conf->{dist}\" is version $version (needs at least 004)";
+        return undef;
+    }
+    my $col;
+    my @errors = ();
+    return undef unless $col = $self->getGroupColumn($conf); # conf_id
+    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}$conf->{type}_configurations WHERE configuration = ? AND active = ? AND $col = ? AND distribution = ?");
+    foreach my $torm (@configurations) {
+        my $location = $self->count("SELECT ordering FROM $self->{schema}$conf->{type}_configurations WHERE configuration = ? AND active = ? AND $col = ? AND distribution = ?", $torm->{name}, $torm->{active}, $conf->{name}, $conf->{dist});
+        unless ($location) {
+            push @errors, "\"".($torm->{active} ? "+" : "-")."$torm->{name}\" is not in \"$conf->{name}\"";
+            next;
+        }
+        my $rv = $sth->execute($torm->{name}, $torm->{active}, $conf->{name}, $conf->{dist});
+        if ($sth->errstr) {
+            push @errors, $sth->errstr;
+            next;
+        } 
+        push @errors, $self->{error} unless ($self->closeOrdering($location, "$self->{schema}$conf->{type}_configurations", "$col = ? AND distribution = ?", $conf->{name}, $conf->{dist}));
+    }
+    if (@errors) {
+        $self->{error} = join "\n", @errors;
+        return undef;
+    }
+    return 1;
+#}   
+}
+
+sub getConfigurationConfigurations {
+    my $self = shift;
+    my $conf = shift;
+    my $version = $self->getDistributionVersion($conf->{dist});
+    if (versionCompare($version, "004") < 0) {
+        $self->{error} = "distribution \"$conf->{dist}\" is version $version (needs at least 004)";
+        return undef;
+    }
+    my $col = $self->getGroupColumn($conf); # conf_id
+    return undef unless $col;
+
+    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $stmt = "SELECT configuration, active FROM $self->{schema}$conf->{type}_configurations WHERE $col = ? AND distribution = ? ORDER BY ordering";
+    my $sth = $dbh->prepare_cached($stmt);
+    unless ($sth->execute($conf->{name}, $conf->{dist})) {
+        $self->{error} = $sth->errstr;
+        chomp ($self->{error});
+        return undef;
+    }
+    my $resultArray = $sth->fetchall_arrayref();
+    if ($sth->err) {
+        $self->{error} = $sth->errstr;
+        chomp ($self->{error});
+        return undef;
+    }
+    return map { +{name => $_->[0], active => $_->[1], path => undef, dist => undef, group => $conf}} @$resultArray;
+}
+
+
+sub addConfigurationConfiguration {
+    my $self = shift;
+    my $conf = shift;
+    my $configuration = shift;
+    my $location = shift;
+    $location = int $location if $location;
+    my $version = $self->getDistributionVersion($conf->{dist});
+    if (versionCompare($version, "004") < 0) {
+        $self->{error} = "distribution \"$conf->{dist}\" is version $version (needs at least 004)";
+        return undef;
+    }
+    my $col;
+    return undef unless $col = $self->getGroupColumn($conf); # conf_id
+    my $stmt = "SELECT COUNT(configuration) FROM $self->{schema}$conf->{type}_configurations WHERE configuration = ? AND active = ? AND $col = ? AND distribution = ?";
+    if ($self->count($stmt, $configuration->{name}, $configuration->{active}, $conf->{name}, $conf->{dist})) {
+        # first remove if already there
+        return undef unless $self->removeConfigurationConfigurations($conf, $configuration);
+    }
+    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $max = $self->count("SELECT MAX(ordering) FROM $self->{schema}$conf->{type}_configurations WHERE $col = ? AND distribution = ?", $conf->{name}, $conf->{dist});
+    $max = 0 unless $max;
+    if ($location and $max and $location <= $max) { 
+        return undef unless ($self->openOrdering($location, "$self->{schema}$conf->{type}_configurations", "$col = ? AND distribution = ?", $conf->{name}, $conf->{dist}));
+    } else {
+        $location = $max + 1;
+    }
+    return undef unless ($self->insert("$self->{schema}$conf->{type}_configurations", $conf->{name}, $configuration->{name}, $location, $configuration->{active}, $conf->{dist}));
+    return 1;
+}
+
 sub getGroupConfigurations {
     my $self = shift;
     my $group = shift;
@@ -1210,10 +1304,8 @@ sub closeOrdering {
     return 1;
 }
 
-
-
 # input: qualified group
-# output: host, distribution or groupid, depending on the group type
+# output: host, distribution, groupid or conf_id, depending on the group type
 sub getGroupColumn {
     my $self = shift;
     my $group = shift;
@@ -1223,11 +1315,13 @@ sub getGroupColumn {
         return "groupid";
     } elsif ($group->{type} eq "distribution") {
         return "distribution";
+    } elsif ($group->{type} eq "configuration") {
+        return "conf_id";
     }
     $self->{error} = "Bad group";
     return undef;
 }
- 
+
 # input: SELECT statement with single row/column, [values]
 # output: first value
 sub count {

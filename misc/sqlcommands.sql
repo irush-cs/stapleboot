@@ -226,6 +226,16 @@ CREATE TABLE group_configurations (
        FOREIGN KEY (configuration, distribution) REFERENCES configurations(name, distribution) ON DELETE CASCADE
 );
 
+CREATE TABLE configuration_configurations (
+       conf_id       TEXT,
+       configuration TEXT,
+       ordering      INT,
+       active        BOOLEAN,
+       distribution  TEXT NOT NULL,
+       PRIMARY KEY (conf_id, distribution, ordering),
+       FOREIGN KEY (conf_id, distribution) REFERENCES configurations(name, distribution) ON DELETE CASCADE,
+       FOREIGN KEY (configuration, distribution) REFERENCES configurations(name, distribution) ON DELETE CASCADE
+);
 
 GRANT SELECT ON hosts                        TO staple_user;
 GRANT SELECT ON distributions                TO staple_user;
@@ -248,12 +258,14 @@ GRANT SELECT ON host_configurations          TO staple_user;
 GRANT SELECT ON group_tokens                 TO staple_user;
 GRANT SELECT ON group_groups                 TO staple_user;
 GRANT SELECT ON group_configurations         TO staple_user;
+GRANT SELECT ON configuration_configurations TO staple_user;
 
 COMMIT;
 
 /*
 
 BEGIN;
+DROP TABLE configuration_configurations;
 DROP TABLE group_configurations;
 DROP TABLE group_groups;
 DROP TABLE group_tokens;

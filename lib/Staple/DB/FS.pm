@@ -792,6 +792,42 @@ sub removeMounts {
     return 1;
 }
 
+sub removeConfigurationConfigurations {
+    my $self = shift;
+    my $conf = shift;
+    my @confs = @_;
+    my $version = $self->getDistributionVersion($conf->{dist});
+    if (versionCompare($version, "004") < 0) {
+        $self->{error} = "distribution \"$conf->{dist}\" is version $version (needs at least 004)";
+        return undef;
+    }
+    $self->removeGroupConfigurations($conf, @confs);
+}
+
+sub addConfigurationConfiguration {
+    my $self = shift;
+    my $conf1 = shift;
+    my $conf2 = shift;
+    my $location = shift;
+    my $version = $self->getDistributionVersion($conf1->{dist});
+    if (versionCompare($version, "004") < 0) {
+        $self->{error} = "distribution \"$conf1->{dist}\" is version $version (needs at least 004)";
+        return undef;
+    }
+    $self->addGroupConfiguration($conf1, $conf2, $location);
+}
+
+sub getConfigurationConfigurations {
+    my $self = shift;
+    my $conf = shift;
+    my $version = $self->getDistributionVersion($conf->{dist});
+    if (versionCompare($version, "004") < 0) {
+        $self->{error} = "distribution \"$conf->{dist}\" is version $version (needs at least 004)";
+        return undef;
+    }
+    $self->getGroupConfigurations($conf);
+}
+
 sub getGroupConfigurations {
     my $self = shift;
     my $group = shift;
@@ -1031,11 +1067,17 @@ sub getAllConfigurations {
     my $distribution = shift;
     my $path = $self->getConfigurationPath("/", $distribution);
     return () unless $path;
+    my $version = $self->getDistributionVersion($distribution);
     my @configurations = getDirectoryList($path);
     @configurations = grep {-d $_ } @configurations;
     @configurations = grep { s/^$path//; $_} @configurations;
-    @configurations = grep { m!^/[^/]+$! or m!configurations/[^/]+$! } @configurations;
-    @configurations = map { s!/configurations/!/!g; $_ } @configurations;
+    if (versionCompare($version, "004") < 0) {
+        @configurations = grep { m!^/[^/]+$! or m!configurations/[^/]+$! } @configurations;
+        @configurations = map { s!/configurations/!/!g; $_ } @configurations;        
+    } else {
+        @configurations = grep { m!^/[^/]+$! or m!subconfs/[^/]+$! } @configurations;
+        @configurations = map { s!/subconfs/!/!g; $_ } @configurations;
+    }
     return sort {$a cmp $b} @configurations;
 }
 
@@ -1088,15 +1130,22 @@ sub setDistributionVersion {
             $self->{error} = "Can't change to older configuration ($ver from $old)";
             return undef;
         }
+        my @configurations = $self->getFullConfigurations([$self->getAllConfigurations($dist)], $dist);
         if (open(VER, ">$path/version")) {
             print VER "$ver\n";
             close(VER);
-            # fix tokens
+            # 004: remove old tokens, rename configuration trees
             if (versionCompare($ver, "004") >= 0 and
                 versionCompare($old, "004") < 0) {
                 # let's hope there's no configuration named tokens...
                 `find \`find $path -name tokens -type d\` -maxdepth 1 \\( -name static -o -name dynamic -o -name regexp \\) -delete`;
-                `find $path -name tokens -type d -delete`
+                `find $path -name tokens -type d -delete`;
+                foreach my $conf (sort {length($b) <=> length($a)} map {$_->{path}} @configurations) {
+                    if (-d "$conf/configurations") {
+                        rename "$conf/configurations", "$conf/subconfs";
+                    }
+                }
+                rename "$path/confs", "$path/subconfs";
             }
             return $old;
         }
@@ -1114,9 +1163,17 @@ sub getConfigurationPath {
     my $force = shift;
     my $path = $self->getDistributionPath($distribution,$force);
     return undef unless $path;
-    $configuration =~ s!^/!!;
-    $configuration =~ s!/!/configurations/!g;
-    $configuration = fixPath("$path/confs/${configuration}");
+    my $version = $self->getDistributionVersion($distribution);
+    return undef unless $version;
+    if (versionCompare($version, "004") < 0) {
+        $configuration =~ s!^/!!;
+        $configuration =~ s!/!/configurations/!g;
+        $configuration = fixPath("$path/confs/${configuration}");
+    } else {
+        $configuration =~ s!^/!!;
+        $configuration =~ s!/!/subconfs/!g;
+        $configuration = fixPath("$path/subconfs/${configuration}");
+    }
     return $configuration if -d $configuration or $force;
     return undef;
 }
@@ -1288,7 +1345,7 @@ sub setGroupGroups {
     return 1;
 }
 
-# input: group hash, list of configuration hashes (name + active)
+# input: group hash (may be a configuration), list of configuration hashes (name + active)
 # output: 1 or undef
 # writes the groups file
 sub setGroupConfigurations {
