@@ -250,6 +250,16 @@ sub copyConfiguration {
         $self->{error} = "Distribution \"$to\" doesn't exist";
         return undef;        
     }
+    my $fromVersion = $self->getDistributionVersion($from);
+    my $toVersion = $self->getDistributionVersion($to);
+    my $fromvcmp = versionCompare($fromVersion, "004");
+    my $tovcmp = versionCompare($toVersion, "004");
+    if (($fromvcmp >= 0 and $tovcmp < 0) or
+        ($fromvcmp < 0 and $tovcmp >= 0)) {
+        $self->{error} = "Can't copy configurations (yet) from different distribution versions ($fromVersion to $toVersion)";
+        return undef;
+    }
+
     if ($self->getConfigurationPath($conf, $to) and not $self->removeConfiguration($to, $conf)) {
         return undef;
     }

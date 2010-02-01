@@ -211,8 +211,6 @@ sub copyConfiguration {
     my $from = shift;
     my $to = shift;
     my @errors = ();
-    my $fromPath = $self->getConfigurationPath($conf, $from);
-    my $toPath = $self->getConfigurationPath($conf, $to, 1);
 
     unless ($self->count("SELECT COUNT(name) FROM $self->{schema}configurations WHERE name = ? AND distribution = ?", $conf, $from)) {
         $self->{error} = "Configuration \"$conf\" doesn't exist";
@@ -230,6 +228,9 @@ sub copyConfiguration {
         return undef;
     }
 
+    my $fromVersion = $self->getDistributionVersion($from);
+    my $toVersion = $self->getDistributionVersion($to);
+    
     # configurations
     my $sqlstring = "INSERT INTO $self->{schema}configurations SELECT name, '$to' AS distribution, comment FROM $self->{schema}configurations WHERE distribution = ? AND ( name LIKE ? OR name = ?)";
     my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
@@ -281,6 +282,24 @@ sub copyConfiguration {
             push @errors, $sqlstring."\n".$sth->errstr;
         } else {
             push @errors, $sqlstring."\n".$dbh->errstr;
+        }
+    }
+
+    # recursive configurations
+    if (versionCompare($fromVersion, "004") >= 0) {
+        if (versionCompare($toVersion, "004") < 0) {
+            push @errors, "Warning: ignoring recursive configuration (not supported in $to - version $toVersion)\n";
+        } else {
+            $sqlstring = "INSERT INTO $self->{schema}configuration_configurations (conf_id, configuration, ordering, active, distribution) SELECT conf_id, configuration, ordering, active, '$to' AS distribution FROM $self->{schema}configuration_configurations WHERE distribution = ? AND (conf_id LIKE ? OR conf_id = ?)";
+            $sth = $dbh->prepare_cached($sqlstring);
+            $sth->execute("$from", "$conf/%", "$conf");
+            if ($dbh->errstr or $sth->errstr) {
+                if ($sth->errstr) {
+                    push @errors, $sqlstring."\n".$sth->errstr;
+                } else {
+                    push @errors, $sqlstring."\n".$dbh->errstr;
+                }
+            }
         }
     }
     
