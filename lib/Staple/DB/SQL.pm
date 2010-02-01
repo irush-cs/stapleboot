@@ -122,8 +122,10 @@ sub addConfiguration {
 sub addDistribution {
     my $self = shift;
     my $distribution = shift;
+    my $version = shift;
+    $version = $Staple::VERSION unless defined $version;
     return 0 if ($self->{error} = invalidDistribution($distribution));
-    return $self->insert("$self->{schema}distributions(name)", "$distribution");
+    return $self->insert("$self->{schema}distributions(name, version)", "$distribution", "$version");
 }
 
 sub removeHost {

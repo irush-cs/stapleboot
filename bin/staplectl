@@ -3387,11 +3387,11 @@ sub gad {
 }
 
 sub ad {
-    unless ($db->addDistribution($_[0])) {
+    my $dist = shift;
+    my $version = shift;
+    unless ($db->addDistribution($dist, $version)) {
         print $db->{error}."\n"
-    } else {
-        print $db->{error}."\n" unless $db->setDistributionVersion($_[0], $Staple::VERSION);
-    }
+    } 
 }
 
 sub rd {

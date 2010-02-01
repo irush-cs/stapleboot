@@ -101,10 +101,13 @@ sub removeGroup {
     die "removeGroup not implemented in this database yet";
 }
 
-=item B<addDistribution(I<distribution>)>
+=item B<addDistribution(I<distribution>, [version])>
 
 Add distribution to the database, returns 1 on success, or undef on failure. $error is set
 to the error.
+
+If version is provided, sets as the initial version. Otherwise, uses the
+current version $Staple::VERSION.
 
 =cut
 

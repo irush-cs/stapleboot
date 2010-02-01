@@ -146,10 +146,23 @@ sub removeGroup {
 sub addDistribution {
     my $self = shift;
     my $distribution = shift;
+    my $version = shift;
+    $version = $Staple::VERSION unless defined $version;
     return 0 if ($self->{error} = invalidDistribution($distribution));
     my $distributionPath = $self->getDistributionPath($distribution, 1);
     if (not -d "$distributionPath") {
-        return $self->mkdirs($distributionPath);
+        if ($self->mkdirs($distributionPath)) {
+            if (open(VER, ">$distributionPath/version")) {
+                print VER "$version\n";
+                close(VER);
+                return 1;
+            } else {
+                $self->{error} = "Can't set distribution version: $!\n";
+                return undef;
+            }
+        } else {
+            return undef;
+        }
     }
     $self->{error} = "Distribution already exists";
     return 0;
