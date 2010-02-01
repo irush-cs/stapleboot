@@ -1063,11 +1063,14 @@ sub whoHasGroup {
 sub whoHasConfiguration {
     my $self = shift;
     my $configuration = shift;
+    my $distribution = shift;
     my $exact = 0;
     if ($configuration =~ m/\$$/) {
         $configuration =~ s/\$$//;
         $exact = 1;
     }
+
+    $distribution = undef if defined $distribution and not $self->getDistributionGroup($distribution);
     
     # hosts
     my @hosts;
@@ -1099,7 +1102,15 @@ sub whoHasConfiguration {
     @groups = $self->getGroupsByName(@groups);
     return undef if (grep {not defined $_} @groups);
 
-    return @hosts, @distributions, @groups;
+    # configurations
+    my @configurations;
+    if ($exact) {
+        @configurations = $self->getList("SELECT conf_id FROM $self->{schema}configuration_configurations WHERE configuration = ? AND distribution = ?", $configuration, $distribution);
+    } else {
+        @configurations = $self->getList("SELECT conf_id FROM $self->{schema}configuration_configurations WHERE (configuration = ? OR configuration LIKE ?) AND distribution = ?", $configuration, "$configuration/%", $distribution);
+    }
+    @configurations = $self->getConfigurationsByName(@configurations);
+    return @hosts, @distributions, @groups, @configurations;
 }
 
 sub whoHasToken {

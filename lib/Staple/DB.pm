@@ -872,12 +872,15 @@ sub whoHasToken {
     return ([@groups], [@configurations])
 }
 
-=item B<whoHasConfiguration(I<configuration name>)>
+=item B<whoHasConfiguration(I<configuration name, [distribution]>)>
 
 Receives a single configuration name (string), and returns a group (hash) list,
 of the groups that are attached to the given configuration. The output can be a
-group, host, or distribution groups. The output also includes group which
-contains a removed configurations.
+group, host, distribution groups or configurations. The output also includes
+group which contains a removed configurations.
+
+If the second argument is a valide distribution name, then configurations for
+that distribution are also checked.
 
 On error undef is returned, and the error is set.
 
@@ -885,8 +888,26 @@ On error undef is returned, and the error is set.
 
 sub whoHasConfiguration {
     my $self = shift;
-    $self->{error} = "whoHasConfiguration not implemented in this database yet";
-    return undef;
+    my $configuration = shift;
+    my $distribution = shift;
+    $distribution = undef if defined $distribution and not $self->getDistributionGroup($distribution);
+
+    my @groups;
+    foreach my $group ((map {$self->getHostGroup($_)} $self->getAllHosts()),
+                       (map {$self->getDistributionGroup($_)} $self->getAllDistributions()),
+                       $self->getGroupsByName($self->getAllGroups())) {
+        my @configurations = $self->getGroupConfigurations($group);
+        push @groups, $group if grep {$_->{name} =~ /^${configuration}/} @configurations;
+    }
+
+    if ($distribution and versionCompare($self->getDistributionVersion($distribution), "004") >= 0) {
+        foreach my $conf ($self->getFullConfigurations([$self->getAllConfigurations($distribution)], $distribution)) {
+            my @configurations = $self->getConfigurationConfigurations($conf);
+            push @groups, $conf if grep {$_->{name} =~ /^${configuration}/} @configurations;
+        }
+    }
+
+    return @groups;
 }
 
 #=item B<getConfigurationPath(I<conf string, distribution>)

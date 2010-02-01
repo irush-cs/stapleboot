@@ -1329,7 +1329,7 @@ sub whc {
     my @groups;
     eval {
         local $SIG{INT} = sub {die "SIGINT"};
-        @groups = $db->whoHasConfiguration($configuration);
+        @groups = $db->whoHasConfiguration($configuration, $distribution);
     };
     if ($@) {
         print "\n";
@@ -1340,7 +1340,7 @@ sub whc {
         print $db->{error}."\n";
         return;
     }
-    foreach my $type ("host", "distribution", "group") {
+    foreach my $type ("host", "distribution", "group", "configuration") {
         my @subset = grep {$_->{type} eq $type} @groups;
         if (@subset) {
             print "${type}s:\n";

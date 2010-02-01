@@ -828,6 +828,7 @@ sub getConfigurationConfigurations {
     $self->getGroupConfigurations($conf);
 }
 
+# applies also to getConfigurationConfigurations
 sub getGroupConfigurations {
     my $self = shift;
     my $group = shift;
@@ -848,6 +849,7 @@ sub getGroupConfigurations {
     return @configurations;
 }
 
+# applies also to addConfigurationConfiguration
 sub addGroupConfiguration {
     my $self = shift;
     my $group = shift;
@@ -871,6 +873,7 @@ sub addGroupConfiguration {
     return $self->setGroupConfigurations($group, @results);
 }
 
+# applies also to removeConfigurationConfigurations
 sub removeGroupConfigurations {
     my $self = shift;
     my $group = shift;
@@ -1016,46 +1019,6 @@ sub whoHasGroup {
     #}
 
     @groups = map {$a = $_; $a =~ s,^$self->{stapleDir}/groups(/.+)/groups$,$1,; $a =~ s,/subgroups/,/,g; $a} @groups;
-    @groups = $self->getGroupsByName(@groups);
-    return undef if (grep {not defined $_} @groups);
-
-    return @hosts, @distributions, @groups;
-}
-
-sub whoHasConfiguration {
-    my $self = shift;
-    my $configuration = shift;
-    my $suffix = "(\$|/)";
-    if ($configuration =~ m/\$$/) {
-        $configuration =~ s/\$$//;
-        $suffix = "\$";
-    }
-    
-    # can't check if configuration exists, on which distribution to check?
-    
-    # hosts
-    my $cmd = "find ".$self->{stapleDir}."/hosts -type f -name configurations -print0 | xargs -0 egrep -l '^[+-]".$configuration.$suffix."'";
-    my @hosts = `$cmd`;
-    chomp @hosts;
-    @hosts = map {$a = $_; $a =~ s,^.*/([^/]+)/configurations$,$1,;$a} @hosts;
-    @hosts = map {$self->getHostGroup($_)} @hosts;
-    return undef if (grep {not defined $_} @hosts);
-
-    # distributions
-    $cmd = "find ".$self->{stapleDir}."/distributions -type f -name configurations -print0 | xargs -0 egrep -l '^[+-]".$configuration.$suffix."'";
-    my @distributions = `$cmd`;
-    chomp @distributions;
-
-    @distributions = map {$a = $_; $a =~ s,^.*/([^/]+)/configurations$,$1,;$a} @distributions;
-    @distributions = map {$self->getDistributionGroup($_)} @distributions;
-    return undef if (grep {not defined $_} @distributions);
-     
-    # groups
-    $cmd = "find ".$self->{stapleDir}."/groups -type f -name configurations -print0 | xargs -0 egrep -l '^[+-]".$configuration.$suffix."'";
-    my @groups = `$cmd`;
-    chomp @groups;
-
-    @groups = map {$a = $_; $a =~ s,^$self->{stapleDir}/groups(/.+)/configurations$,$1,; $a =~ s,/subgroups/,/,g; $a} @groups;
     @groups = $self->getGroupsByName(@groups);
     return undef if (grep {not defined $_} @groups);
 
