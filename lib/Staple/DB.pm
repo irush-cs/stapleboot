@@ -550,6 +550,7 @@ sub getCompleteConfigurations {
     my @remaining = @{$_[0]};
     my $distribution = $_[1];
     my $badConfigurations = $_[2];
+    my $version = $self->getDistributionVersion($distribution);
 
     my @final = ();
     my %final = ();
@@ -563,7 +564,6 @@ sub getCompleteConfigurations {
         if (not $conf->{active}) {
             my @toremove = $conf->{name};
             while (@toremove) {
-                my @newfinals = ();
                 my $c = shift @toremove;
                 next unless $final{$c};
                 @final = grep {$_->{name} ne $c} @final;
@@ -603,11 +603,16 @@ sub getCompleteConfigurations {
             }
             $aconf->{_source} = $conf->{_source};
             $conf = $aconf;
-            my @confs = $self->getConfigurationConfigurations($conf);
-            map {$_->{_source} = [$conf->{name}, @{$conf->{_source}}]} @confs;
             $conf->{_done} = "recursive";
             unshift @remaining, $conf;
-            unshift @remaining, @confs;
+            if (versionCompare($version, "004") >= 0) {
+                my @confs = $self->getConfigurationConfigurations($conf);
+                # what to do if fails, but version > 004?
+                if (defined $confs[0]) {
+                    map {$_->{_source} = [@{$conf->{_source}}]} @confs;
+                    unshift @remaining, @confs;
+                }
+            }
         }
         # add the damn conf already
         elsif ($conf->{_done} eq "recursive") {
