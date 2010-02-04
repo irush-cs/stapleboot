@@ -3287,7 +3287,7 @@ sub sd {
     } else {
         print "Missing distribution\n";
     }
-    print "Current distribution: $distribution\n";
+    print "Current distribution: $distribution (".$db->getDistributionVersion($distribution).")\n";
 }
 
 sub setdb {

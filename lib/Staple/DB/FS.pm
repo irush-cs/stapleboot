@@ -837,6 +837,10 @@ sub addConfigurationConfiguration {
         $self->{error} = "distribution \"$conf1->{dist}\" is version $version (needs at least 004)";
         return undef;
     }
+    unless ($self->getFullConfigurations([$conf2], $conf1->{dist})) {
+        $self->{error} = "distribution $conf1->{dist} doesn't have $conf2->{name}";
+        return undef;
+    }
     $self->addGroupConfiguration($conf1, $conf2, $location);
 }
 

@@ -535,48 +535,90 @@ sub getGroupsConfigurations {
 Receives an ordered list reference of configurations (hashes) and a
 distribution name (string), and returns a complete ordered list of
 configuration (hashes). The configurations are full (i.e. includes I<path> and
-I<dist>). The list includes:
+I<dist>), and include all intermediate configurations and recursive
+configurations; inactive configurations are removed.
 
-=over
+If the (empty) hash ref of bad list is also supplied, it will be filled with
+configurations that doesn't exist under the given distribution. 
 
-=item -
-
-Only active configuraitons.
-
-=item -
-
-Intermediate configurations in the path (i.e. for /a/b/c, the list will have /a, /a/b, /a/b/c). Without any duplicates.
-
-=for comment
-=item -
-Distribution variants of the same configuration.
-
-=back
-
-These filters are applied in that order. If the (empty) hash ref of bad list is
-also supplied, it will be filled with configurations that doesn't exist under
-the given distribution.
+WARNING: This method doesn't check for loops in recursive configurations!
 
 =cut
 
 sub getCompleteConfigurations {
     my $self = shift;
-    my @configurations = @{$_[0]};
+    my @remaining = @{$_[0]};
     my $distribution = $_[1];
     my $badConfigurations = $_[2];
 
-    @configurations = cleanInactive(@configurations);
-    @configurations = fillIntermediate(@configurations);
-    my @finalConfigurations = $self->getFullConfigurations(\@configurations, $distribution);
+    my @final = ();
+    my %final = ();
+    # _source, the originating confs (list ref)
+    # _done, the stage undef, super, recursive
+    map {$_->{_source} = [$_->{name}]} @remaining;
+    while (@remaining) {
+        my $conf = shift @remaining;
 
-    if ($badConfigurations) {
-        my @goodConfigurations = map {$_->{name}} @finalConfigurations;
-        foreach my $conf (map {$_->{name}} @configurations) {
-            push @$badConfigurations, $conf unless grep {$_ eq $conf} @goodConfigurations;
+        # remove a configuration
+        if (not $conf->{active}) {
+            my @toremove = $conf->{name};
+            while (@toremove) {
+                my @newfinals = ();
+                my $c = shift @toremove;
+                next unless $final{$c};
+                @final = grep {$_->{name} ne $c} @final;
+                delete $final{$c};
+                push @toremove, grep m!^$c/!, map {$_->{name}} @final;
+
+                # for now, check sources only for super configurations (instead of recursive as well)
+                foreach my $super (splitData($c)) {
+                    next unless $final{$super};
+                    my @sources = grep {$_ ne $c} @{$final{$super}->{_source}};
+                    if (@sources) {
+                        $final{$super}->{_source} = [@sources];
+                    } else {
+                        push @toremove, $super;
+                    }
+                }
+            }
+        }
+        # next if already done, just add source 
+        elsif ($final{$conf->{name}}) {
+            push @{$final{$conf->{name}}->{_source}}, @{$conf->{_source}};
+        }
+        # add superconfs
+        elsif (not exists $conf->{_done}) {
+            $conf->{_done} = "super";
+            # fillIntermediate copies also _source and _done
+            my @confs = fillIntermediate($conf);
+            map {push @{$_->{_source}}, $conf->{name}} @confs;
+            unshift @remaining, @confs;
+        }
+        # add recursive confs
+        elsif ($conf->{_done} eq "super") {
+            (my $aconf) = $self->getFullConfigurations([$conf], $distribution);
+            unless ($aconf) {
+                push @$badConfigurations, $conf->{name} if ($badConfigurations);
+                next;
+            }
+            $aconf->{_source} = $conf->{_source};
+            $conf = $aconf;
+            my @confs = $self->getConfigurationConfigurations($conf);
+            map {$_->{_source} = [$conf->{name}, @{$conf->{_source}}]} @confs;
+            $conf->{_done} = "recursive";
+            unshift @remaining, $conf;
+            unshift @remaining, @confs;
+        }
+        # add the damn conf already
+        elsif ($conf->{_done} eq "recursive") {
+            push @final, $conf;
+            $final{$conf->{name}} = $conf;
+        } else {
+            die "something really bad happened, probably a bug\n";
         }
     }
-    
-    return @finalConfigurations;
+    map {delete $_->{_done}; delete $_->{_source}} @final;
+    return @final;
 }
 
 
