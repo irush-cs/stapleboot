@@ -344,7 +344,7 @@ sub initStage {
     $boot->setDefaultGroups();
     $boot->update();
     
-    $boot->output("distribution: $boot->{distribution}", 2);
+    $boot->output("distribution: $boot->{distribution} ".$boot->{db}->getDistributionVersion($boot->{distribution}), 2);
 
     #printTokens($boot);
     #printGroups($boot);
@@ -510,7 +510,7 @@ sub finalStage {
                 print LOG "host name: $boot->{host}\n";
                 print LOG "staple version: $Staple::VERSION\n";
                 print LOG "staple database: $db\n";
-                print LOG "distribution: $boot->{distribution}\n";
+                print LOG "distribution: $boot->{distribution} (".$boot->{db}->getDistributionVersion($boot->{distribution}).")\n";
                 print LOG "kernel: ".`uname -smr`;
                 print LOG "\ngroups:\n";
                 print LOG join "", map {"  $_->{name}\n"} @{$boot->{groups}};

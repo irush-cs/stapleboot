@@ -209,7 +209,7 @@ unless ($stapler->{distribution}) {
     $stapler->error("Can't recognize distribution");
     $stapler->doCriticalAction();
 }
-$stapler->output("distribution: $distribution");
+$stapler->output("distribution: $distribution (".$stapler->{db}->getDistributionVersion($distribution).")");
 
 my @distributions = $stapler->{db}->getAllDistributions();
 unless (grep {$_ eq $stapler->{distribution}} @distributions) {
