@@ -1536,29 +1536,40 @@ sub gci {
         next if $configuration_name eq "common";
         print "$configuration_name\n";
         print "-" x length($configuration_name);
-        print "\nConfigurations:\n";
         (my $aconf) = $db->getFullConfigurations([$configuration_name], $distribution);
         my @configurations = $db->getConfigurationConfigurations($aconf);
         if (@configurations and not defined $configurations[0]) {
             print $db->{error}."\n";
         } else {
             if (@configurations) {
+                print "\nConfigurations:\n";
                 print "  ";
                 print join "\n  ", map {($_->{active} ?  "+" : "-").$_->{name}} @configurations;
                 print "\n";
             }
             print "\n";
         }
-        print "Tokens:\n";
-        gct($configuration_name);
-        print "Mounts:\n";
-        gm($configuration_name);
-        print "\nTemplates:\n";
-        gtm($configuration_name);
-        print "\nScripts:\n";
-        gs($configuration_name);
-        print "\nAutos:\n";
-        ga($configuration_name);
+
+        if (keys %{$db->getTokens($aconf)}) {
+            print "Tokens:\n";
+            gct($configuration_name);
+        }
+        if ($db->getMounts($aconf)) {
+            print "Mounts:\n";
+            gm($configuration_name);
+        }
+        if ($db->getTemplates($aconf)) {
+            print "\nTemplates:\n";
+            gtm($configuration_name);
+        }
+        if ($db->getScripts($aconf)) {
+            print "\nScripts:\n";
+            gs($configuration_name);
+        }
+        # why need to encapsulate with reference?!?!?, hint: it doesn't work otherwise...
+        if (@{[$db->getAutos($aconf)]}) {
+            ga($configuration_name);
+        }
         print "\n";
     }
 }
