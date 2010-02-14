@@ -322,7 +322,7 @@ sub applyScripts {
         $self->output("$script->{name} error:\n$scriptError") if $scriptError and $self->{verbose} == 1;
         if ($scriptExit) {
             $self->error("$script->{configuration}->{name}/$script->{name} failed ($scriptExit)");
-            my $body = "$script->{configuration}->{name}/$script->{name} failed with exit code: $scriptExit\n\n";
+            my $body = "$script->{configuration}->{name}/$script->{stage}/$script->{name} failed with exit code: $scriptExit\n\n";
             $body .= "output:\n-------\n$scriptOutput\n\n" if $scriptOutput;
             $body .= "error:\n------\n$scriptError\n\n" if $scriptError;
             if ($script->{critical}) {

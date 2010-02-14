@@ -103,6 +103,7 @@ sub addConfiguration {
     my $configuration = shift;
     return undef if ($self->{error} = invalidDistribution($distribution));
     return undef if ($self->{error} = invalidConfiguration($configuration));
+    $distribution = $self->getCommonPath() if index($configuration, "common/") == 0;
     $configuration = fixPath($configuration);
     $configuration =~ s/\/$//;
     if ($self->count("SELECT COUNT(name) FROM $self->{schema}configurations WHERE name = ? AND distribution = ?", $configuration, $distribution)) {
@@ -183,6 +184,7 @@ sub removeConfiguration {
     my $configuration = shift;
     return undef if ($self->{error} = invalidDistribution($distribution));
     return undef if ($self->{error} = invalidConfiguration($configuration));
+    $distribution = $self->getCommonPath() if index($configuration, "common/") == 0;
     $configuration = fixPath($configuration);
     $configuration =~ s/\/$//;
     unless ($self->count("SELECT COUNT(name) FROM $self->{schema}configurations WHERE name = ? AND distribution = ?", $configuration, $distribution)) {
@@ -1081,58 +1083,59 @@ sub whoHasGroup {
     return @hosts, @distributions, @groups;
 }
 
-sub whoHasConfiguration {
-    my $self = shift;
-    my $configuration = shift;
-    my $distribution = shift;
-    my $exact = 0;
-    if ($configuration =~ m/\$$/) {
-        $configuration =~ s/\$$//;
-        $exact = 1;
-    }
-
-    $distribution = undef if defined $distribution and not $self->getDistributionGroup($distribution);
-    
-    # hosts
-    my @hosts;
-    if ($exact) {
-        @hosts = $self->getList("SELECT host FROM $self->{schema}host_configurations WHERE configuration = ?", $configuration);
-    } else {
-        @hosts = $self->getList("SELECT host FROM $self->{schema}host_configurations WHERE configuration = ? OR configuration LIKE ?", $configuration, "$configuration/%");
-    }
-    @hosts = map {$self->getHostGroup($_)} @hosts;
-    return undef if (grep {not defined $_} @hosts);
-
-    # distributions
-    my @distributions;
-    if ($exact) {
-        @distributions = $self->getList("SELECT distribution FROM $self->{schema}distribution_configurations WHERE configuration = ?", $configuration);
-    } else {
-        @distributions = $self->getList("SELECT distribution FROM $self->{schema}distribution_configurations WHERE configuration = ? OR configuration LIKE ?", $configuration, "$configuration/%");
-    }
-    @distributions = map {$self->getDistributionGroup($_)} @distributions;
-    return undef if (grep {not defined $_} @distributions);
-     
-    # groups
-    my @groups;
-    if ($exact) {
-        @groups = $self->getList("SELECT groupid FROM $self->{schema}group_configurations WHERE configuration = ?", $configuration);
-    } else {
-        @groups = $self->getList("SELECT groupid FROM $self->{schema}group_configurations WHERE configuration = ? OR configuration LIKE ?", $configuration, "$configuration/%");
-    }
-    @groups = $self->getGroupsByName(@groups);
-    return undef if (grep {not defined $_} @groups);
-
-    # configurations
-    my @configurations;
-    if ($exact) {
-        @configurations = $self->getList("SELECT conf_id FROM $self->{schema}configuration_configurations WHERE configuration = ? AND distribution = ?", $configuration, $distribution);
-    } else {
-        @configurations = $self->getList("SELECT conf_id FROM $self->{schema}configuration_configurations WHERE (configuration = ? OR configuration LIKE ?) AND distribution = ?", $configuration, "$configuration/%", $distribution);
-    }
-    @configurations = $self->getConfigurationsByName(@configurations);
-    return @hosts, @distributions, @groups, @configurations;
-}
+# re-activate after checking for common configurations
+##sub whoHasConfiguration {
+##    my $self = shift;
+##    my $configuration = shift;
+##    my $distribution = shift;
+##    my $exact = 0;
+##    if ($configuration =~ m/\$$/) {
+##        $configuration =~ s/\$$//;
+##        $exact = 1;
+##    }
+##
+##    $distribution = undef if defined $distribution and not $self->getDistributionGroup($distribution);
+##    
+##    # hosts
+##    my @hosts;
+##    if ($exact) {
+##        @hosts = $self->getList("SELECT host FROM $self->{schema}host_configurations WHERE configuration = ?", $configuration);
+##    } else {
+##        @hosts = $self->getList("SELECT host FROM $self->{schema}host_configurations WHERE configuration = ? OR configuration LIKE ?", $configuration, "$configuration/%");
+##    }
+##    @hosts = map {$self->getHostGroup($_)} @hosts;
+##    return undef if (grep {not defined $_} @hosts);
+##
+##    # distributions
+##    my @distributions;
+##    if ($exact) {
+##        @distributions = $self->getList("SELECT distribution FROM $self->{schema}distribution_configurations WHERE configuration = ?", $configuration);
+##    } else {
+##        @distributions = $self->getList("SELECT distribution FROM $self->{schema}distribution_configurations WHERE configuration = ? OR configuration LIKE ?", $configuration, "$configuration/%");
+##    }
+##    @distributions = map {$self->getDistributionGroup($_)} @distributions;
+##    return undef if (grep {not defined $_} @distributions);
+##     
+##    # groups
+##    my @groups;
+##    if ($exact) {
+##        @groups = $self->getList("SELECT groupid FROM $self->{schema}group_configurations WHERE configuration = ?", $configuration);
+##    } else {
+##        @groups = $self->getList("SELECT groupid FROM $self->{schema}group_configurations WHERE configuration = ? OR configuration LIKE ?", $configuration, "$configuration/%");
+##    }
+##    @groups = $self->getGroupsByName(@groups);
+##    return undef if (grep {not defined $_} @groups);
+##
+##    # configurations
+##    my @configurations;
+##    if ($exact) {
+##        @configurations = $self->getList("SELECT conf_id FROM $self->{schema}configuration_configurations WHERE configuration = ? AND distribution = ?", $configuration, $distribution);
+##    } else {
+##        @configurations = $self->getList("SELECT conf_id FROM $self->{schema}configuration_configurations WHERE (configuration = ? OR configuration LIKE ?) AND distribution = ?", $configuration, "$configuration/%", $distribution);
+##    }
+##    @configurations = $self->getConfigurationsByName(@configurations);
+##    return @hosts, @distributions, @groups, @configurations;
+##}
 
 sub whoHasToken {
     my $self = shift;
@@ -1182,17 +1185,32 @@ sub getAllGroups {
 sub getAllConfigurations {
     my $self = shift;
     my $distribution = shift;
-    return sort {$a cmp $b} $self->getList("SELECT name FROM $self->{schema}configurations WHERE distribution = ?", $distribution);
+    return sort {$a cmp $b} $self->getList("SELECT name FROM $self->{schema}configurations WHERE distribution = ? OR distribution = '".$self->getCommonPath()."'", $distribution);
+}
+
+sub getFullConfigurations {
+    my $self = shift;
+    my $confs = shift;
+    my $distribution = shift;
+    my @confs = $self->SUPER::getFullConfigurations($confs, $distribution);
+    my $common =$self->getCommonPath();
+    map {$_->{dist} = $common if index($_->{name}, "common/") == 0} @confs;
+    return @confs;
 }
 
 sub getAllDistributions {
     my $self = shift;
-    return sort {$a cmp $b} $self->getList("SELECT name FROM $self->{schema}distributions");
+    return sort {$a cmp $b} $self->getList("SELECT name FROM $self->{schema}distributions WHERE name <> '".$self->getCommonPath()."'");
 }
 
 sub getDistributionVersion {
     my $self = shift;
     my $dist = shift;
+    if ($dist eq $self->getCommonPath()) {
+        my $version = $self->getMinimumDistributionVersion();
+        $version = "004" if (versionCompare($version, "004") < 0);
+        return $version;
+    }
     my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
     my $schema = $self->{schema};
     $schema =~ s/\.$//;
@@ -1231,11 +1249,17 @@ sub getConfigurationPath {
     my $self = shift;
     my $configuration = shift;
     my $distribution = shift;
+    $distribution = $self->getCommonPath() if index($configuration, "common/") == 0;
     if ($self->count("SELECT COUNT(name) FROM $self->{schema}configurations WHERE name = ? AND distribution = ?", $configuration, $distribution)) {
         # not really used, lets keep this unique
         return "$configuration:$distribution";
     }
     return undef;
+}
+
+sub getCommonPath {
+    my $self = shift;
+    return "/common/";
 }
 
 sub getGroupPath {

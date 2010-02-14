@@ -1533,6 +1533,7 @@ sub gci {
     }
     my @configurations_names = splitData($configuration_name);
     foreach my $configuration_name (@configurations_names) {
+        next if $configuration_name eq "common";
         print "$configuration_name\n";
         print "-" x length($configuration_name);
         print "\nConfigurations:\n";
@@ -3525,11 +3526,11 @@ sub sign_configuration_completion {
     my ($text, $count) = @_;
     if ($count == 0) {
         @currentCompletionList = ();
-        if (length($text) < 2) {
+        if (length($text) < 1) {
             $attribs->{completion_append_character} = "";
-            @currentCompletionList = grep {index($_, $text) == 0} qw(+/ -/);
+            @currentCompletionList = grep {index($_, $text) == 0} qw(+ -);
         } else {
-            return () unless $text =~ m,^([+-])(/.*),;
+            return () unless $text =~ m,^([+-])(.*),;
             my $sign = $1;
             my $conf = $2;
             configuration_completion($conf, 0);
@@ -3811,8 +3812,17 @@ sub mount_completion {
 sub dir_completion_helper {
     my $text = shift;
     my @list = @_;
-    $text = "/" unless $text;
-    (my $basedir, my $filename) = $text =~ m,^(.*?/)([^/]+)?$,;
+    unless ($text) {
+        # hack for configurations, might start with common/
+        if (grep !/^\//, @list) {
+            return ("/", "common/");
+        } else {
+            $text = "/";
+        };
+    }
+    # hack for configurations, might start with c/
+    $text = "common/" if (index("common", $text) == 0) and grep m/^common\//, @list;
+    (my $basedir, my $filename) = $text =~ m,^(.*?)([^/]+)?$,;
     return () unless $basedir;
     unless ($filename) {
         return grep {$_ =~ m,^${basedir}[^/]*$,} @list;

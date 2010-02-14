@@ -950,6 +950,7 @@ sub whoHasConfiguration {
         push @groups, $group if grep {$_->{name} =~ /^${configuration}/} @configurations;
     }
 
+    # recursive configurations and common configuration only from 004
     if ($distribution and versionCompare($self->getDistributionVersion($distribution), "004") >= 0) {
         foreach my $conf ($self->getFullConfigurations([$self->getAllConfigurations($distribution)], $distribution)) {
             my @configurations = $self->getConfigurationConfigurations($conf);
@@ -974,6 +975,12 @@ sub whoHasConfiguration {
 sub getConfigurationPath {
     my $self = shift;
     $self->{error} = "getConfigurationPath not implemented in this database yet";
+    return undef;
+}
+
+sub getCommonPath {
+    my $self = shift;
+    $self->{error} = "getCommonPath not implemented in this database yet";
     return undef;
 }
 

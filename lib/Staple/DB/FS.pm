@@ -1056,15 +1056,22 @@ sub getAllConfigurations {
     my $self = shift;
     my $distribution = shift;
     my $path = $self->getConfigurationPath("/", $distribution);
-    return () unless $path;
+    #return () unless $path;
     my $version = $self->getDistributionVersion($distribution);
     my @configurations = getDirectoryList($path);
     @configurations = grep {-d $_ } @configurations;
     @configurations = grep { s/^$path//; $_} @configurations;
     if (versionCompare($version, "004") < 0) {
         @configurations = grep { m!^/[^/]+$! or m!configurations/[^/]+$! } @configurations;
-        @configurations = map { s!/configurations/!/!g; $_ } @configurations;        
+        @configurations = map { s!/configurations/!/!g; $_ } @configurations;
     } else {
+        # get common configurations
+        if ($path = $self->getConfigurationPath("common/", $distribution)) {
+            my @cconfigurations = getDirectoryList($path);
+            @cconfigurations = grep {-d $_ } @cconfigurations;
+            @cconfigurations = grep { s/^$path/common\/subconfs/; $_} @cconfigurations;
+            push @configurations, @cconfigurations;
+        }
         @configurations = grep { m!^/[^/]+$! or m!subconfs/[^/]+$! } @configurations;
         @configurations = map { s!/subconfs/!/!g; $_ } @configurations;
     }
@@ -1151,15 +1158,23 @@ sub getConfigurationPath {
     my $configuration = shift;
     my $distribution = shift;
     my $force = shift;
+    my $common = index($configuration, "common") == 0;
     my $path = $self->getDistributionPath($distribution,$force);
+    $path = $self->getCommonPath() if $common;
     return undef unless $path;
     my $version = $self->getDistributionVersion($distribution);
+    if ($common) {
+        $version = $self->getMinimumDistributionVersion();
+        # common configurations only from 004
+        $version = "004" if (versionCompare($version, "004") < 0);
+    }
     return undef unless $version;
     if (versionCompare($version, "004") < 0) {
         $configuration =~ s!^/!!;
         $configuration =~ s!/!/configurations/!g;
         $configuration = fixPath("$path/confs/${configuration}");
     } else {
+        $configuration =~ s/^common\/?// if $common;
         $configuration =~ s!^/!!;
         $configuration =~ s!/!/subconfs/!g;
         $configuration = fixPath("$path/subconfs/${configuration}");
@@ -1186,6 +1201,11 @@ sub getDistributionPath {
     my $path = fixPath("$self->{stapleDir}/distributions/$distribution");
     return $path if -d $path or $force;
     return undef;
+}
+
+sub getCommonPath {
+    my $self = shift;
+    return fixPath("$self->{stapleDir}/common");
 }
 
 sub getHostPath {

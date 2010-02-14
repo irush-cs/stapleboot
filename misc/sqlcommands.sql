@@ -21,6 +21,8 @@ CREATE TABLE distributions (
        version       TEXT
 );
 
+INSERT INTO distributions(name) VALUES ('/common/');
+
 CREATE TABLE group_types (
        type          TEXT UNIQUE
 );

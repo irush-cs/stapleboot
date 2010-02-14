@@ -541,7 +541,7 @@ if the configuration is legal, otherwise returns an error mesage.
 sub invalidConfiguration {
     my $configuration = shift;
     return "Missing configuration name" if not defined $configuration or length($configuration) == 0;
-    return "Configuration must start with '/'" if (index($configuration, "/") != 0);
+    return "Configuration must start with '/' or 'common/'" if (index($configuration, "/") != 0 and index($configuration, "common/") != 0);
     return "Configuration can't end with '/'" if (rindex($configuration, "/") == length($configuration) - 1);
     return "Configuration can't contain '..'" if $configuration =~ m,/\.\./|/\.\.$,;
     return "Configuration can't contain '.'" if $configuration =~ m,/\./|/\.$,;
