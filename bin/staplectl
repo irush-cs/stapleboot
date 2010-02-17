@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 #
-# Copyright (C) 2007-2009 Hebrew University Of Jerusalem, Israel
+# Copyright (C) 2007-2010 Hebrew University Of Jerusalem, Israel
 # See the LICENSE file.
 #
 # Author: Yair Yarom <irush@cs.huji.ac.il>
@@ -44,6 +44,7 @@ my $echooff = 0;
 my $singleCommand = "";
 my @dnsHostList = (); # for ah completion and warning
 my $db;
+my $lastCommand = "";
 
 my %commands = (
                 ac => \&ac,
@@ -1568,6 +1569,7 @@ sub gci {
         }
         # why need to encapsulate with reference?!?!?, hint: it doesn't work otherwise...
         if (@{[$db->getAutos($aconf)]}) {
+            print "\nAutos:\n";
             ga($configuration_name);
         }
         print "\n";
@@ -3446,7 +3448,16 @@ sub parseline {
             $command = "badcommandorfilename";
         }
     }
-    return $command, @params
+    my @fixedParams;
+    foreach my $param (@params) {
+        if ($param eq '!$') {
+            my $temp = (split / /, $lastCommand)[-1];
+            $param = $temp if $temp;
+        }
+        push @fixedParams, $param;
+    }
+    $lastCommand = join " ", ($command, @fixedParams) if $command ne "badcommandorfilename";
+    return $command, @fixedParams;
 }
 
 ###

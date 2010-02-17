@@ -1,7 +1,7 @@
 package Staple::DB::FS;
 
 #
-# Copyright (C) 2007-2009 Hebrew University Of Jerusalem, Israel
+# Copyright (C) 2007-2010 Hebrew University Of Jerusalem, Israel
 # See the LICENSE file.
 #
 # Author: Yair Yarom <irush@cs.huji.ac.il>
@@ -1407,7 +1407,7 @@ Yair Yarom, E<lt>irush@cs.huji.ac.ilE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2007-2009 Hebrew University Of Jerusalem, Israel
+Copyright (C) 2007-2010 Hebrew University Of Jerusalem, Israel
 See the LICENSE file.
 
 =cut
