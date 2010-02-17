@@ -15,7 +15,7 @@ require Exporter;
 use Staple::Application;
 use Term::ANSIColor qw(:constants color);
 our @ISA = ("Staple::Application");
-our $VERSION = '004';
+our $VERSION = '005';
 
 
 
