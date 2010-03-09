@@ -1459,20 +1459,27 @@ sub gdi {
 
 sub ghi {
     my $host = shift;
+    my $hostg;
     unless ($host) {
         print "Missing host\n";
         return;
     }
-    unless ($db->getHostGroup($host)) {
+    unless ($hostg = $db->getHostGroup($host)) {
         print "No such host \"$host\"\n";
         return;
     }
-    print "Tokens:\n";
-    ght($host);
-    print "\nGroups:\n";
-    ghg($host);
-    print "\nConfigurations:\n";
-    ghc($host);
+    if (keys %{$db->getTokens($hostg)}) {
+        print "Tokens:\n";
+        ght($host);
+    }
+    if ($db->getGroupGroups($hostg)) {
+        print "\nGroups:\n";
+        ghg($host);
+    }
+    if ($db->getGroupConfigurations($hostg)) {
+        print "\nConfigurations:\n";
+        ghc($host);
+    }
 }
 
 sub ggi {
@@ -1493,29 +1500,32 @@ sub ggi {
         print "-" x length($group->{name});
         print "\n";
         #print "Path: $group->{path}\n";
-        print "Tokens:\n";
-        printgctokens($group);
-        print "Groups:\n";
+        if (keys %{$db->getTokens($group)}) {
+            print "Tokens:\n";
+            printgctokens($group);
+        }
         my @groupsref = $db->getGroupGroups($group);
         if (@groupsref and not defined $groupsref[0]) {
             print $db->{error}."\n";
             return;
         } else {
-            print join "\n", map {"$_->{name}"} @groupsref;
-            print "\n";
+            if (@groupsref) {
+                print "Groups:\n";
+                print join "\n", map {"$_->{name}"} @groupsref;
+                print "\n\n";
+            }
         }
-        print "Configurations:\n";
         my @configurations = $db->getGroupsConfigurations($group);
         if (@configurations and not defined $configurations[0]) {
             print $db->{error}."\n";
             return;
         } else {
             if (@configurations) {
+                print "Configurations:\n";
                 print "  ";
                 print join "\n  ", map {($_->{active} ?  "+" : "-").$_->{name}} @configurations;
                 print "\n";
             }
-            print "\n";
         }
         print "\n";
     }
