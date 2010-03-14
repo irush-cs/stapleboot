@@ -631,7 +631,8 @@ sub getCompleteConfigurations {
 
 Receives a list of configurations names (strings), and returns a list an
 incomplete (missing path, distribution, and group), active configuration hash
-refs (order preserved).
+refs (order preserved). The configurations can be prefixed with +/- sign
+indicating active/inactive configurations
 
 =cut
 
@@ -639,8 +640,13 @@ sub getConfigurationsByName {
     my $self = shift;
     my @configurations = ();
     while (my $configuration = shift) {
+        my $active = 1;
+        if ($configuration =~ m/^([+-])(.*)$/) {
+            $active = $1 eq '+';
+            $configuration = $2;
+        }
         next if invalidConfiguration($configuration);
-        push @configurations, {name => $configuration, path => undef, dist => undef, active => 1, group => undef, type => "configuration"};
+        push @configurations, {name => $configuration, path => undef, dist => undef, active => $active, group => undef, type => "configuration"};
     }
     return @configurations;
 }
