@@ -874,6 +874,22 @@ sub getMinimumDistributionVersion {
     return $min;
 }
 
+=item B<getVersionOf(I<group|configuration|distribution|host hash>)
+
+For distribution returns its version. For configuration returns it's
+distribution version. For the rest (group, host) returns the minimum
+distribution version.
+
+=cut
+
+sub getVersionOf {
+    my $self = shift;
+    my $group = shift;
+    return $self->getDistributionVersion($group->{name}) if $group->{type} eq "distribution";
+    return $self->getDistributionVersion($group->{dist}) if $group->{type} eq "configuration";
+    return $self->getMinimumDistributionVersion();
+}
+
 =item B<whoHasGroup(I<group name>)>
 
 Receives a single group name (string), and returns a group (hash) list, of the

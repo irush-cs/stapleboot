@@ -311,9 +311,7 @@ sub addTokens {
     }
 
     # old tokens style, only before 004
-    if (($group->{type} eq "configuration" and versionCompare($self->getDistributionVersion($group->{dist}), "004") < 0) or
-        ($group->{type} eq "distribution" and versionCompare($self->getDistributionVersion($group->{name}), "004") < 0) or
-        ($group->{type} ne "configuration" and $group->{type} ne "distribution" and versionCompare($self->getMinimumDistributionVersion(), "004") < 0)) {
+    if (versionCompare($self->getVersionOf($group), "004") < 0) {
         return undef unless ($self->mkdirs("$group->{path}/tokens"));
         foreach my $type ("static", "dynamic", "regexp") {
             my @tokens = map {$_->{key}} grep {$_->{type} eq $type} values %$tokens;
@@ -358,9 +356,7 @@ sub removeTokens {
     }
 
     # old tokens style, only before 004
-    if (($group->{type} eq "configuration" and versionCompare($self->getDistributionVersion($group->{dist}), "004") < 0) or
-        ($group->{type} eq "distribution" and versionCompare($self->getDistributionVersion($group->{name}), "004") < 0) or
-        ($group->{type} ne "configuration" and $group->{type} ne "distribution" and versionCompare($self->getMinimumDistributionVersion(), "004") < 0)) {
+    if (versionCompare($self->getVersionOf($group), "004") < 0) {
         foreach my $type ("static", "dynamic", "regexp") {
             my $file = "$group->{path}/tokens/$type";
             my %oldTokens = readTokensFile($file);

@@ -33,7 +33,7 @@ use Staple::DB::Sync;
 use Staple::DB::Factory;
 use Staple::Hangman;
 use Term::ReadLine;
-use Term::ANSIColor;
+use Term::ANSIColor qw(:constants);
 use Net::DNS;
 
 my $historyFile = "$ENV{HOME}/.staplectl_history";
@@ -1254,6 +1254,19 @@ sub bad {
 sub empty {
 }
 
+sub perror {
+    my $err = shift;
+    unless ($ENV{ANSI_COLORS_DISABLED}) {
+        my $suffix = "";
+        if ($err =~ m/\n$/) {
+            $suffix = "\n";
+            chop($err);
+        }
+        $err = RED.$err.RESET.$suffix;
+    } 
+    print $err;
+}
+
 sub gdv {
     my $dist = shift;
     $dist = $distribution unless $dist;
@@ -1964,7 +1977,9 @@ sub as {
     eval {
         local $SIG{INT} = sub {die "SIGINT"};
         my %script;
-        $script{name} = prompt "name";
+        do {
+            $script{name} = prompt "name";
+        } until ($script{name});
         $script{source} = $tmpFile;
         $script{configuration} = $conf;
         do {
@@ -2130,7 +2145,9 @@ sub at {
         do {
             $template{stage} = prompt "stage (mount, sysinit, final)";
         } until ($template{stage} =~ m/^(?:mount|sysinit|final)$/);
-        $template{destination} = prompt "destination";
+        do {
+            $template{destination} = prompt "destination";
+        } until ($template{destination});
         $template{configuration} = $conf;
         print $db->{error}."\n" unless ($db->addTemplates(\%template));
     };
@@ -3311,17 +3328,25 @@ sub sd {
     } else {
         print "Missing distribution\n";
     }
-    print "Current distribution: $distribution (".$db->getDistributionVersion($distribution).")\n";
+    print "Current distribution: ".($distribution ? "$distribution (".$db->getDistributionVersion($distribution).")" : "UNKNOWN")."\n";
 }
 
+# for search: sub sdb {
 sub setdb {
     my $newDB = createDB(@_);
     unless (ref $newDB) {
-        print "$newDB\n";
+        perror "$newDB\n";
     } elsif ($newDB->{error}) {
-        print "$newDB->{error}\n";
+        perror "$newDB->{error}\n";
     } else {
         $db = $newDB;
+        if ($db) {
+            my @distributions = $db->getAllDistributions();
+            unless (grep {$_ eq $distribution} @distributions) {
+                print "$distribution doesn't exist in this database\n" if $distribution;
+                $distribution = undef;
+            }
+        }
     }
     print "Current database: ".$db->info()."\n";
 }
@@ -3527,9 +3552,18 @@ sub host_configurations_completion {
         @currentCompletionList = ();
         my $host = (split(/\s+/, $currentCommand))[-1];
         return () unless $host;
-        my $group = $db->getHostGroup($host);
-        return () unless $group;        
-        my @confs = $db->getGroupsConfigurations($group);
+        my @groups;
+        if (isRange($host)) {
+            foreach my $h (parseRange($host)) {
+                $h = $db->getHostGroup($h);
+                push @groups, $h if $h
+            }
+        } else {
+            my $h = $db->getHostGroup($host);
+            @groups = $h if $h;
+        }
+        return () unless @groups;
+        my @confs = $db->getGroupsConfigurations(@groups);
         return () if (@confs and not defined $confs[0]);
         @currentCompletionList = grep {index($_, $text) == 0} map {($_->{active} ?  "+" : "-").$_->{name}} @confs;
     }
@@ -3579,10 +3613,19 @@ sub host_groups_completion {
         $attribs->{completion_append_character} = " ";
         @currentCompletionList = ();
         my $host = (split(/\s+/, $currentCommand))[-1];
-        return () unless $host;        
-        my $group = $db->getHostGroup($host);
-        return () unless $group;
-        my @groups = $db->getGroupGroups($group);
+        return () unless $host;
+        my @gs;
+        if (isRange($host)) {
+            foreach my $h (parseRange($host)) {
+                $h = $db->getHostGroup($h);
+                push @gs, $h if $h
+            }
+        } else {
+            my $h = $db->getHostGroup($host);
+            @gs = $h if $h;
+        }
+        return () unless @gs;
+        my @groups = $db->getGroupGroups(@gs);
         return () if (@groups and not defined $groups[0]);
         @currentCompletionList = grep {index($_, $text) == 0} map {$_->{name}} @groups;
     }
@@ -3597,9 +3640,18 @@ sub host_tokens_completion {
         @currentCompletionList = ();
         my $host = (split(/\s+/, $currentCommand))[-1];
         return () unless $host;
-        my $group = $db->getHostGroup($host);
-        return () unless $group;
-        my $tokens = $db->getTokens($group);
+        my @groups;
+        if (isRange($host)) {
+            foreach my $h (parseRange($host)) {
+                $h = $db->getHostGroup($h);
+                push @groups, $h if $h
+            }
+        } else {
+            my $h = $db->getHostGroup($host);
+            @groups = $h if $h;
+        }
+        return () unless @groups;
+        my $tokens = $db->getTokens(@groups);
         my @tokens = keys %$tokens;
         @currentCompletionList = grep {index($_, $text) == 0} @tokens;
     }
@@ -4068,8 +4120,17 @@ $singleCommand = join (" ", @ARGV) if $singleCommand;
 $distribution = getDistribution() unless ($distribution);
 $db = createDB($db ? split /\s+/, $db : undef);
 unless (ref $db) {
-    print "$db\n";
+    perror "$db\n";
+    exit 1;
     $db = undef;
+    $distribution = undef;
+}
+if ($db) {
+    my @distributions = $db->getAllDistributions();
+    unless (grep {$_ eq $distribution} @distributions) {
+        perror "$distribution doesn't exist in the current db\n" if $distribution;
+        $distribution = undef;
+    }
 }
 
 if ($singleCommand) {
