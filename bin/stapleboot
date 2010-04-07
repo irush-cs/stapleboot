@@ -522,6 +522,17 @@ sub finalStage {
                 print LOG "\nscripts:\n  ";
                 print LOG join "\n  ", @{$boot->{applied}->{scripts}};
                 print LOG "\n";
+                my $badMounts = $boot->getBadMounts();
+                if (@$badMounts) {
+                    print LOG "\nbad mounts:\n";
+                    foreach my $mount (@$badMounts) {
+                        print LOG "  $mount->{destination}\n";
+                        print LOG "    configuration: $mount->{configuration}->{name}\n";
+                        print LOG "    command: $mount->{_cmd}\n";
+                        print LOG "    status: $mount->{_status}\n";
+                    }
+                    print LOG "\n";
+                }
                 print LOG "\ntokens:\n";
                 print LOG tokensToXML($boot->{tokens});
                 if ($sysinitoutput) {

@@ -54,6 +54,8 @@ noted). Most of them are set automatically by the member functions.
 
 =item I<badConfigurations> - List of unknown configurations (filled by the update method)
 
+=item i<badMounts>         - List of unsuccessful mounts (filled by applyMounts)
+
 =item I<stapleDir>         - Staple directory
 
 =item I<tmpDir>            - Tmp directory
@@ -488,6 +490,8 @@ Won't apply the mounts if the Application is disabled (__STAPLE_DISABLE__). In
 this mode the output fstab records might be wrong, as the unsuccessful mounts
 won't be caught.
 
+Any unsuccessful mounts will be added to the badMounts list. 
+
 =cut
 
 sub applyMounts {
@@ -631,6 +635,10 @@ sub applyMounts {
             my $body = "Mount: $mount->{source} -> $mount->{destination}\n";
             $body .= "Command: $mountcmd\n" if $mountcmd;
             $body .= "Status: $status\n\nMount data:";
+            my $bad = clone($mount);
+            $bad->{_cmd} = $mountcmd;
+            $bad->{_status} = $status;
+            push @{$self->{badMounts}}, $bad;
 
             foreach my $key (keys %$mount) {
                 # the configuration name
@@ -663,7 +671,9 @@ sub applyMounts {
                 $next->{configurations} = \@nextConfigurations;
                 $next->{tokens} = \%nextTokens;
                 $next->{mounts} = [$nextMounts[0]];
+                $next->{badMounts} = [];
                 push @fstab, $next->applyMounts() if $nextMounts[0];
+                push @{$self->{badMounts}}, @{$next->{badMounts}};
             }
         }
     }
@@ -742,6 +752,17 @@ sub exitCode {
     return $self->{exitCode};
 }
 
+=item B<getBadMounts()>
+
+Returns the bad mounts registered after applyMounts. With the additional fields
+of _cmd and _status for the command and status of the failed mount.
+
+=cut
+
+sub getBadMounts {
+    my $self = shift;
+    return $self->{badMounts};
+}
 
 ################################################################################
 #   Internals
@@ -762,6 +783,7 @@ sub clearAll {
     $self->{templates} = [];
     $self->{autos} = [];
     $self->{badConfigurations} = [];
+    $self->{badMounts} = [];
     $self->{exitCode} = 0;
 
     $self->{host} = hostname unless defined $self->{host};
