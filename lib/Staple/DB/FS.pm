@@ -249,6 +249,10 @@ sub copyConfiguration {
     my $conf = shift;
     my $from = shift;
     my $to = shift;
+    if (index($conf, "common/") == 0) {
+        $self->{error} = "Can't copy common configuration between distributions";
+        return undef;
+    }
     my $fromPath = $self->getConfigurationPath($conf, $from);
     my $toPath = $self->getConfigurationPath($conf, $to, 1);
     unless ($fromPath) {

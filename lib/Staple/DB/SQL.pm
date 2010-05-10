@@ -216,6 +216,10 @@ sub copyConfiguration {
     my $to = shift;
     my @errors = ();
 
+    if (index($conf, "common/") == 0) {
+        $self->{error} = "Can't copy common configuration between distributions";
+        return undef;
+    }
     unless ($self->count("SELECT COUNT(name) FROM $self->{schema}configurations WHERE name = ? AND distribution = ?", $conf, $from)) {
         $self->{error} = "Configuration \"$conf\" doesn't exist";
         return undef;
