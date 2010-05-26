@@ -448,22 +448,22 @@ sub applyTemplates {
                                                      type => "auto"};
         $data = applyTokens($data, $self->{tokens});
         delete $self->{tokens}->{__AUTO_CONFIGURATION__};
-        my @dirs = splitData($template->{destination});
-        pop @dirs;
-        foreach my $dir (@dirs) {
-            unless (-e "$self->{rootDir}$dir") {
-                mkdir "$self->{rootDir}$dir";
-                (my $mode, my $uid, my $gid) = (stat("$configurationPath$dir"))[2,4,5];
-                chown $uid, $gid, "$self->{rootDir}$dir";
-                chmod $mode & 07777, "$self->{rootDir}$dir";
-            }
-        }
         my $destination = "$self->{rootDir}$template->{destination}";
         if ($template->{destination} =~ m@^/__AUTO_TMP__/@) {
             $destination = "$template->{destination}";
             $destination =~ s@^/__AUTO_TMP__@$self->{tmpDir}@;
         }
         $destination = fixPath($destination);
+        my @dirs = splitData($destination);
+        pop @dirs;
+        foreach my $dir (@dirs) {
+            unless (-e "$dir") {
+                mkdir "$dir";
+                (my $mode, my $uid, my $gid) = (stat("$configurationPath$dir"))[2,4,5];
+                chown $uid, $gid, "$dir";
+                chmod $mode & 07777, "$dir";
+            }
+        }
         $self->output("Applying template: $destination", 2);
         if (open(FILE, ">$destination")) {
             print FILE $data;

@@ -2256,8 +2256,16 @@ sub gts {
             my $data = join "", <FILE>;
             close(FILE);
             print $data;
+            if ($data !~ m/\n$/) {
+                print "\n";
+                print "(template doesn't end with \\n)\n";
+            }
         } elsif ($template->{data}) {
             print $template->{data};
+            if ($template->{data} !~ m/\n$/) {
+                print "\n";
+                print "(template doesn't end with \\n)\n";
+            }
         } else {
             print "Bad template, no source or data\n";
             return;
