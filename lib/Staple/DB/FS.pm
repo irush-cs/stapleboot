@@ -1056,7 +1056,7 @@ sub getAllConfigurations {
     my $self = shift;
     my $distribution = shift;
     my $path = $self->getConfigurationPath("/", $distribution);
-    #return () unless $path;
+    return () unless $path;
     my $version = $self->getDistributionVersion($distribution);
     my @configurations = getDirectoryList($path);
     @configurations = grep {-d $_ } @configurations;
@@ -1220,6 +1220,51 @@ sub getHostPath {
 sub getStapleDir {
     my $self = shift;
     return $self->{stapleDir};
+}
+
+sub getNote {
+    my $self = shift;
+    my $group = shift;
+    my $note = "";
+    $self->{error} = "";
+    if (ref $group and $group->{path} and -e "$group->{path}/note") {
+        if (open(NOTE, "<$group->{path}/note")) {
+            $note = join "", <NOTE>;
+            close(NOTE);
+        } else {
+            $self->{error} = "note is not readable";
+            $note = undef;
+        }
+    }
+    return $note;
+}
+
+sub setNote {
+    my $self = shift;
+    my $group = shift;
+    my $note = shift;
+    if (defined $note and $note ne "") {
+        if (defined $group->{path} and -d "$group->{path}") {
+            if (open(NOTE, ">$group->{path}/note")) {
+                print NOTE $note;
+                close(NOTE);
+            } else {
+                $self->{error} = "Can't save note: $!\n";
+                return undef;
+            }
+        } else {
+            $self->{error} = "Don't know $group->{type} path";
+            return undef;
+        }
+    } else {
+        if (-e "$group->{path}/note") {
+            unless (unlink "$group->{path}/note") {
+                $self->{error} = "Can't delete note: $!\n";
+                return undef;
+            }
+        }
+    }
+    return 1;
 }
 
 ################################################################################

@@ -73,7 +73,8 @@ sub sync {
     return 0 unless syncTemplates($db1, $db2);
     return 0 unless syncScripts($db1, $db2);
     return 0 unless syncAutos($db1, $db2);
-
+    return 0 unless syncNotes($db1, $db2);
+    
     return 1;
 }
 
@@ -312,6 +313,40 @@ sub syncTokens {
             return 0;
         }
         unless ($to->addTokens($fromTokens, $toGroup)) {
+            $error = $to->{error};
+            return 0;
+        }
+    }
+    return 1;
+}
+
+sub syncNotes {
+    (my $from, my $to) = @_;
+    my @fromDistributions = $from->getAllDistributions();
+    my @toDistributions = $to->getAllDistributions();
+    
+    my @fromGroups = map {$from->getDistributionGroup($_)} @fromDistributions;
+    my @toGroups = map {$to->getDistributionGroup($_)} @toDistributions;
+    
+    push @fromGroups, map {$from->getHostGroup($_)} $from->getAllHosts();
+    push @toGroups, map {$to->getHostGroup($_)} $to->getAllHosts();
+    
+    push @fromGroups, map {$from->getGroupsByName($_)} $from->getAllGroups();
+    push @toGroups, map {$to->getGroupsByName($_)} $to->getAllGroups();
+    
+    foreach my $distribution (@fromDistributions) {
+        push @fromGroups, $from->getFullConfigurations([$from->getAllConfigurations($distribution)], $distribution);
+        push @toGroups, $to->getFullConfigurations([$to->getAllConfigurations($distribution)], $distribution);
+    }
+    
+    foreach my $fromGroup (@fromGroups) {
+        my $toGroup = shift @toGroups;
+        my $fromNote = $from->getNote($fromGroup);
+        unless (defined $fromNote) {
+            $error = $from->{error};
+            return 0;
+        }
+        unless ($to->setNote($toGroup, $fromNote)) {
             $error = $to->{error};
             return 0;
         }

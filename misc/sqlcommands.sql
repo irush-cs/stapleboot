@@ -18,7 +18,8 @@ CREATE TABLE hosts (
 
 CREATE TABLE distributions (
        name          TEXT PRIMARY KEY,
-       version       TEXT
+       version       TEXT,
+       comment       TEXT
 );
 
 INSERT INTO distributions(name) VALUES ('/common/');

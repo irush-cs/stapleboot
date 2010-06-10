@@ -111,6 +111,7 @@ sub addConfiguration {
         return undef;
     };
     foreach my $subconf (splitData($configuration)) {
+        next if ($subconf eq "common");
         unless ($self->count("SELECT COUNT(name) FROM $self->{schema}configurations WHERE name = ? AND distribution = ?", $subconf, $distribution)) {
             unless ($self->insert("$self->{schema}configurations(name, distribution)", "$subconf", "$distribution")) {
                 return undef;
@@ -1294,6 +1295,47 @@ sub getHostPath {
         return "$host";
     }
     return undef;
+}
+
+sub setNote {
+    my $self = shift;
+    my $group = shift;
+    my $note = shift;
+    my $col = $group->{type} eq "host" ? "host" : "name";
+    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    if ($group->{type} eq "configuration") {
+        my $sth = $dbh->prepare_cached("UPDATE $self->{schema}configurations SET comment = ? WHERE name = ? AND distribution = ?");
+        unless ($sth->execute($note, $group->{name}, $group->{dist})) {
+            $self->{error} = $sth->errstr;
+            return undef;
+        }
+    } else {
+        my $sth = $dbh->prepare_cached("UPDATE $self->{schema}$group->{type}s SET comment = ? WHERE $col = ?");
+        unless ($sth->execute($note, $group->{name})) {
+            $self->{error} = $sth->errstr;
+            return undef;
+        }
+    }
+    return 1;
+}
+
+sub getNote {
+    my $self = shift;
+    my $group = shift;
+    my $note = "";
+    $self->{error} = "";
+    if (ref $group and $group->{path}) {
+        if ($group->{type} eq "configuration") {
+            $note = $self->count("SELECT comment FROM $self->{schema}configurations WHERE name = ? AND distribution = ?", $group->{name}, $group->{dist});
+            return undef if $self->{error};
+        } else {
+            my $col = $group->{type} eq "host" ? "host" : "name";
+            $note = $self->count("SELECT comment FROM $self->{schema}$group->{type}s WHERE $col = ?", $group->{name});
+            return undef if $self->{error};
+        }
+        $note = "" unless defined $note;
+    }
+    return $note;
 }
 
 ################################################################################

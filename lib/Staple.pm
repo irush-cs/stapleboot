@@ -33,11 +33,11 @@ B<group hash>
 
 =over
 
-=item I<name>   - The name of the group
+=item I<name>    - The name of the group
 
-=item I<type>   - The type of the group (group, distribution, or host)
+=item I<type>    - The type of the group (group, distribution, or host)
 
-=item I<path>   - The path of the group in the filesystem
+=item I<path>    - The path of the group in the filesystem
 
 =for comment =item I<active> - Whether this group is active (1) or not (0)
 
@@ -53,7 +53,7 @@ B<configuration hash>
 
 =item I<name>   - The name of the configuration
 
-=item I<type>   - "configuration"
+=item I<type>   - "configuration" (to distinguish from groups)
 
 =item I<path>   - The full path of the configuration (filesystem)
 

@@ -121,6 +121,14 @@ my %commands = (
                 acc => \&acc,
                 gcc => \&gcc,
                 rcc => \&rcc,
+                ghn => \&ghn,
+                shn => \&shn,
+                sgn => \&sgn,
+                ggn => \&ggn,
+                sdn => \&sdn,
+                gdn => \&gdn,
+                scn => \&scn,
+                gcn => \&gcn,
 
                 sd  => \&sd,
                 sync => \&syncctl,
@@ -217,6 +225,14 @@ my %commandMap = (
                   acc                              => "acc",
                   gcc                              => "gcc",
                   rcc                              => "rcc",
+                  ghn                              => "ghn",
+                  shn                              => "shn",
+                  sgn                              => "sgn",
+                  ggn                              => "ggn",
+                  gdn                              => "gdn",
+                  sdn                              => "sdn",
+                  gcn                              => "gcn",
+                  scn                              => "scn",
 
                   sd                               => "sd",
                   sdb                              => "setdb",
@@ -305,6 +321,14 @@ my %commandMap = (
                   addconfigurationconfiguration    => "acc",
                   getconfigurationconfigurations   => "gcc",
                   removeconfigurationconfiguration => "rcc",
+                  gethostnote                      => "ghn",
+                  sethostnote                      => "shn",
+                  setgroupnote                     => "sgn",
+                  getgroupnote                     => "ggn",
+                  setdistributionnote              => "sdn",
+                  getdistributionnote              => "gdn",
+                  setconfigurationnote             => "scn",
+                  getconfigurationnote             => "gcn",
 
                   badcommandorfilename             => "bad",
                   " "                              => " ",
@@ -398,7 +422,15 @@ my %commandCompletionMap =
    sdv       => [\&version_completion, \&distribution_completion],
    acc       => [\&configuration_completion, \&sign_configuration_completion],
    gcc       => [\&configuration_completion],
-   rcc       => [\&configuration_completion, \&configuration_configurations_completion], 
+   rcc       => [\&configuration_completion, \&configuration_configurations_completion],
+   ghn       => [\&host_completion],
+   shn       => [\&host_completion],
+   sgn       => [\&group_completion],
+   ggn       => [\&group_completion],
+   sdn       => [\&distribution_completion],
+   gdn       => [\&distribution_completion],
+   gcn       => [\&configuration_completion],
+   scn       => [\&configuration_completion],
   );
 
 my %commandsHelp = (
@@ -756,7 +788,55 @@ name: ghc | get host configurations
 parameters: <host>
 
 Prints the list of configurations (active and inactive) for the given <host>.
-",
+  ",
+                    ghn => "
+name: ghn | get host note
+parameters: <host>
+
+Prints the <host>'s note  
+  ",
+                    shn => "
+name: shn | set host note
+parameters: <host> <note>
+
+Sets <host> note to <note>
+  ",
+                    sgn => "
+name: sgn | set group note
+parameters: <group> <note>
+
+Sets <group> note to <note>
+  ",
+                    ggn => "
+name: ggn | get group note
+parameters: <group>
+
+Prints the <group>'s note  
+  ",
+                    scn => "
+name: scn | set configuration note
+parameters: <configuration> <note>
+
+Sets <configuration> note to <note>
+  ",
+                    gcn => "
+name: gcn | get configuration note
+parameters: <configuration>
+
+Prints the <configuration>'s note  
+  ",
+                    gdn => "
+name: sdn | set distribution note
+parameters: <distribution> <note>
+
+Sets <distribution> note to <note>
+  ",
+                    gdn => "
+name: gdn | get distribution note
+parameters: [<distribution>]
+
+Prints the <group>'s note  
+  ",
                     gdc => "
 name: gdc | get distribution configurations
 parameters: [<distribution>]
@@ -983,6 +1063,8 @@ Distribution commands:
   rdc | remove distribution configuration {+|-}<conf>
   gdv | get distribution version [<dist>]
   sdv | set distribution version <version> [<dist>]
+  sdn | set distribution note <dist> <note>
+  gdn | get distribution note [<dist>]
 ",
                     helphosts          => "
 Host commands:
@@ -999,6 +1081,8 @@ Host commands:
   ghc | get host configurations <host>
   ahc | add host configuration <host> {+|-}<conf> [<location>] 
   rhc | remove host configuration <host> {+|-}<conf>
+  ghn | get host note <host>
+  shn | set host note <host> <note>
 ",
                     helpgroups         => "
 Group commands:
@@ -1016,6 +1100,8 @@ Group commands:
    agc | add group configuration <group> {+|-}<conf> [<location>]
    rgc | remove group configuration <group> {+|-}<conf>
    whg | who has group <group>
+   sgn | set group note <group> <note>
+   ggn | get group note <group>
 ",
                     helpconfigurations => "
 Configuration commands:
@@ -1049,6 +1135,8 @@ Configuration commands:
    acc | add configuration configuration <conf> {+|-}<conf> [<location>]
    gcc | get configuration configurations <conf>
    rcc | remove configuration configuration <conf1> {+|-}<conf2>
+   scn | set configuration note <conf> <note>
+   gcn | get configuration note <conf>
 ",
                     helpothers         => "
 Other commands:
@@ -1095,7 +1183,7 @@ Removes {+|-}<configuration2> from <configuration1>'s list of configurations.
 ",
 );
 
-my @singleCommandCommands = ("ahc", "rhc", "gag", "ghc", "wht", "whc", "whg", "ghi", "ggi", "gci", "bad", "badcommandorfilename", "gt", "gdt", "gct", "gah", "gac", "gas", "gss", "gts", "gm", "ah", "gad");
+my @singleCommandCommands = ("ahc", "rhc", "gag", "ghc", "wht", "whc", "whg", "ghi", "ggi", "gci", "bad", "badcommandorfilename", "gt", "gdt", "gct", "gah", "gac", "gas", "gss", "gts", "gm", "ah", "gad", "ghn", "ggn", "gdn", "gcn");
 
 sub help {
     my %topics = (a              => "helpall",
@@ -1454,11 +1542,12 @@ sub cc {
 sub gdi {
     my $dist = shift;
     $dist = $distribution unless $dist;
+    my $group;
     unless ($dist) {
         print "Distribution not set\n";
         return;
     }
-    unless ($db->getDistributionGroup($dist)) {
+    unless ($group = $db->getDistributionGroup($dist)) {
         print "Unknown distribution \"$dist\"\n";
         return;
     }
@@ -1468,6 +1557,10 @@ sub gdi {
     gdg($dist);
     print "\nConfigurations:\n";
     gdc($dist);
+    if (my $note = $db->getNote($group)) {
+        print "\nNote:\n";
+        print "$note\n";
+    }
 }
 
 sub ghi {
@@ -1492,6 +1585,10 @@ sub ghi {
     if ($db->getGroupConfigurations($hostg)) {
         print "\nConfigurations:\n";
         ghc($host);
+    }
+    if (my $note = $db->getNote($hostg)) {
+        print "\nNote:\n";
+        print "$note\n";
     }
 }
 
@@ -1539,6 +1636,10 @@ sub ggi {
                 print join "\n  ", map {($_->{active} ?  "+" : "-").$_->{name}} @configurations;
                 print "\n";
             }
+        }
+        if (my $note = $db->getNote($group)) {
+            print "\nNote:\n";
+            print "$note\n";
         }
         print "\n";
     }
@@ -1594,6 +1695,10 @@ sub gci {
         if (@{[$db->getAutos($aconf)]}) {
             print "\nAutos:\n";
             ga($configuration_name);
+        }
+        if (my $note = $db->getNote($aconf)) {
+            print "\nNote:\n";
+            print "$note\n";
         }
         print "\n";
     }
@@ -2779,6 +2884,139 @@ sub ghc {
         }
     } else {
         print "No such host \"$host\"\n";
+        return;
+    }
+}
+
+sub gdn {
+    my $dist = shift;
+    $dist = $distribution unless ($dist);
+    if (my $group = $db->getDistributionGroup($dist)) {
+        if (my $note = $db->getNote($group)) {
+            print "$note\n";
+        } else {
+            print "No note for distribution \"$dist\"\n";
+        }
+    } else {
+        print "No such distribution \"$dist\"\n";
+        return;
+    }
+}
+
+sub sdn {
+    my $dist = shift;
+    my $note = join " ", @_;
+    unless ($dist) {
+        print "Missing distribution\n";
+    }
+    if (my $group = $db->getDistributionGroup($dist)) {
+        print "Error: $db->{error}\n" unless ($db->setNote($group, $note));
+    } else {
+        print "No such distribution \"$dist\"\n";
+        return;
+    }
+}
+
+sub ghn {
+    my $host = shift;
+    unless ($host) {
+        print "Missing host\n";
+        return;
+    }
+    if (my $group = $db->getHostGroup($host)) {
+        if (my $note = $db->getNote($group)) {
+            print "$note\n";
+        } else {
+            print "No note for host \"$host\"\n";
+        }
+    } else {
+        print "No such host \"$host\"\n";
+        return;
+    }
+}
+
+sub shn {
+    my $host = shift;
+    my $note = join " ", @_;
+    unless ($host) {
+        print "Missing host\n";
+    }
+    if (my $group = $db->getHostGroup($host)) {
+        print "Error: $db->{error}\n" unless ($db->setNote($group, $note));
+    } else {
+        print "No such host \"$host\"\n";
+        return;
+    }
+}
+
+sub sgn {
+    my $group_name = shift;
+    my $note = join " ", @_;
+    unless ($group_name) {
+        print "Missing group\n";
+        return;
+    }
+    if ((my $group) = $db->getGroupsByName($group_name)) {
+        unless ($db->setNote($group, $note)) {
+            print "Error: $db->{error}\n";
+            return;
+        }
+    } else {
+        print "No such group \"$group_name\"\n";
+        return;
+    }
+}
+
+sub ggn {
+    my $group_name = shift;
+    unless ($group_name) {
+        print "Missing group\n";
+        return;
+    }
+    if ((my $group) = $db->getGroupsByName($group_name)) {
+        if (my $note = $db->getNote($group)) {
+            print "$note\n";
+        } else {
+            print "No note for group \"$group_name\"\n";
+        }
+    } else {
+        print "No such group \"$group_name\"\n";
+        return;
+    }
+}
+
+sub scn {
+    my $conf = shift;
+    my $note = join " ", @_;
+    unless ($conf) {
+        print "Missing configuration\n";
+        return;
+    }
+    if ((my $group) = $db->getFullConfigurations([$conf], $distribution)) {
+        unless ($db->setNote($group, $note)) {
+            print "Error: $db->{error}\n";
+            return;
+        }
+    } else {
+        print "No such configuration \"$conf\"\n";
+        return;
+    }
+}
+
+sub gcn {
+    my $conf = shift;
+    unless ($conf) {
+        print "Missing configuration\n";
+        return;
+    }
+    if ((my $group) = $db->getFullConfigurations([$conf], $distribution)) {
+        if (my $note = $db->getNote($group)) {
+            print "$note\n";
+        } else {
+            print "No note for configuration \"$conf\"\n";
+        }
+    } else {
+        print "No such configuration \"$conf\"\n";
         return;
     }
 }

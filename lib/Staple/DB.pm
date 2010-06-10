@@ -582,18 +582,22 @@ sub getCompleteConfigurations {
                 }
             }
         }
+
         # next if already done, just add source 
         elsif ($final{$conf->{name}}) {
             push @{$final{$conf->{name}}->{_source}}, @{$conf->{_source}};
         }
+
         # add superconfs
         elsif (not exists $conf->{_done}) {
             $conf->{_done} = "super";
+
             # fillIntermediate copies also _source and _done
             my @confs = fillIntermediate($conf);
             map {push @{$_->{_source}}, $conf->{name}} @confs;
             unshift @remaining, @confs;
         }
+
         # add recursive confs
         elsif ($conf->{_done} eq "super") {
             (my $aconf) = $self->getFullConfigurations([$conf], $distribution);
@@ -614,6 +618,7 @@ sub getCompleteConfigurations {
                 }
             }
         }
+
         # add the damn conf already
         elsif ($conf->{_done} eq "recursive") {
             push @final, $conf;
@@ -1087,6 +1092,21 @@ sub getHostGroup {
     return undef;
 }
 
+
+
+=item B<setNote(group|configuration ref, note)>
+
+Sets the note for the given group/configurations. Returns 1 on success and
+undef on failure (and sets the error). To delete a note set it to undef. 
+
+=cut
+
+sub setNote {
+    my $self = shift;
+    $self->{error} = "setNote not implemented in this database yet";
+    return undef;
+}
+
 #=item B<getHostPath(I<host string>)
 #
 #Returns the path of the host. On some databases this is undefined (yet?). You
@@ -1103,6 +1123,18 @@ sub getHostPath {
     return undef;
 }
 
+=item B<getNote(I<group|configuration hash>)>
+
+Returns the group's note. returns undef on error and sets the error. If no
+note, returns empty string and error is empty.
+
+=cut
+
+sub getNote {
+    my $self = shift;
+    $self->{error} = "getNote not implemented in this database yet";
+    return undef;
+}
 
 =over
 
