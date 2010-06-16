@@ -12,7 +12,9 @@ use warnings;
 use Staple::DB;
 use Staple::Misc;
 use DBI;
-use DBD::Pg;
+use Staple::DBFactory;
+use Staple::DB::SQL::Init;
+
 our @ISA = ("Staple::DB");
 our $VERSION = '005';
 
@@ -32,10 +34,9 @@ our $VERSION = '005';
 
 =itme B<new(params, schema [,username, password])>
 
-creates a new instance. First parameter is the schema name string (defaults to
-staple). second parameter is the database parameters (defaults to
-dbi:Pg:dbname=staple;host=pghost;port=5432;). Third and forth parameters are
-username and password (can be undef).
+creates a new instance. First parameter is the database parameters (defaults to
+dbi:SQLite:/tmp/staple.sqlite3). Second is the schema name string. Third and
+forth parameters are username and password (can be undef).
 
 =cut
 
@@ -44,21 +45,62 @@ sub new {
     my $class = ref($proto) || $proto;
     my $self = {};
     my @params = @_;
-    $params[0] = "$params[0]" if defined $params[0];
-    $params[0] = "staple" unless defined $params[0];
-    $params[1] = "dbi:Pg:dbname=staple;host=pghost;port=5432;" unless $params[1];
+    $params[0] = "dbi:SQLite:/tmp/staple.sqlite3" unless $params[0];
+    $params[1] = "$params[1]" if defined $params[1];
+    $params[1] = undef if defined $params[1] and $params[1] eq "undef";
     $self->{error} = "";
-    $self->{schema} = $params[0];
-    $self->{connectionParams} = [$params[1], $params[2], $params[3], {
+    $self->{schema} = $params[1];
+    $self->{connectionParams} = [$params[0], $params[2], $params[3], {
                                                                       #HandleError => \&sigDBError,
                                                                       PrintError => 0,
                                                                       AutoCommit => 1,
                                                                       RaiseError => 0,
                                                                       pg_server_prepare => 1}];
     $self->{schema} .= "." if $self->{schema};
-    return undef unless DBI->connect_cached(@{$self->{connectionParams}});
+    $self->{schema} = "" unless defined $self->{schema};
+    return createDB("error", DBI::errstr) unless DBI->connect_cached(@{$self->{connectionParams}});
     bless ($self, $class);
     return $self;
+}
+
+sub create {
+    my $self = new(@_);
+    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    return createDB("error", DBI::errstr) unless $dbh;
+    return createDB("error", $dbh->errstr) if $dbh->errstr;
+    my $schema = $self->{schema};
+    $schema =~ s/\.$//;
+    my $sth = $dbh->table_info(undef, $schema ? $schema : undef, undef, "TABLE");
+    return createDB("error", $dbh->errstr) unless $sth;
+    my $tables = $sth->fetchall_hashref("TABLE_NAME");
+    return createDB("error", $sth->errstr) if $sth->errstr;
+    foreach my $create (@Staple::DB::SQL::Init::createTables) {
+        $create =~ s/_SCHEMA_/$self->{schema}/g;
+        (my $name) = $create =~ m/^CREATE TABLE ([^\s]*)/;
+        $name =~ s/^$self->{schema}//;
+        next if ($tables->{$name});
+        $dbh->do($create);
+        return createDB("error", $dbh->errstr) if $dbh->errstr;
+    }
+    foreach my $insert (@Staple::DB::SQL::Init::insertInto) {
+        $insert =~ s/_SCHEMA_/$self->{schema}/;
+        (my $name) = $insert =~ m/^INSERT INTO ([^\s(]*)/;
+        $name =~ s/^$self->{schema}//;
+        next if ($tables->{$name});
+        $dbh->do($insert);
+        return createDB("error", $dbh->errstr) if $dbh->errstr;
+    }
+    return $self;
+}
+
+sub describe {
+    return ("SQL database",
+            "receives 4 parameters:
+      1. The database connection parameters, as given to DBI->connect perl
+         function. Defaults to 'dbi:SQLite:/tmp/staple.sqlite3'
+      2. The database schema to use. \"undef\" or undef to ignore.
+      3. username (optional)
+      4. password (optional)");
 }
 
 sub info {
@@ -67,14 +109,14 @@ sub info {
     $schema =~ s/\.$//;
     my $username = $self->{connectionParams}->[1];
     $username = "" unless $username;
-    return "sql $schema $self->{connectionParams}->[0] $username"
+    return "sql $self->{connectionParams}->[0] $schema $username"
 }
 
 sub addHost {
     my $self = shift;
     my $host = shift;
     return 0 if ($self->{error} = invalidHost($host));
-    return $self->insert("$self->{schema}hosts", "$host");
+    return $self->insert("$self->{schema}hosts(host)", "$host");
 }
 
 sub addGroup {
@@ -956,7 +998,7 @@ sub addGroupConfiguration {
     } else {
         $location = $max + 1;
     }
-    return undef unless ($self->insert("$self->{schema}$group->{type}_configurations", $group->{name}, $configuration->{name}, $location, $configuration->{active}));
+    return undef unless ($self->insert("$self->{schema}$group->{type}_configurations ($col, configuration, ordering, active)", $group->{name}, $configuration->{name}, $location, $configuration->{active}));
     return 1;
 }
 
@@ -1455,6 +1497,10 @@ sub getList {
     $self->{error} = "";
     my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
     my $sth = $dbh->prepare_cached($stmt);
+    unless ($sth) {
+        $self->{error} = $dbh->errstr;
+        return undef;
+    }
     unless ($sth->execute(@values)) {
         $self->{error} = $sth->errstr;
         chomp ($self->{error});
@@ -1503,12 +1549,14 @@ sub insert {
     my @values = @_;
     my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
     my $sth = $dbh->prepare_cached("INSERT INTO $table VALUES (".join(",",map {"?"} @values).")");
+    goto inserterror unless $sth;
     my $rv = $sth->execute(@values);
-    if ($dbh->errstr) {
-        $self->{error} = "INSERT INTO $table VALUES (".join(", ", @values)."): ".$dbh->errstr;
-        return 0;
-    }
+    goto inserterror if $dbh->errstr;
     return 1;
+
+  inserterror:
+    $self->{error} = "INSERT INTO $table VALUES (".join(", ", @values)."): ".$dbh->errstr;
+    return 0;
 }
 
 ################################################################################
@@ -1527,7 +1575,7 @@ L<Staple> - Staple main module.
 
 L<Staple::DB> - DB interface
 
-L<Staple::DB::DB> - SQL - Database
+L<Staple::DB::SQL> - SQL - Database
 
 =head1 AUTHOR
 

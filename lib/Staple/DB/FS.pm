@@ -12,6 +12,8 @@ use warnings;
 require Exporter;
 use Staple::DB;
 use Staple::Misc;
+use File::Path;
+
 our @ISA = ("Staple::DB");
 our $VERSION = '005';
 
@@ -38,13 +40,38 @@ creates a new instance, the path is the staple direcotry.
 sub new {
     my $proto = shift;
     my $path = shift;
-    return undef unless $path;
+    return Staple::DB::Error::new("error", "Missing database path") unless $path;
     my $class = ref($proto) || $proto;
     my $self = {};
     $self->{error} = "";
     $self->{stapleDir} = $path;
     bless ($self, $class);
+    $self->setTmpDir("$path/tmp");
     return $self;
+}
+
+=item B<create(path)>
+
+Creates a new instance and build the directory tree if needed
+
+=cut
+
+sub create {
+    my $self = new(@_);
+    mkpath([$self->{stapleDir}, $self->{tmpDir}]);
+    unless (-d $self->{stapleDir} and -d $self->{tmpDir}) {
+        return createDB("error", "Can't create paths: $!\n");
+    }
+    unless (open(TEMP, ">$self->{tmpDir}/tmp-is-not-mounted")) {
+        return createDB("error", "Can't create file: $!\n");
+    }
+    close(TEMP);
+    return $self;
+}
+
+sub describe {
+    return ("Filesystem database",
+            "Receives a single parameter: the directory of the database.");
 }
 
 sub info {
@@ -208,7 +235,7 @@ sub addConfiguration {
     unless (-d $path) {
         return $self->mkdirs($path);
     }
-    $self->{error} = "Configuration already exists";
+    $self->{error} = "Configuration \"$configuration\" already exists";
     return 0;
 }
 
@@ -1444,7 +1471,7 @@ L<Staple> - Staple main module.
 
 L<Staple::DB> - the DB interface
 
-L<Staple::DB::SLQ> - SQL - Database
+L<Staple::DB::SQL> - SQL - Database
 
 =head1 AUTHOR
 

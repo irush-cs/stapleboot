@@ -29,8 +29,8 @@ BEGIN {
 
 use Staple;
 use Staple::Misc;
-use Staple::DB::Sync;
-use Staple::DB::Factory;
+use Staple::DBSync;
+use Staple::DBFactory;
 use Staple::Hangman;
 use Term::ReadLine;
 use Term::ANSIColor qw(:constants);
@@ -133,6 +133,7 @@ my %commands = (
                 sd  => \&sd,
                 sync => \&syncctl,
 
+                ndb     => \&ndb,
                 quit    => \&quit,
                 help    => \&help,
                 setdb   => \&setdb,
@@ -236,6 +237,7 @@ my %commandMap = (
 
                   sd                               => "sd",
                   sdb                              => "setdb",
+                  ndb                              => "ndb",
                   gdb                              => "getdb",
                   sync                             => "sync",
 
@@ -243,6 +245,7 @@ my %commandMap = (
                   help                             => "help",
                   exit                             => "quit",
                   setdb                            => "setdb",
+                  newdb                            => "ndb",
                   getdb                            => "getdb",
                   setdistribution                  => "sd",
                   getallhosts                      => "gah",
@@ -409,6 +412,7 @@ my %commandCompletionMap =
    sdb       => [\&database_completion],
    gdb       => [],
    setdb     => [\&database_completion],
+   ndb       => [\&database_completion],
    getdb     => [],
    sync      => [],
    cc        => [\&configuration_completion, \&distribution_completion, \&distribution_completion],
@@ -1006,24 +1010,8 @@ Paraemters like {a|b} means can be the string a or the string b
 Parameters like {<host>|<group>} means can be either a host or a group
 ",
 
-                    setdb   => "
-name: sdb | setdb
-parameters: {fs|sql} [<database specific parameters> ...]
-
-Sets this staplectl session to the given database. There are currently two
-types of databases: fs - file system, or sql - \"real\" database (postgres).
-
-fs - receives a single parameter: the directory of the database. When omitted,
-     uses the default (as set by Staple.pm, which is currently
-     /boot/staple). This is the default when staplectl starts.
-
-sql - can receive 4 parameters:
-      1. The database schema to use. If omitted, defaults to \"staple\".
-      2. The database connection parameters, as given to DBI->connect perl
-         function. Defaults to 'dbi:Pg:dbname=staple;host=pghost;port=5432;'
-      3. username (optional)
-      4. password (optional)
-",
+                    setdb   => "TBD",
+                    ndb     => "TBD",
                     getdb   => "
 name: gdb | getdb
 
@@ -1142,7 +1130,8 @@ Configuration commands:
 Other commands:
    h   | help [{<topic>|<command>}]
    q   | exit | quit
-   sdb | set db {fs|sql} <params>
+   sdb | set db <db> <params>
+   ndb | new db <db> <params>
    gdb
    sync
    debug <host>
@@ -3577,9 +3566,18 @@ sub sd {
     print "Current distribution: ".($distribution ? "$distribution (".$db->getDistributionVersion($distribution).")" : "UNKNOWN")."\n";
 }
 
+sub ndb {
+    sdb2(createDBinit(@_));
+}
+
 # for search: sub sdb {
 sub setdb {
-    my $newDB = createDB(@_);
+    sdb2(createDB(@_));
+}
+
+# fro ndb and sdb
+sub sdb2 {
+    my $newDB = shift;
     unless (ref $newDB) {
         perror "$newDB\n";
     } elsif ($newDB->{error}) {
@@ -4326,10 +4324,39 @@ sub attempted_completion {
     }
 }
 
+sub setDBHelp {
+    my %dbs = listDB();
+    delete $dbs{error};
+    my $shelp = "
+name: sdb | setdb
+parameters: <database> [<database specific parameters> ...]
 
-###
-#   main
-###
+Sets this staplectl session to the given database. There are currently ".scalar(keys %dbs)."
+types of databases:
+
+";
+    my $nhelp = "
+name: ndb | newdb
+parameters: <database> [<database specific parameters> ...]
+
+Sets this staplectl session to the given database and create it if necessary
+(similar to setdb but creates the database if doesn't exist). There are
+currently ".scalar(keys %dbs)." types of databases:
+
+";
+    my $i = 1;
+    foreach my $db (keys %dbs) {
+        my $str .= "$i: $db - $dbs{$db}->{desc}
+   $dbs{$db}->{long}
+
+";
+        $shelp .= $str;
+        $nhelp .= $str;
+        $i++;
+    }
+    $commandsHelp{setdb} = $shelp;
+    $commandsHelp{ndb} = $nhelp;
+}
 
 sub usage {
     my $exitCode = shift;
@@ -4340,10 +4367,14 @@ options are:
         | --color\t\t Colored prompt
   -c    | --command\t Executes the rest of argv as a command and exits
   -dist | --distribution <dist>\t Start with the given distribution
-  -db   | --database <db>\t Connects to <db> instead of the default (a Staple::DB::Factory::CreateDB parameter).
+  -db   | --database <db>\t Connects to <db> instead of the default (a Staple::DBFactory::CreateDB parameter).
 ";
     exit $exitCode;
 }
+
+###
+#   main
+###
 
 my $coloredPrompt;
 
@@ -4363,9 +4394,12 @@ if ($coloredPrompt) {
 
 $singleCommand = join (" ", @ARGV) if $singleCommand;
 
+setDBHelp();
+
 $distribution = getDistribution() unless ($distribution);
 $db = createDB($db ? split /\s+/, $db : undef);
-unless (ref $db) {
+if (not ref $db or $db->{error}) {
+    $db = $db->{error} if ref $db;
     perror "$db\n";
     exit 1;
     $db = undef;

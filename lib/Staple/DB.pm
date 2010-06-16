@@ -20,25 +20,40 @@ our $VERSION = '005';
 
 Staple::DB module, provides an abstract class for staple database 
 
-=head1 METHODS
+=head1 FUNCTIONS
 
 =over
 
-=item addHost(host)
+=item B<new(I<params>)>
 
-=item removeHost(host)
+Creates a new instance of this database.
 
-=item getTokens(group|configuration, [...])
+=item B<create(I<params>)>
 
-=back
+Like new but builds the database if doesn't exists (directory tree, sql tables, etc.)
+
+=item B<describe( )>
+
+Returns two strings describing the database. First string is a single line base
+description, second string is a usage information (i.e. the new/create
+parameters).
+
+In case of error, the first string is undef and the second starts with "Error:"
+with the error message.
 
 =cut
+
+sub describe {
+    return (undef, "Error: not a real database\n");
+}
 
 ################################################################################
 #   Methods
 ################################################################################
 
-=head1 DESCRIPTION
+=back
+
+=head1 METHODS
 
 =over
 
@@ -1198,6 +1213,30 @@ sub getStapleDir {
     }
 }
 
+=item B<getTmpDir( )>
+
+Returns the temporary directory. On some databases, this has some initial value
+(FS). Returns undef if not defined (default).
+
+=cut
+
+sub getTmpDir {
+    my $self = shift;
+    $self->{error} = "tmpDir is not defined" unless defined $self->{tmpDir};
+    return $self->{tmpDir};
+}
+
+=item B<setTmpDir(I<dir>)>
+
+Sets the temporary directory.
+
+=cut
+
+sub setTmpDir {
+    my $self = shift;
+    $self->{tmpDir} = shift;
+}
+
 ################################################################################
 #   Internals
 ################################################################################
@@ -1298,7 +1337,7 @@ L<Staple> - Staple main module.
 
 L<Staple::DB::FS> - Filesyste database
 
-L<Staple::DB::DB> - SQL - Database
+L<Staple::DB::SQL> - SQL - Database
 
 =head1 AUTHOR
 

@@ -13,7 +13,7 @@ use Sys::Hostname;
 use Clone qw(clone);
 use Staple;
 use Staple::Misc;
-use Staple::DB::Factory;
+use Staple::DBFactory;
 use Net::DNS;
 our $VERSION = '005';
 
@@ -95,7 +95,7 @@ noted). Most of them are set automatically by the member functions.
 =item B<useDB([db [parameters]])>
 
 Sets the staple database. I<db> is a Staple::DB instance, if omitted calls
-Staple::DB::Factory::createDB(). If db is a scalar (string), it is treated as a
+Staple::DBFactory::createDB(). If db is a scalar (string), it is treated as a
 database type, and is sent (along with the rest of the parameters) to
 createDB. Note that it will not split the string.
 
@@ -115,7 +115,8 @@ sub useDB {
     } else {
         $self->{db} = createDB();
     }
-    unless (ref $self->{db}) {
+    if (not ref $self->{db} or $self->{db}->{error}) {
+        $self->{db} = $self->{db}->{error} if ref $self->{db};
         $self->error($self->{db});
         $self->{db} = undef;
     }

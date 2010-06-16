@@ -464,7 +464,7 @@ L<Staple::Misc> - Staple miscellaneous utilities.
 
 L<Staple::DB> - Staple database connection interface
 
-L<Staple::Sync> - Syncs between to databases
+L<Staple::DBSync> - Syncs between to databases
 
 =head1 AUTHOR
 
