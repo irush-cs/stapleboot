@@ -1,4 +1,4 @@
-package Staple::DB::Sync;
+package Staple::DBSync;
 
 #
 # Copyright (C) 2007-2010 Hebrew University Of Jerusalem, Israel
@@ -14,6 +14,7 @@ use Staple;
 use Staple::DB::FS;
 use Staple::DB::SQL;
 use Staple::Misc;
+use Staple::DBFactory;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = qw();
 our @EXPORT = qw(
@@ -26,7 +27,7 @@ my $error;
 
 =head1 NAME
 
-  Staple::DB::Sync - module for syncing between different databases
+  Staple::DBSync - module for syncing between different databases
 
 =head1 EXPORTS
 
@@ -55,8 +56,10 @@ sub syncError {
 sub sync {
     $error = "";
     
-    my $db1 = createDB(shift, shift);
-    my $db2 = createDB(shift, shift);
+    my $db1 = createDB(shift, @{+shift});
+    return 0 if $error = $db1->{error};
+    my $db2 = createDB(shift, @{+shift});
+    return 0 if $error = $db2->{error};
     
     return 0 unless $db1;
     return 0 unless $db2;
@@ -424,6 +427,7 @@ sub syncGroups {
 
 sub syncConfigurations {
     (my $from, my $to) = @_;
+    my $didcommon = 0;
     my @distributions = $from->getAllDistributions();
     foreach my $distribution (@distributions) {
         my @from = $from->getAllConfigurations($distribution);
@@ -433,11 +437,18 @@ sub syncConfigurations {
             $error = $from->{error};
             return undef;
         }
+
+        if ($didcommon) {
+            @to = grep !/^common\//, @to;
+            @from = grep !/^common\//, @from;
+        }
+        $didcommon = 1 if (grep /^common\//,@from or grep /^common\//, @to);
+        
         my %from;
         my %to;
         @from{@from} = @from;
         @to{@to} = @to;
-    
+
         for my $configuration (sort {$b cmp $a} @to) {
             if ($from{$configuration}) {
                 delete $from{$configuration};
@@ -498,7 +509,7 @@ sub syncDistributions {
     }
     
     for my $distribution (keys %from) {
-        unless ($to->addDistribution($distribution)) {
+        unless ($to->addDistribution($distribution, $from->getDistributionVersion($distribution))) {
             $error = $to->{error};
             return 0;
         }
@@ -509,31 +520,6 @@ sub syncDistributions {
     }
 
     return 1;
-}
-
-sub createDB {
-    my $db = shift;
-    my $dbparams = shift;
-    if ($db =~ m/sql/i) {
-        my @params = @$dbparams;
-        $params[0] = "$params[0]" if defined $params[0];
-        $params[0] = "staple" unless defined $params[0];
-        $params[1] = "dbi:Pg:dbname=staple;host=pghost;port=5432;" unless $params[1];
-        $db = Staple::DB::SQL->new(@params);
-        unless ($db) {
-            $error = "Error connecting sql database";
-            return undef;
-        }
-    } elsif ($db =~ m/fs/i) {
-        unless ($db = Staple::DB::FS->new(@$dbparams)) {
-            $error = "can't connect to fs database with: ".join(", ", @$dbparams);
-            return undef;
-        }
-    } else {
-        $error = "unknown database";
-        return undef
-    }
-    return $db;
 }
 
 ################################################################################

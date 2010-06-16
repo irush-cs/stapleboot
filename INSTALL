@@ -1,0 +1,157 @@
+
+Table of Contents
+-----------------
+1. Preface 
+2. Download
+3. File System
+4. Installing
+5. Configuring Boot
+6. Dependencies
+7. Staple Initial Configuration
+
+
+1. Preface
+-----------
+
+As staple is a framework for diskless boot management, the installation process
+is different for each distribution/system/network configuration. This file will
+give the necessary instruction for general installations, with examples from
+debian.
+
+This document explain only the basic installation process of staple. It does
+not explain the staple operation or how to configure it, nor how to boot a
+diskless machine.
+
+You should already be familiar with your system boot process in order to
+properly install staple. For more information you should look at your system
+manual or the init(8) or rc(8) man pages (and/or others, depending on you
+system).
+
+
+2. Download
+------------
+
+Currently the only way to download is through svn. For the latest development:
+
+  svn checkout http://stapleboot.googlecode.com/svn/trunk/ /path/to/download 
+
+or for specific version:
+
+  svn checkout http://stapleboot.googlecode.com/svn/tags/<version> /path/to/download 
+
+
+3. File System
+---------------
+
+Staple installation consists of several directories:
+
+3.1: The binary directory
+
+This is where the staple binaries and libraries are. It could be on the root
+filesystem (distribution) itself or mounted at boot from a network
+filesystem. The bin and the lib directories from the download should be placed
+there. As staple is currently perl based, the lib and bin directories can be
+separated as long as the PERL5LIB environment variable is set up correctly.
+
+3.2: The database directory
+
+This is where the staple configurations are. This is only relevant when staple
+is configured to use filesystem as a database (as opposed to SQL). With the
+exception of the tmp directory, the staple itself creates the appropriate
+subdirectories when configured (common, distributions, hosts and groups). This
+directory should probably be a network filesystem and not part of the
+distribution, as it contain configuration for other distributions as well. It
+can be the same directory as the binaries. The default is /boot/staple.
+
+3.3: The stapleboot configurations
+
+/etc/staple/ contains initial configurations for the stapleboot. There are two
+files read directly by staple: 'distribution' which contains a single line
+naming the distribution; and 'staple.conf', which is an old style staple token
+file with initial tokens for staple.
+
+This directory can also be used for distribution specific binaries/scripts,
+such as the fine lable script, or a mount script.
+
+
+4. Installing
+--------------
+
+Copy the bin and lib directories to the binary directory (either network or
+distribution). 
+
+Copy misc/staple.conf to /etc/staple/staple.conf as an initial configuration
+(and change it appropriately if needed).
+
+Create /etc/staple/distribution with the distribution name (arbitrary name, try
+to avoid weird letters or spaces).
+
+Create the database directory. Create a tmp directory there and touch
+the 'tmp-is-not-mounted' file.
+
+
+5. Configuring Boot
+--------------------
+
+The main staple program that runs on boot is 'stapleboot'. This program is
+basically a wrapper for the default sysinit scripts and as such, should be run
+instead of them. Usually there's a simple script that mounts the necessary
+directories and then runs stapleboot.
+
+On SysV like init, stapleboot should be run in the sysinit entry or
+/etc/inittab, e.g.: 
+
+si::sysinit:/etc/rcS.staple
+
+An example of an /etc/rcS.staple script is available in the misc directory.
+This example mounts $staplesrc (received from the dhcp as a kernel parameter,
+or manually set on the script), which is considered the binary and
+configuration directories, and runs stapleboot.
+
+
+6. Dependencies
+----------------
+
+Staple requires several perl packages that should be installed either directly
+on the distribution, or in the lib directory of staple. The simplest way to
+figure out what the dependencies are (until a proper list is conjured) is to cd
+into the bin directory and run stapleboot, stapler and staplectl (*NOT* as
+root). Perl will complain about its missing packages. When perl finishes to
+complain, staple will complain that it is not configured properly (or that it
+is not root).
+
+
+7. Staple Initial Configuration
+--------------------------------
+
+In order for the stapleboot to work, even without doing anything, two things
+must be configured in the staple: the host and the distribution.
+
+start staplectl from the bin directory. If it's on a machine that booted from
+staple, it should find the database automatically. If not (obviously for the
+first run), it should be set either with the --db parameter:
+
+staplectl --db="fs /some/dir/probably/network/stapledb/"
+
+or from within staple:
+
+staplectl> setdb fs /some/dir/probably/network/stapledb/
+
+Then, add the distribution and the host:
+
+staplectl> adddistribution <dist-name>
+staplectl> addhost <host-name>
+
+Where <dist-name> is the string in /etc/staple/distribution, and <host-name> is
+the host as received from "hostname" (or, rather, perl's Sys::Hostname
+package).
+
+
+
+
+
+8. 
+---
+
+Site: http://stapleboot.googlecode.com/
+Author: Yair Yarom <irush@cs.huji.ac.il>
