@@ -181,8 +181,8 @@ unless ($stapler->useDB($database ? split /\s+/, $database : undef)) {
 }
 $stapler->output("database: ".$stapler->{db}->info());
 
+$stapler->setTmpDir("/tmp");
 $stapler->{tokens} = {$stapler->{db}->getCompleteTokens({})};
-$stapler->{tmpDir} = "/tmp";
 $stapler->{verbose} = $verbose;
 $stapler->{disabled} = 0;
 $stapler->updateData();

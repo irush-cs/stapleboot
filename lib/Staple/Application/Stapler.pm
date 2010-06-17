@@ -67,9 +67,7 @@ sub updateData {
     $self->SUPER::updateData();
     $self->{verbose} = $verbose;
     $self->{disabled} = 0;
-    $self->{tmpDir} = $tmpDir;
-    $self->{tokens}->{__AUTO_TMP__}->{value} = $tmpDir;
-    $self->{tokens}->{__AUTO_TMP__}->{raw} = $tmpDir;
+    $self->setTmpDir($tmpDir);
 }
 
 # input: error string

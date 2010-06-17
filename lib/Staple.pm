@@ -303,28 +303,6 @@ my %mountTokenDefaultValues = (
                                "FSCK_EXIT_OK" => "",
                               );
 
-BEGIN {
-    #$error = "";
-    
-    #if (-r "/etc/staple/staple_dir") {
-    #    open(FILE, "/etc/staple/staple_dir");
-    #    my $dir = <FILE>;
-    #    close(FILE);
-    #    chomp $dir;
-    #    $stapleDir = $dir;
-    #} else {
-    #    #print STDERR "warning: can't get staple directory (from /etc/staple/staple_dir), assuming /staple\n";
-    #    $error = "Can't get staple directory from /etc/staple/staple_dir, assuming /staple";
-    #    $stapleDir = "/staple";
-    #}
-
-    #$stapleDir = "/boot/staple";
-    #die "/boot/staple doesn't exists, can't find staple database" unless -d $stapleDir;
-    
-    #    $db = Staple::DB::FS->new($stapleDir);
-    #    die "Can't open filesystem database" unless defined $db;
-    ;
-}
 
 ################################################################################
 #   Exported

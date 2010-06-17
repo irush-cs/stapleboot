@@ -56,9 +56,7 @@ separated as long as the PERL5LIB environment variable is set up correctly.
 3.2: The database directory
 
 This is where the staple configurations are. This is only relevant when staple
-is configured to use filesystem as a database (as opposed to SQL). With the
-exception of the tmp directory, the staple itself creates the appropriate
-subdirectories when configured (common, distributions, hosts and groups). This
+is configured to use filesystem as a database (as opposed to SQL). This
 directory should probably be a network filesystem and not part of the
 distribution, as it contain configuration for other distributions as well. It
 can be the same directory as the binaries. The default is /boot/staple.
@@ -85,10 +83,6 @@ Copy misc/staple.conf to /etc/staple/staple.conf as an initial configuration
 
 Create /etc/staple/distribution with the distribution name (arbitrary name, try
 to avoid weird letters or spaces).
-
-Create the database directory. Create a tmp directory there and touch
-the 'tmp-is-not-mounted' file.
-
 
 5. Configuring Boot
 --------------------
@@ -136,6 +130,10 @@ staplectl --db="fs /some/dir/probably/network/stapledb/"
 or from within staple:
 
 staplectl> setdb fs /some/dir/probably/network/stapledb/
+
+To initialize a completely new database:
+
+staplectl> newdb fs /some/dir/probably/network/stapledb/
 
 Then, add the distribution and the host:
 

@@ -56,8 +56,6 @@ noted). Most of them are set automatically by the member functions.
 
 =item i<badMounts>         - List of unsuccessful mounts (filled by applyMounts)
 
-=item I<stapleDir>         - Staple directory
-
 =item I<tmpDir>            - Tmp directory
 
 =item I<rootDir>           - The root directory (when applying templates)
@@ -180,8 +178,9 @@ sub updateData {
     foreach my $token (keys %{$self->{tokensToData}}) {
         $self->{$self->{tokensToData}->{$token}} = $self->{tokens}->{$token}->{value} if $self->{tokens}->{$token};
     }
-    $self->{findLabelScript} = fixPath("$self->{stapleDir}/bin/$self->{findLabelScript}") if ($self->{findLabelScript} and $self->{findLabelScript} !~ m|^/|);
-    $self->{tokens}->{"__STAPLE_FIND_LABEL__"}->{value} = $self->{findLabelScript} if $self->{findLabelScript};
+    $self->{db}->setTmpDir($self->{tmpDir}) if ($self->{tmpDir} ne $self->{db}->getTmpDir());
+    #$self->{findLabelScript} = fixPath("$self->{stapleDir}/bin/$self->{findLabelScript}") if ($self->{findLabelScript} and $self->{findLabelScript} !~ m|^/|);
+    #$self->{tokens}->{"__STAPLE_FIND_LABEL__"}->{value} = $self->{findLabelScript} if $self->{findLabelScript};
 }
 
 =item B<addTokens(token hash ref)>
@@ -692,6 +691,18 @@ sub updateMounts {
     @{$self->{mounts}} = getCompleteMounts($self->{mounts}, $self->{tokens});
 }
 
+=item B<setTmpDir(I<path>)>
+
+Set's the tmpDir to the given path. Should be called before the mountTmp.
+
+=cut
+
+sub setTmpDir {
+    my $self = shift;
+    $self->{tmpDir} = shift;
+    $self->{db}->setTmpDir($self->{tmpDir});
+}
+
 =item B<mountTmp()>
 
 Mounts tmp as in $self->{tmpDir}, if it's not mounted ($tmpDir/tmp-is-mounted,
@@ -794,8 +805,7 @@ sub clearAll {
     }
     $self->{distribution} = getDistribution() unless defined $self->{distribution};
     $self->{db} = $self->useDB();
-    $self->{stapleDir} = $self->{db}->getStapleDir();
-    $self->{tmpDir} = "$self->{stapleDir}/tmp";
+    $self->{tmpDir} = $self->{db}->getTmpDir();
     $self->{rootDir} = "/";
     $self->{applied} = {"templates" => [],
                         "scripts" => [],
@@ -820,6 +830,7 @@ sub clearAll {
                              "__STAPLE_CRITICAL_halt__"     => "haltCommand",
                              "__STAPLE_CRITICAL_reboot__"   => "rebootCommand",
                              "__STAPLE_CRITICAL_poweroff__" => "poweroffCommand",
+                             "__STAPLE_TMP__"               => "tmpDir",
                             };
 
     foreach my $token (keys %Staple::defaultTokens) {

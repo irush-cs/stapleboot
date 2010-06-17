@@ -1181,7 +1181,7 @@ sub getCompleteTokens {
     delete @tokens{@delete};
     $tokens{__AUTO_DISTRIBUTION__} = {key => "__AUTO_DISTRIBUTION__", value => $distribution, raw => $distribution, type => "static", source => "auto"} if $distribution;
     $tokens{__AUTO_HOSTNAME__} = {key => "__AUTO_HOSTNAME__", value => $host, raw => $host, type => "static", source => "auto"} if $host;
-    $tokens{__AUTO_TMP__} = {key => "__AUTO_TMP__", value => $self->getStapleDir()."/tmp", raw => $self->getStapleDir()."/tmp", type => "static", source => "auto"};
+    $tokens{__AUTO_TMP__} = {key => "__AUTO_TMP__", value => $self->getTmpDir(), raw => $self->getTmpDir(), type => "static", source => "auto"};
     #$tokens{__AUTO_IP__} = $ip;
     %tokens = setDefaultTokens(\%tokens, \%Staple::defaultTokens);
     %tokens = verifyTokens(\%tokens, \%Staple::allowedTokensValues);
@@ -1193,36 +1193,27 @@ sub getCompleteTokens {
     return %tokens;
 }
 
-
-=item B<getStapleDir( )>
-
-Returns the staple directory.
-
-=cut
-
-sub getStapleDir {
-    my $self = shift;
-    if (-d "/boot/staple") {
-        return "/boot/staple";
-    } elsif (-d "/private/staple") {
-        return "/private/staple";
-    } elsif (-d "/staple") {
-        return "/staple";
-    } else {
-        return "/tmp/staple";
-    }
-}
-
 =item B<getTmpDir( )>
 
-Returns the temporary directory. On some databases, this has some initial value
-(FS). Returns undef if not defined (default).
+Returns the temporary directory. If not explicitly set, will search for
+existing relevant directories (/boot/staple/tmp, /private/staple/tmp,
+/staple/tmp), If none exists, will results in /boot/staple/tmp. On some
+databases, this has some initial value (FS).
 
 =cut
 
 sub getTmpDir {
     my $self = shift;
-    $self->{error} = "tmpDir is not defined" unless defined $self->{tmpDir};
+    unless ($self->{tmpDir}) {
+        my @tmps = qw(/boot/staple/tmp /private/staple/tmp /staple/tmp);
+        foreach my $tmp (@tmps) {
+            if (-d $tmp) {
+                $self->{tmpDir} = $tmp;
+                last;
+            }
+        }
+        $self->{tmpDir} = "/boot/staple/tmp" unless $self->{tmpDir};
+    }
     return $self->{tmpDir};
 }
 
