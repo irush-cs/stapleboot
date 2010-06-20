@@ -439,6 +439,10 @@ failure. Writes only the "key" "type" and "raw" attributes.
 sub writeTokensXMLFile {
     my $file = shift;
     my $tokens = shift;
+    unless (%$tokens) {
+        unlink "$file";
+        return 1;
+    }
     return undef unless ($file and $tokens);
     my $xml = tokensToXML($tokens, [qw(key raw type)]);
     return undef unless $xml;
