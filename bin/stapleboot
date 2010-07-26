@@ -170,9 +170,12 @@ sub debug {
                     $currentStage = undef;
                     last;
                 } elsif ($line eq "debug-off") {
-                    $boot->{tokens}->{__STAPLE_DEBUG__}->{value} = "0" if exists $boot->{tokens}->{__STAPLE_DEBUG__};
-                    $boot->updateData();
-                    #$boot->updateMounts();
+                    my $dtoken = $boot->{tokens}->{__STAPLE_DEBUG__};
+                    if ($dtoken) {
+                        $dtoken->{value} = "0";
+                        # need to add for the updateData (even though reference change)
+                        $boot->addTokens({__STAPLE_DEBUG__ => $dtoken});
+                    }
                 } elsif ($line ne "") {
                     if ($line !~ m/^help$|^\?$/) {
                         print "Unknown command: $line\n";
@@ -316,8 +319,7 @@ sub printTokens {
 
 sub initStage {
     my $boot = shift;
-    $boot->{tokens} = {$boot->{db}->getCompleteTokens({})};
-    $boot->updateData();
+    $boot->setTokens({$boot->{db}->getCompleteTokens({})});
 
     unless (-e $boot->{conf}) {
         $boot->error("$boot->{conf} does not exists.");

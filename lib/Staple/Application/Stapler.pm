@@ -60,6 +60,7 @@ sub new {
 
 
 # ignore verbose mode, use ours. not disabled either. And keep the tmpDir
+# XXX change also the tokens themselves
 sub updateData {
     my $self = shift;
     my $verbose = $self->{verbose};

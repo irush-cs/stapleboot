@@ -182,7 +182,8 @@ unless ($stapler->useDB($database ? split /\s+/, $database : undef)) {
 $stapler->output("database: ".$stapler->{db}->info());
 
 $stapler->setTmpDir("/tmp");
-$stapler->{tokens} = {$stapler->{db}->getCompleteTokens({})};
+$stapler->setTokens({$stapler->{db}->getCompleteTokens({})});
+# XXX change the tokens
 $stapler->{verbose} = $verbose;
 $stapler->{disabled} = 0;
 $stapler->updateData();
@@ -257,6 +258,8 @@ if (not $doall) {
 }
 
 # $stapler->mountTmp();
+## for the tmp/tokens.xml
+$stapler->setTokens($stapler->{tokens});
 
 # autoscripts
 if (grep {$_ eq "autoscripts"} @stages) {

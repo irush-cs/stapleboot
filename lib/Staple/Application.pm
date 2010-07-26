@@ -156,8 +156,7 @@ to the host, distribution, groups and configurations.
 
 sub updateSettings {
     my $self = shift;
-    $self->{tokens} = {$self->{db}->getCompleteTokens($self->{db}->getTokens(@{$self->{configurations}}, @{$self->{groups}}), $self->{host}, $self->{distribution})};
-    $self->updateData();
+    $self->setTokens({$self->{db}->getCompleteTokens($self->{db}->getTokens(@{$self->{configurations}}, @{$self->{groups}}), $self->{host}, $self->{distribution})});
     $self->{mounts} = [getCompleteMounts([$self->{db}->getRawMounts(@{$self->{configurations}})], $self->{tokens})];
     if (scalar(@{$self->{configurations}}) > 0) {
         $self->{templates} = [$self->{db}->getTemplates(@{$self->{configurations}})];
@@ -196,9 +195,7 @@ sub addTokens {
     foreach my $token (values %$tokens) {
         $self->{tokens}->{$token->{key}} = $token;
     }
-    $self->{tokens} = {$self->{db}->getCompleteTokens($self->{tokens}, $self->{host}, $self->{distribution})};
-    $self->updateData();
-    $self->updateMounts();
+    $self->setTokens({$self->{db}->getCompleteTokens($self->{tokens}, $self->{host}, $self->{distribution})});
 }
 
 =item B<setTokens(token hash ref)>
@@ -215,6 +212,12 @@ sub setTokens {
     $self->{tokens} = $tokens;
     $self->updateData();
     $self->updateMounts();
+    # ignore if can't write
+    if (not $self->{disabled} and open(TOKENS, ">$self->{tmpDir}/tokens.xml")) {
+        print TOKENS tokensToXML($self->{tokens});
+        close(TOKENS);
+        chmod(0600, "$self->{tmpDir}/tokens.xml");
+    }
 }
 
 =item B<setDefaultGroups([group names list])>
@@ -360,12 +363,9 @@ sub applyScripts {
             }
             map {$_->{source} = "script:$script->{configuration}->{name}/$script->{stage}/$script->{name}"} values %newTokens;
             @$tokens{keys %newTokens} = values %newTokens;
-            %$tokens = $self->{db}->getCompleteTokens($tokens, $self->{host}, $self->{distribution});
-            #setVariablesFromTokens($tokens, \%tokensToVariables);
-            $self->updateData();
-            #@mounts = getCompleteMounts(\@mounts, $tokens);
-            $self->updateMounts();
-            #printTokens(%$tokens);
+            # setTokens for updateData
+            $self->setTokens({$self->{db}->getCompleteTokens($tokens, $self->{host}, $self->{distribution})});
+            $tokens = $self->{tokens};
         }
     }
     unlink @toDelete;
@@ -718,6 +718,8 @@ sub mountTmp {
         open(FILE, ">$self->{tmpDir}/tmp-is-mounted");
         close(FILE);
     }
+    # for the tmp/tokens.xml
+    $self->setTokens($self->{tokens});
 }
 
 =item B<umountTmp()>
