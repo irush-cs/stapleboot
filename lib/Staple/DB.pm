@@ -629,7 +629,7 @@ sub getCompleteConfigurations {
 
             # fillIntermediate copies also _source and _done
             # but don't change the _source of $conf
-            my @confs = grep {$_->{name} ne $conf->{name}} fillIntermediate($conf);
+            my @confs = grep {$_->{name} ne $conf->{name} and $_->{name} ne "common"} fillIntermediate($conf);
             map {push @{$_->{_source}}, $conf->{name}} @confs;
             unshift @remaining, (@confs, $conf);
         }

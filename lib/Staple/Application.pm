@@ -438,9 +438,14 @@ sub applyTemplates {
         my $configurationPath = "$template->{configuration}->{path}/templates/$stage";
         my $data = $template->{data};
         if ($template->{source}) {
-            open(FILE, "<$template->{source}");
-            $data = join "", <FILE>;
-            close(FILE);
+            if (open(FILE, "<$template->{source}")) {
+                $data = join "", <FILE>;
+                close(FILE);
+            } else {
+                $self->error("applyTemplates: can't read $template->{source}: $!");
+                $self->addMail("Error reading template $template->{configuration}->{name}/${stage}$template->{destination}: $!");
+                next;
+            }
         }
         $self->{tokens}->{__AUTO_CONFIGURATION__} = {key => "__AUTO_CONFIGURATION__",
                                                      value => $template->{configuration}->{name},
