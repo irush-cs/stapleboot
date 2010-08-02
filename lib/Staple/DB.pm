@@ -570,10 +570,12 @@ sub getCompleteConfigurations {
     my @final = ();
     my %final = ();
     # _source, the originating confs (list ref)
-    # _done, the stage undef, super, recursive
+    # _done, the stage: undef, super, recursive
     map {$_->{_source} = [$_->{name}]} @remaining;
     while (@remaining) {
         my $conf = shift @remaining;
+        #use Data::Dumper;
+        #print "PROCESSING: ".($conf->{active} ? "+" : "-")."$conf->{name} ".(exists $conf->{_done} ? "(after $conf->{_done}) " : "").Dumper($conf->{_source});
 
         # remove a configuration
         if (not $conf->{active}) {
@@ -581,20 +583,38 @@ sub getCompleteConfigurations {
             while (@toremove) {
                 my $c = shift @toremove;
                 next unless $final{$c};
+                #use Data::Dumper;
+                #print "DELETE: $c\n";
+
                 @final = grep {$_->{name} ne $c} @final;
                 delete $final{$c};
                 push @toremove, grep m!^$c/!, map {$_->{name}} @final;
 
-                # for now, check sources only for super configurations (instead of recursive as well)
-                foreach my $super (splitData($c)) {
-                    next unless $final{$super};
-                    my @sources = grep {$_ ne $c} @{$final{$super}->{_source}};
-                    if (@sources) {
-                        $final{$super}->{_source} = [@sources];
+                # go over all configuration and check for source (might be more efficient to just super and recursive)
+                foreach my $c2 (@final) {
+                    my @s = @{$c2->{_source}};
+                    next unless grep {$_ eq $c} @s;
+                    #use Data::Dumper;
+                    #print "MIGHT DELETE\n";
+                    #print "$c2->{name}: ".Dumper(\@s);
+                    @s = grep {$_ ne $c} @s;
+                    if (@s) {
+                        $c2->{_source} = [@s];
                     } else {
-                        push @toremove, $super;
+                        push @toremove, $c2->{name};
                     }
                 }
+                  
+                # # for now, check sources only for super configurations (instead of recursive as well)
+                # foreach my $super (splitData($c)) {
+                #     next unless $final{$super};
+                #     my @sources = grep {$_ ne $c} @{$final{$super}->{_source}};
+                #     if (@sources) {
+                #         $final{$super}->{_source} = [@sources];
+                #     } else {
+                #         push @toremove, $super;
+                #     }
+                # }
             }
         }
 
@@ -608,9 +628,10 @@ sub getCompleteConfigurations {
             $conf->{_done} = "super";
 
             # fillIntermediate copies also _source and _done
-            my @confs = fillIntermediate($conf);
+            # but don't change the _source of $conf
+            my @confs = grep {$_->{name} ne $conf->{name}} fillIntermediate($conf);
             map {push @{$_->{_source}}, $conf->{name}} @confs;
-            unshift @remaining, @confs;
+            unshift @remaining, (@confs, $conf);
         }
 
         # add recursive confs
@@ -626,9 +647,12 @@ sub getCompleteConfigurations {
             unshift @remaining, $conf;
             if (versionCompare($version, "004") >= 0) {
                 my @confs = $self->getConfigurationConfigurations($conf);
-                # what to do if fails, but version > 004?
+                # XXX what to do if fails, but version > 004?
                 if (defined $confs[0]) {
                     map {$_->{_source} = [@{$conf->{_source}}]} @confs;
+                    #use Data::Dumper;
+                    #print "NEW\n";
+                    #print map {"$_->{name}: ".Dumper($_->{_source})} @confs;
                     unshift @remaining, @confs;
                 }
             }

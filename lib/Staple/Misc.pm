@@ -9,6 +9,7 @@ package Staple::Misc;
 
 use strict;
 use warnings;
+use Clone qw(clone);
 use IPC::Open3;
 use IO::Select;
 use XML::Writer;
@@ -309,8 +310,8 @@ sub cleanInactive {
 
 Receives an ordered list of hashes with a "name" key. Where "name" is a
 path-like string. It returns an ordered list with intermediate hashes (before
-the final one). The new values are simply duplicates of the originals with
-"name" value changed appropriately. No duplicate entries are returned.
+the final one). The new values are deep duplicates of the originals with "name"
+value changed appropriately. No duplicate entries are returned.
 
 =cut
 
@@ -322,9 +323,9 @@ sub fillIntermediate {
         my @splited = splitData $data->{name};
         for my $split (@splited) {
             unless ($data{$split}) {
-                my %newData = %$data;
-                $newData{name} = $split;
-                push @data, \%newData;
+                my $newData = clone($data);
+                $newData->{name} = $split;
+                push @data, $newData;
                 $data{$split} = 1;
             }
         }

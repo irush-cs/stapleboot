@@ -368,7 +368,7 @@ sub applyScripts {
             $tokens = $self->{tokens};
         }
     }
-    unlink @toDelete;
+    unlink @toDelete unless $self->{debug};
 }
 
 
