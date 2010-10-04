@@ -478,7 +478,11 @@ sub applyTemplates {
             #chmod $mode & 07777, "$rootDir$template->{destination}";
             chown $template->{uid}, $template->{gid}, "$destination";
             chmod $template->{mode}, "$destination";
-            push @{$self->{applied}->{templates}}, $destination;
+            if ($template->{source}) {
+                push @{$self->{applied}->{templates}}, $template->{source};
+            } else {
+                push @{$self->{applied}->{templates}}, $destination;
+            }
         } else {
             $self->error("applyTemplates error ($template->{destination}): $!");
             $self->addMail("Error coping template $template->{destination} from $template->{configuration}->{name}: $!");
