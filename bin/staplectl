@@ -1602,6 +1602,7 @@ sub ggi {
         if (keys %{$db->getTokens($group)}) {
             print "Tokens:\n";
             printgctokens($group);
+            print "\n";
         }
         my @groupsref = $db->getGroupGroups($group);
         if (@groupsref and not defined $groupsref[0]) {
@@ -1652,17 +1653,19 @@ sub gci {
         print "-" x length($configuration_name);
         (my $aconf) = $db->getFullConfigurations([$configuration_name], $distribution);
         my @configurations = $db->getConfigurationConfigurations($aconf);
-        if (@configurations and not defined $configurations[0]) {
-            perror $db->{error}."\n";
-        } else {
-            if (@configurations) {
-                print "\nConfigurations:\n";
-                print "  ";
-                print join "\n  ", map {($_->{active} ?  "+" : "-").$_->{name}} @configurations;
-                print "\n";
+        if (versionCompare($db->getDistributionVersion($distribution), "004") >= 0) {
+            if (@configurations and not defined $configurations[0]) {
+                perror $db->{error};
+            } else {
+                if (@configurations) {
+                    print "\nConfigurations:\n";
+                    print "  ";
+                    print join "\n  ", map {($_->{active} ?  "+" : "-").$_->{name}} @configurations;
+                    print "\n";
+                }
             }
-            print "\n";
         }
+        print "\n";
 
         if (keys %{$db->getTokens($aconf)}) {
             print "Tokens:\n";
@@ -3575,7 +3578,7 @@ sub setdb {
     sdb2(createDB(@_));
 }
 
-# fro ndb and sdb
+# for ndb and sdb
 sub sdb2 {
     my $newDB = shift;
     unless (ref $newDB) {
@@ -3586,6 +3589,7 @@ sub sdb2 {
         $db = $newDB;
         if ($db) {
             my @distributions = $db->getAllDistributions();
+            $distribution = getDistribution() unless $distribution;
             unless (grep {$_ eq $distribution} @distributions) {
                 print "$distribution doesn't exist in this database\n" if $distribution;
                 $distribution = undef;
