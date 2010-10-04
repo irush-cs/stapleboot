@@ -227,7 +227,7 @@ our @EXPORT = qw(
                     setDefaultTokens
                     getCompleteMounts
                );
-our $VERSION = '005';
+our $VERSION = '006snap';
 
 # don't use this, it's just for initializing %defaultTokens
 # SMTP_SERVER isn't localhost, as this host most likely doesn't have a mail server running...

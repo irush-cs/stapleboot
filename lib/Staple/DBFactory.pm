@@ -49,7 +49,7 @@ our @EXPORT = qw(
                     createDBinit
                     listDB
                );
-our $VERSION = '005';
+our $VERSION = '006snap';
 
 
 ################################################################################

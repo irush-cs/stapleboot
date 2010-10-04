@@ -21,7 +21,7 @@ our @EXPORT = qw(
                     sync
                     syncError
                );
-our $VERSION = '005';
+our $VERSION = '006snap';
 
 my $error;
 

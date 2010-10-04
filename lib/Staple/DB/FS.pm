@@ -15,7 +15,7 @@ use Staple::Misc;
 use File::Path;
 
 our @ISA = ("Staple::DB");
-our $VERSION = '005';
+our $VERSION = '006snap';
 
 =head1 NAME
 

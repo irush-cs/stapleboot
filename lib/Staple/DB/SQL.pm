@@ -16,7 +16,7 @@ use Staple::DBFactory;
 use Staple::DB::SQL::Init;
 
 our @ISA = ("Staple::DB");
-our $VERSION = '005';
+our $VERSION = '006snap';
 
 =head1 NAME
 

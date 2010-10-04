@@ -103,7 +103,7 @@ our @EXPORT = qw(
                     invalidConfiguration
                     invalidTokenKey
                );
-our $VERSION = '005';
+our $VERSION = '006snap';
 
 
 ################################################################################
@@ -119,9 +119,9 @@ our $VERSION = '005';
 
 Compares between 2 versions of staple and returns -1, 0, or 1 if version1 is
 lower than, equal to, or greater than version2. "none" is lower than
-everything. "none" is equal to "none".
+everything. "none" is equal to "none". (\d{3})snap is lower than \1.
 
-Currently supports \d{3} and "none" versions.
+Currently supports \d{3}(snap)? and "none" versions.
 
 =cut
 
@@ -131,7 +131,13 @@ sub versionCompare {
     return 0 if $v1 eq $v2;
     return -1 if $v1 eq "none";
     return 1 if $v2 eq "none";
+    ($v1, my $v1snap) = $v1 =~ m/^(.*?)(snap)?$/;
+    ($v2, my $v2snap) = $v2 =~ m/^(.*?)(snap)?$/;
     my $c = $v1 <=> $v2;
+    if ($c == 0) {
+        return -1 if $v1snap and not defined $v2snap;
+        return 1 if $v2snap and not defined $v1snap;
+    }
     return $c / abs($c);
 }
 
