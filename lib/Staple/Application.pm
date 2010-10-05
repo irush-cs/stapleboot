@@ -60,7 +60,7 @@ noted). Most of them are set automatically by the member functions.
 
 =item I<rootDir>           - The root directory (when applying templates)
 
-=item I<applied>           - Hash ref of "templates" and "scripts" lists (of strings).
+=item I<applied>           - Hash ref of "templates" (strings list), "scripts" (strings list) and "autos" (hash -> auto => string lists).
 
 =item I<db>                - The staple database (Staple::DB).
 
@@ -386,8 +386,10 @@ sub applyAutos {
     my @toDelete = ();
     foreach my $auto (@{$self->{autos}}) {
         my $runnable;
+        my $autoname;
         if ($auto->{source}) {
             $runnable = $auto->{source};
+            $autoname = $runnable;
         } else {
             $runnable = `mktemp $self->{tmpDir}/auto.XXXXXXXX 2>/dev/null`;
             chomp($runnable);
@@ -395,7 +397,8 @@ sub applyAutos {
             print FILE $auto->{data};
             close(FILE);
             push @toDelete, $runnable;
-            chmod 0755, $runnable;            
+            chmod 0755, $runnable;
+            $autoname = "$self->{distribution}:$auto->{configuration}->{name}/$auto->{stage}/$auto->{name}";
         }        
         if ($auto->{tokens}) {
             open(FILE, "<$runnable");
@@ -412,12 +415,13 @@ sub applyAutos {
         }
 
         my ($autoExit, $autoOutput, $autoError) = runCommand($runnable);
-        push @groups, split /\n/, $autoOutput;
+        $self->{applied}->{autos}->{$autoname} = [split /\n/, $autoOutput];
+        push @groups, @{$self->{applied}->{autos}->{$autoname}};
         $self->error("$auto->{configuration}->{name}/$auto->{name} failed ($autoExit)") if $autoExit;
         $self->error("$auto->{configuration}->{name}/$auto->{name}\n$autoError") if $autoError;
         $self->addMail("$auto->{configuration}->{name}/$auto->{name} failed:\nerror: $autoError\n exit code: $autoExit;") if $autoError or $autoExit;
     }
-    unlink @toDelete;
+    unlink @toDelete unless $self->{debug};
     @groups = grep {$_} @groups;
     return @groups;
 }
@@ -820,6 +824,7 @@ sub clearAll {
     $self->{rootDir} = "/";
     $self->{applied} = {"templates" => [],
                         "scripts" => [],
+                        "autos" => {},
                        };
 
     $self->{tokensToData} = {

@@ -440,6 +440,11 @@ sub finalStage {
                 print LOG join "", map {"  $_->{name}\n"} @{$boot->{groups}};
                 print LOG "\nconfigurations:\n";
                 print LOG join "", map {"  $_->{name}\n"} @{$boot->{configurations}};
+                print LOG "\nautos:\n";
+                foreach my $auto (keys %{$boot->{applied}->{autos}}) {
+                    print LOG "  $auto\n";
+                    print LOG join "", map {"    $_\n"} @{$boot->{applied}->{autos}->{$auto}};
+                }
                 print LOG "\ntemplates:\n  ";
                 print LOG join "\n  ", @{$boot->{applied}->{templates}};
                 print LOG "\n";
