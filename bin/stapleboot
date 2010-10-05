@@ -14,10 +14,12 @@ use Staple;
 use Staple::Misc;
 use Staple::Hangman;
 use Staple::Application::Boot;
+use Term::ReadKey;
 #use Sys::Syslog;
 #use Sys::Syslog qw(:macros);
 
 my $sysinitoutput = "";
+my $pager = undef;
 
 my $currentStage = "init";
 
@@ -132,40 +134,54 @@ sub debug {
                     print "token>";
                     next;
                 } elsif ($line eq "tokens") {
-                    my $oldVerbose = $boot->{verbose};
-                    $boot->{verbose} = 3;
-                    printTokens($boot);
-                    $boot->{verbose} = $oldVerbose;
+                    printPager(tokensToXML($boot->{tokens}));
                 } elsif ($line eq "mounts") {
-                    my $oldVerbose = $boot->{verbose};
-                    $boot->{verbose} = 3;
-                    printMounts($boot);
-                    $boot->{verbose} = $oldVerbose;
+                    my @temp = @{$boot->{mounts}};
+                    my $temp = "";
+                    foreach my $mount (@temp) {
+                        $temp .= "   $mount->{destination}";
+                        $temp .= ":\n". join "\n", map {"      $_ => $mount->{$_}"} keys %$mount;
+                        $temp .= "\n";
+                    }
+                    printPager($temp);
                 } elsif ($line eq "templates") {
-                    my $oldVerbose = $boot->{verbose};
-                    $boot->{verbose} = 3;
-                    $boot->printTemplates();
-                    $boot->{verbose} = $oldVerbose;
+                    my @temp = @{$boot->{templates}};
+                    my $temp = "";
+                    foreach my $template (@temp) {
+                        $temp .= "   $template->{destination}";
+                        $temp .= ":\n".join("\n",  map {if (ref $template->{$_}) {"      $_ => $template->{$_}->{name}"} else {defined $template->{$_} ? "      $_ => $template->{$_}" : "      $_ => (undef)"}} keys %$template);
+                        $temp .="\n";
+                    }
+                    printPager($temp);
                 } elsif ($line eq "configurations") {
-                    my $oldVerbose = $boot->{verbose};
-                    $boot->{verbose} = 3;
-                    printConfigurations($boot);
-                    $boot->{verbose} = $oldVerbose;
+                    my @temp = @{$boot->{configurations}};
+                    my $temp = "";
+                    $temp .= join "\n", map {"   $_->{name}"} @temp;
+                    printPager($temp);
                 } elsif ($line eq "groups") {
-                    my $oldVerbose = $boot->{verbose};
-                    $boot->{verbose} = 3;
-                    printGroups($boot);
-                    $boot->{verbose} = $oldVerbose;
+                    my @temp = @{$boot->{groups}};
+                    my $temp = "";
+                    $temp .= join "\n", map {"   $_->{name}"} @temp;
+                    $temp .= "\n";
+                    printPager($temp);
                 } elsif ($line eq "scripts") {
-                    my $oldVerbose = $boot->{verbose};
-                    $boot->{verbose} = 3;
-                    printScripts($boot);
-                    $boot->{verbose} = $oldVerbose;
+                    my @temp = @{$boot->{scripts}};
+                    my $temp = "";
+                    foreach my $script (@temp) {
+                        $temp .= "   $script->{name}";
+                        $temp .= ":\n". join "\n", map {if (ref $script->{$_}) {"      $_ => $script->{$_}->{name}"} else {"      $_ => $script->{$_}"}} keys %$script;
+                        $temp .= "\n";
+                    }
+                    printPager($temp);
                 } elsif ($line eq "autos") {
-                    my $oldVerbose = $boot->{verbose};
-                    $boot->{verbose} = 3;
-                    printAutos(@{$boot->{autos}});
-                    $boot->{verbose} = $oldVerbose;
+                    my @temp = @{$boot->{autos}};
+                    my $temp = "";
+                    foreach my $auto (@temp) {
+                        $temp .= "   $auto->{name}";
+                        $temp .= ":\n". join "\n", map {if (ref $auto->{$_}) {"      $_ => $auto->{$_}->{name}"} else {"      $_ => $auto->{$_}"}} keys %$auto;
+                        $temp .= "\n";
+                    }
+                    printPager($temp);
                 } elsif ($line eq "quit") {
                     $currentStage = undef;
                     last;
@@ -214,104 +230,23 @@ EOF
 #   Output (maybe move to Application?)
 ################################################################################
 
-# input: boot
+# input: string
 # no output
-# prints the scripts on verbose level 2 (+ extended on 3);
-sub printScripts {
-    my $boot = shift;
-    return if $boot->{verbose} < 2;
-    my @scripts = @{$boot->{scripts}};
-    my $output = "scripts:\n";
-    foreach my $script (@scripts) {
-        $output .= "   $script->{name}";
-        $output .= ":\n". join "\n", map {if (ref $script->{$_}) {"      $_ => $script->{$_}->{name}"} else {"      $_ => $script->{$_}"}} keys %$script;
-        $output .= "\n";
-    }
-    $boot->output($output, 2);
-}
-
-# input: boot
-# no output
-# prints the autos on verbose level 2 (+ extended on 3);
-sub printAutos {
-    my $boot = shift;
-    return if $boot->{verbose} < 2;
-    my @autos = @{$boot->{autos}};
-    my $output = "autos:\n";
-    foreach my $auto (@autos) {
-        $output .= "   $auto->{name}";
-        $output .= ":\n". join "\n", map {if (ref $auto->{$_}) {"      $_ => $auto->{$_}->{name}"} else {"      $_ => $auto->{$_}"}} keys %$auto;
-        $output .= "\n";
-    }
-    $boot->output($output, 2);
-}
-
-# input: boot
-# no output
-# prints the groups on verbose level 2 (+ path on 3)
-sub printGroups {
-    my $boot = shift;
-    return if $boot->{verbose} < 2;
-    my @groups = @{$boot->{groups}};
-    my $output = "groups:\n";
-    #if ($verbose >= 3) {
-    #    $output .= join "\n", map {"   $_->{name} => $_->{path}"} @groups;
-    #} else {
-    $output .= join "\n", map {"   $_->{name}"} @groups;
-    #}
-    $boot->output($output, 2);
-}
-
-# input: boot
-# no output
-# prints the configurations on verbose level 2
-sub printConfigurations {
-    my $boot = shift;
-    return if $boot->{verbose} < 2;
-    my @configurations = @{$boot->{configurations}};
-    my $output = "configurations:\n";
-    #if ($verbose >= 3) {
-    #    $output .= join "\n", map {"   $_->{name} ($_->{path})"} @configurations;
-    #} else {
-    #    $output .= join "\n", map {"   $_->{name} ($_->{dist})"} @configurations;
-    #}
-    $output .= join "\n", map {"   $_->{name}"} @configurations;
-    $boot->output($output, 2);
-}
-
-# input: boot
-# no output
-# prints the mounts on verbose level 2 (extended on level 3)
-sub printMounts {
-    my $boot = shift;
-    return if $boot->{verbose} < 2;
-    my @mounts = @{$boot->{mounts}};
-    my $output = "mounts:\n";
-    foreach my $mount (@mounts) {
-        $output .= "   $mount->{destination}";        
-        $output .= ":\n". join "\n", map {"      $_ => $mount->{$_}"} keys %$mount if ($boot->{verbose} > 2);
-        $output .= "\n";
-    }
-    chomp $output;
-    $boot->output($output, 2);
-}
-
-# input: boot
-# no output
-# prints the tokens on verbose level 2
-sub printTokens {
-    my $boot = shift;
-    return if $boot->{verbose} < 2;
-    my %tokens = %{$boot->{tokens}};
-    my $output = "tokens:\n";
-    if ($boot->{verbose} >= 3) {
-        $output .= join "\n", map {"   $_ = $tokens{$_}->{value} ($tokens{$_}->{type})"} sort keys %tokens;
+# prints the string to STDOUT, if count(\n) > $nrows, pipe to $pager if exists
+sub printPager {
+    my $input = shift;
+    if ($pager) {
+        my @temp = $input =~ m/(\n)/g;
+        if (scalar(@temp) >= (GetTerminalSize())[1] and open(PAGER, "| $pager")) {
+            print PAGER $input;
+            close(PAGER);
+        } else {
+            print STDOUT $input;
+        }
     } else {
-        $output .= join "\n", map {"   $_ = $tokens{$_}->{value}"} sort keys %tokens;
+        print STDOUT $input;
     }
-    $boot->output($output, 2);
 }
-
 
 ################################################################################
 #   Stages
@@ -347,13 +282,6 @@ sub initStage {
     $boot->update();
     
     $boot->output("distribution: $boot->{distribution} ".$boot->{db}->getDistributionVersion($boot->{distribution}), 2);
-
-    #printTokens($boot);
-    #printGroups($boot);
-    #printConfigurations($boot);
-    #printMounts($boot);
-    #printTemplates($boot);
-    #printScripts($boot);
 
     $boot->mountTmp() unless ($boot->{disabled});
     # openlog("stapleboot", "", $boot->{syslog});
@@ -393,12 +321,6 @@ sub autoStage {
         $boot->setDefaultGroups(@autoGroups);
         $boot->update();
 
-        #printTokens($boot);
-        #printGroups($boot);
-        #printConfigurations($boot);
-        #printMounts($boot);
-        #printTemplates($boot);
-        #printScripts($boot);        
     }
 }
 
@@ -567,6 +489,15 @@ if ($< != 0) {
     $boot->error("Must run as root");
     exit(1);
 }
+
+if ($ENV{PAGER} and -e $ENV{PAGER}) {
+    $pager = $ENV{PAGER};
+} elsif (grep {-e $_} map {"$_/less"} split /:/, $ENV{PATH}) {
+    $pager = "less";
+} elsif (grep {-e $_} map {"$_/more"} split /:/, $ENV{PATH}) {
+    $pager = "more";
+}
+
 
 $boot->output("Version: $Staple::VERSION");
 my $dbversion = $boot->{db}->getDistributionVersion($boot->{distribution});
