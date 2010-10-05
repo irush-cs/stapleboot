@@ -140,7 +140,7 @@ sub debug {
                     my $temp = "";
                     foreach my $mount (@temp) {
                         $temp .= "   $mount->{destination}";
-                        $temp .= ":\n". join "\n", map {"      $_ => $mount->{$_}"} keys %$mount;
+                        $temp .= ":\n". join "\n", map {"      $_ => ".(ref $mount->{$_} ? $mount->{$_}->{name} : $mount->{$_})} keys %$mount;
                         $temp .= "\n";
                     }
                     printPager($temp);
