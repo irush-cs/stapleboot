@@ -84,10 +84,10 @@ sub createDB {
     }
     $type = "fs" unless $type;
     my $db;
-    if ($dbs{$type}) {
+    if ($dbs{$type} and $type ne "error") {
         $db = $dbs{$type}->{new}(@params);
     } else {
-        $db = $dbs{error}->{new}("Unknown database $type\n");
+        $db = $dbs{error}->{new}("Unknown database type \"$type\"");
     }
     return $db;
 }
@@ -112,7 +112,7 @@ sub createDBinit {
     if ($dbs{$type}) {
         $db = $dbs{$type}->{create}(@params);
     } else {
-        $db = $dbs{error}->{new}("Unknown database $type\n");
+        $db = $dbs{error}->{new}("Unknown database type \"$type\"");
     }
     return $db;    
 }

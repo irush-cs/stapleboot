@@ -3754,8 +3754,9 @@ my $currentCommand = "";
 sub database_completion {
     my ($text, $count) = @_;
     if ($count == 0) {
+        my %dbs = listDB();
         $attribs->{completion_append_character} = " ";
-        @currentCompletionList = grep {index($_, $text) == 0} qw(fs sql);
+        @currentCompletionList = grep {index($_, $text) == 0} grep {$_ ne "error"} keys %dbs;
     }
     return $currentCompletionList[$count];
 }

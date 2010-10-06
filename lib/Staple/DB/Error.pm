@@ -48,12 +48,12 @@ sub new {
 
 =item B<create(error message)>
 
-Creates a new instance with the given error.
+Creates a new instance with an error.
 
 =cut
 
 sub create {
-    return new($@);
+    return new($_[0], "Can't really create an \"error\" database");
 }
 
 sub describe {
