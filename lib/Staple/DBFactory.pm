@@ -83,7 +83,12 @@ sub createDB {
         ($type, @params) = split /\s+/, $tokens{__STAPLE_DB__}->{value} if ($tokens{__STAPLE_DB__});
     }
     $type = "fs" unless $type;
-    my $db = $dbs{$type}->{new}(@params);
+    my $db;
+    if ($dbs{$type}) {
+        $db = $dbs{$type}->{new}(@params);
+    } else {
+        $db = $dbs{error}->{new}("Unknown database $type\n");
+    }
     return $db;
 }
 
@@ -103,7 +108,12 @@ sub createDBinit {
         ($type, @params) = split /\s+/, $tokens{__STAPLE_DB__}->{value} if ($tokens{__STAPLE_DB__});
     }
     $type = "fs" unless $type;
-    my $db = $dbs{$type}->{create}(@params);
+    my $db;
+    if ($dbs{$type}) {
+        $db = $dbs{$type}->{create}(@params);
+    } else {
+        $db = $dbs{error}->{new}("Unknown database $type\n");
+    }
     return $db;    
 }
 
