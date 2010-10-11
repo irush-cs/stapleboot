@@ -222,6 +222,30 @@ sub removeConfiguration {
     return undef;
 }
 
+=item B<hasDistribution(I<distribution>)>
+
+Checks if the database has the given distribution (string). Returns 1 if
+distribution exists, 0 if not and undef on error (and sets the error).
+
+=cut
+
+sub hasDistribution {
+    my $self = shift;
+    my $dist = shift;
+    if (not defined $dist) {
+        $self->{error} = "Missing parameter";
+        return undef;
+    }
+    my @distributions = $self->getAllDistributions();
+    if (@distributions and not defined $distributions[0]) {
+        # getAllDistributions already sets the error
+        return undef;
+    } elsif (grep {$_ eq $dist} @distributions) {
+        return 1;
+    }
+    return 0;
+}
+
 =item B<copyConfiguration(I<conf, from, to>)>
 
 Copies the configuration I<conf> (a string) from distribution I<from> to

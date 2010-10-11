@@ -71,6 +71,7 @@ my %commands = (
                 ra => \&ra,
                 ua => \&ua,
                 cc => \&cc,
+                cs => \&cs,
 
                 act => \&act,
                 adt => \&adt,
@@ -176,6 +177,7 @@ my %commandMap = (
                   ra                               => "ra",
                   ua                               => "ua",
                   cc                               => "cc",
+                  cs                               => "cs",
 
                   act                              => "act",
                   adt                              => "adt",
@@ -313,6 +315,7 @@ my %commandMap = (
                   getconfigurationinfo             => "gci",
                   getdistributioninfo              => "gdi",
                   copyconfiguration                => "cc",
+                  copyscript                       => "cs",
                   hangman                          => "hangman",
                   debug                            => "debug",
                   undebug                          => "undebug",
@@ -416,6 +419,7 @@ my %commandCompletionMap =
    getdb     => [],
    sync      => [],
    cc        => [\&configuration_completion, \&distribution_completion, \&distribution_completion],
+   cs        => [\&distribution_completion, \&dist_configuration_completion, \&script_stage_completion, \&script_completion, \&distribution_completion, \&dist_configuration_completion, \&script_stage_completion, \&script_completion],
    hangman   => [],
    debug     => [\&host_completion],
    undebug   => [\&host_completion],
@@ -615,6 +619,16 @@ parameters: <configuration> <distribution1> <distribution2>
 Copies the entire <configuration> from <distribution1> to <distribution2>. This
 includes all child configurations.
 ",
+                    cs => "
+name: cs | copy script
+parameters: <distribution1> <configuration1> <stage1> {<script1>|<location1>} <distribution2> [<configuration2> [<stage2> [<script2> [<location2>]]]]
+  stage: auto | mount | sysinit | final
+
+Copies a single script from <distribution1> to <distribution2>. <distribution1>
+and <distribution2> can be the same to move a script between different
+configurations in the same distribution. If any of the optional destination
+parameters are missing, they're assumed to be the same is the source. If
+location2 is omitted, the script will be copied at the end.",
 
                     act => "
 name: act | add configuration token
@@ -1119,6 +1133,7 @@ Configuration commands:
    ra  | remove auto <conf> <auto> 
    ua  | update auto <conf> <auto> 
    cc  | copy configuration <conf> <from> <to> 
+   cs  | copy script <dist1> <conf1> <stage1> {<script>|<loc>} <dist2> [<conf2> [<stage2> [<script2> [<loc2>]]]]
    whc | who has configuration <conf>
    acc | add configuration configuration <conf> {+|-}<conf> [<location>]
    gcc | get configuration configurations <conf>
@@ -1528,6 +1543,105 @@ sub cc {
     }
 }
 
+sub cs {
+    (my $dist1, my $conf1, my $stage1, my $script1_name, my $dist2, my $conf2, my $stage2, my $script2_name, my $location2) = @_;
+    
+    # script1
+    unless ($dist1) {
+        perror "Missing source distribution\n";
+        return;
+    }
+    (my @scripts1) = localgetscripts($conf1, $dist1);
+    unless ($stage1) {
+        perror "missing stage\n";
+        return;
+    }
+    unless ($script1_name) {
+        perror "missing script name\n";
+        return;
+    }
+    unless (@scripts1) {
+        perror "\"$conf1\" under \"$dist1\" has no scripts\n";
+        return;
+    }
+    if (not defined $scripts1[0]) {
+        return;
+    }
+    (my $script1) = grep {$_->{stage} eq $stage1 and ($_->{name} eq $script1_name or $_->{order} eq $script1_name)} @scripts1;
+    unless ($script1) {
+        perror "No such script \"$script1_name\" in \"$conf1\" (under distribution \"$dist1\")\n";
+        return;
+    }
+
+    # script2
+    unless ($dist2) {
+        perror "Missing destination distribution\n";
+        return;
+    }
+    my $temp = $db->hasDistribution($dist2);
+    if (not defined $temp) {
+        perror "Can't get distribution list: ".$db->{error}."\n";
+        return;
+    } elsif ($temp == 0) {
+        perror "No such distribution \"$dist2\"\n";
+        return undef;
+    }
+    $conf2 = $conf1 unless $conf2;
+    $stage2 = $stage1 unless $stage2;
+    $script2_name = $script1_name unless $script2_name;
+
+    if ($script2_name =~ m/^\d+$/) {
+        perror "Must have a valid name for destination script\n";
+        return;
+    }
+
+    if ($dist1 eq $dist2 and
+        $conf1 eq $conf2) {
+        print "To update a script use the \"update script\" command instead\n";
+        return;
+    }
+    if ($conf1 eq $conf2 and $conf1 =~ m,^common/,) {
+        print "Use \"update script\" for updating common script on the same configuration\n";
+        return;
+    }
+
+    # from here, start changing stuff...
+    (my $conf2full) = $db->getFullConfigurations([$conf2], $dist2);
+    unless ($conf2full) {
+        if ($db->addConfiguration($dist2, $conf2)) {
+            print "Added configurations \"$conf2\" to \"$dist2\"\n";
+            ($conf2full) = $db->getFullConfigurations([$conf2], $dist2);
+        } else {
+            perror $db->{error}."\n";
+            return;
+        }
+    } else {
+        (my @scripts2) = localgetscripts($conf2, $dist2);
+        if (@scripts2 and $scripts2[0]) {
+            (my $script2) = grep {$_->{stage} eq $stage2 and ($_->{name} eq $script2_name or $_->{order} eq $script2_name)} @scripts2;
+            if ($script2) {
+                print "Removing previous script $script2_name in $conf2 of $dist2\n";
+                unless ($db->removeScripts($script2)) {
+                    perror $db->{error}."\n";
+                    return;
+                }
+            }
+        }
+    }
+
+    my %script = ();
+    $script{name} = $script2_name;
+    $script{source} = $script1->{source};
+    $script{configuration} = $conf2full;
+    $script{stage} = $stage2;
+    $script{order} = $location2;
+    $script{order} = undef if $location2 and $script{order} !~ m/^\d+$/;
+    $script{critical} = $script1->{critical};
+    $script{tokens} = $script1->{tokens};
+    $script{tokenScript} = $script1->{tokenScript};
+    perror $db->{error}."\n" unless ($db->addScripts(\%script));
+}
+
 sub gdi {
     my $dist = shift;
     $dist = $distribution unless $dist;
@@ -1917,10 +2031,12 @@ sub ua {
     }
 }
 
-# input: configuration name
-# output: list of scripts
+# input: configuration name, optional distribution name
+# output: list of scripts or undef
 sub localgetscripts {
     my $configuration = shift;
+    my $dist = shift;
+    $dist = $distribution unless $dist;
     unless ($configuration) {
         print "Missing configuration\n" unless $echooff;
         return undef;
@@ -1930,9 +2046,17 @@ sub localgetscripts {
         print "unknown configuration \"$configuration\"\n" unless $echooff;
         return undef;
     }
-    ($conf) = $db->getFullConfigurations([$conf], $distribution);
+    my @distributions = $db->getAllDistributions();
+    if (@distributions and not defined $distributions[0]) {
+        perror "Can't get distribution list: ".$db->{error}."\n";
+        return undef;
+    } elsif (not grep {$_ eq $dist} @distributions) {
+        perror "No such distribution \"$dist\"\n";
+        return undef;
+    }
+    ($conf) = $db->getFullConfigurations([$conf], $dist);
     unless ($conf) {
-        print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n" unless $echooff;
+        print "No such configuration \"$configuration\" under the \"$dist\" distribution\n" unless $echooff;
         return undef;
     }
     my @scripts = $db->getScripts($conf);
@@ -2141,7 +2265,7 @@ sub gss {
 }
 
 sub gs {
-    (my @scripts) = localgetscripts(@_);
+    (my @scripts) = localgetscripts($_[0]);
     if (@scripts and $scripts[0]) {
         foreach my $stage ("auto", "mount", "sysinit", "final") {
             next unless grep {$_->{stage} eq $stage} @scripts;
@@ -4023,16 +4147,17 @@ sub auto_completion {
     return $currentCompletionList[$count];
 }
 
-# completes script name, assume last word is stage, and before that the configuration
+# completes script name, assume last word is stage, and before that the configuration, and before that might be a distribution.
 sub script_completion {
     my ($text, $count) = @_;
     if ($count == 0) {
         $attribs->{completion_append_character} = " ";
         @currentCompletionList = ();
-        (my $configuration, my $stage) = (split(/\s+/, $currentCommand))[-2..-1];
+        (my $dist, my $configuration, my $stage) = (split(/\s+/, $currentCommand))[-3..-1];
+        $dist = $distribution unless $dist and $db->hasDistribution($dist);
         return () unless $configuration and $stage;
         $echooff = 1;
-        (my @scripts) = localgetscripts($configuration);
+        (my @scripts) = localgetscripts($configuration, $dist);
         $echooff = 0;
         return () unless (@scripts and $scripts[0]);        
         @scripts = map {$_->{name}} grep {$_->{stage} eq $stage} @scripts;
@@ -4059,15 +4184,16 @@ sub template_completion {
     return $currentCompletionList[$count];
 }
 
-# complete stage for known scripts, assume last word is a configuration
+# complete stage for known scripts, assume last word is a configuration (word before might be a distribution)
 sub script_stage_completion {
     my ($text, $count) = @_;
     if ($count == 0) {
         $attribs->{completion_append_character} = " "; 
-        my $configuration = (split(/\s+/, $currentCommand))[-1];
+        (my $dist, my $configuration) = (split(/\s+/, $currentCommand))[-2..-1];
+        $dist = $distribution unless $dist and $db->hasDistribution($dist);
         return () unless $configuration;
         $echooff = 1;
-        (my @scripts) = localgetscripts($configuration);
+        (my @scripts) = localgetscripts($configuration, $dist);
         $echooff = 0;
         return () unless (@scripts and $scripts[0]);
         my @stages = map {$_->{stage}} @scripts;
@@ -4203,6 +4329,28 @@ sub help_completion {
         $attribs->{completion_append_character} = " ";
         @currentCompletionList = grep {index($_, $text) == 0} qw(all distributions hosts groups configurations others);
         push @currentCompletionList, grep {index($_, $text) == 0} (keys %commandMap);
+    }
+    return $currentCompletionList[$count];
+}
+
+# complete configuration and dist, assumes last word was a distribution
+sub dist_configuration_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        $attribs->{completion_append_character} = " ";
+        @currentCompletionList = ();
+        my $dist_name = (split(/\s+/, $currentCommand))[-1];
+        return () unless $dist_name;
+        my $dist = $db->getDistributionGroup($dist_name);
+        return () unless $dist;
+        my @configurations = $db->getAllConfigurations($dist_name);
+        if (@configurations and not defined $configurations[0]) {
+            return ();
+        } else {
+            @configurations = grep {index($_, $text) == 0} @configurations;
+        }
+        @currentCompletionList = dir_completion_helper($text, @configurations);
+        $attribs->{completion_append_character} = "" if ($#currentCompletionList != $#configurations);
     }
     return $currentCompletionList[$count];
 }
