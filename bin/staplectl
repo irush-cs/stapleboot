@@ -628,8 +628,8 @@ Copies a single script from <distribution1> to <distribution2>. <distribution1>
 and <distribution2> can be the same to move a script between different
 configurations in the same distribution. If any of the optional destination
 parameters are missing, they're assumed to be the same is the source. If
-location2 is omitted, the script will be copied at the end.",
-
+location2 is omitted, the script will be copied at the end.
+",
                     act => "
 name: act | add configuration token
 parameters: <configuration>
