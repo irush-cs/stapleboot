@@ -349,7 +349,7 @@ sub applyTokens {
     my $data = $_[0];
     my %tokens = %{$_[1]};
     foreach my $token (keys %tokens) {
-        $data =~ s/$token/$tokens{$token}->{value}/g;
+        $data =~ s/\Q$token\E/$tokens{$token}->{value}/g;
     }
     return $data;
 }
