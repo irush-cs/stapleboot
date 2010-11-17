@@ -4560,8 +4560,8 @@ if (not ref $db or $db->{error}) {
 }
 if ($db) {
     my @distributions = $db->getAllDistributions();
-    unless (grep {$_ eq $distribution} @distributions) {
-        perror "$distribution doesn't exist in the current db\n" if $distribution;
+    unless (not defined $distribution or grep {$_ eq $distribution} @distributions) {
+        perror "The $distribution distribution doesn't exist in the current db\n" if $distribution;
         $distribution = undef;
     }
 }
