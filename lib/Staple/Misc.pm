@@ -128,6 +128,7 @@ Currently supports \d{3}(snap)? and "none" versions.
 sub versionCompare {
     my $v1 = shift;
     my $v2 = shift;
+      
     return 0 if $v1 eq $v2;
     return -1 if $v1 eq "none";
     return 1 if $v2 eq "none";

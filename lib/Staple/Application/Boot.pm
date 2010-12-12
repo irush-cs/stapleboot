@@ -98,7 +98,7 @@ sub mail {
     my $db = $self->{db}->info();
     my $prefix = "Staple version: $VERSION\n";
     $prefix .= "Staple database: $db\n";
-    $prefix .= "Distribution: $self->{distribution} (".$self->{db}->getDistributionVersion($self->{distribution}).")\n";
+    $prefix .= "Distribution: $self->{distribution} (".($self->{db}->getDistributionVersion($self->{distribution}) || "unknown version").")\n";
     $prefix .= "Kernel: ".`uname -smr`;
     $prefix .= "\n";
     $prefix .= "=" x 77;

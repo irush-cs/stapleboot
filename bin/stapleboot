@@ -276,7 +276,12 @@ sub initStage {
         $boot->error("\"$boot->{distribution}\" does not exist in the staple database");
         $boot->addMail("\"$boot->{distribution}\" does not exist in the staple database");
         $boot->doCriticalAction();
-    }    
+    }
+    my $dbversion = $boot->{db}->getDistributionVersion($boot->{distribution});
+    if (versionCompare($Staple::VERSION, $dbversion) < 0) {
+        $boot->error("Warning: database version is higher than stapleboot version ($dbversion vs. $Staple::VERSION)");
+        $boot->addMail("Warning: database version is higher than stapleboot version ($dbversion vs. $Staple::VERSION)");
+    }
     
     $boot->setDefaultGroups();
     $boot->update();
@@ -503,13 +508,7 @@ if ($ENV{PAGER} and -e $ENV{PAGER}) {
     $pager = "more";
 }
 
-
 $boot->output("Version: $Staple::VERSION");
-my $dbversion = $boot->{db}->getDistributionVersion($boot->{distribution});
-if (versionCompare($Staple::VERSION, $dbversion) < 0) {
-    $boot->error("Warning: database version is higher than stapleboot version ($dbversion vs. $Staple::VERSION)");
-    $boot->addMail("Warning: database version is higher than stapleboot version ($dbversion vs. $Staple::VERSION)");
-}
 $boot->output("Starting: $boot->{host}", 1);
 
 while ($currentStage) {
