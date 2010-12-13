@@ -118,22 +118,35 @@ our $VERSION = '006snap';
 =item V<versionCompare(I<version1>, I<version2>)
 
 Compares between 2 versions of staple and returns -1, 0, or 1 if version1 is
-lower than, equal to, or greater than version2. "none" is lower than
+lower than, equal to, or greater than version2. "none" and undef are lower than
 everything. "none" is equal to "none". (\d{3})snap is lower than \1.
 
-Currently supports \d{3}(snap)? and "none" versions.
+Currently supports \d{3}(snap)? and "none" versions. Unknown (future) versions
+are considered greater than known ones. Two unknown versions are compared as
+strings.
 
 =cut
 
 sub versionCompare {
     my $v1 = shift;
     my $v2 = shift;
-      
+
+    $v1 = "none" if not defined $v1;
+    $v2 = "none" if not defined $v2;
+    
     return 0 if $v1 eq $v2;
     return -1 if $v1 eq "none";
     return 1 if $v2 eq "none";
+    my $v1unknown = $v1 !~ m/^\d{3}(?:snap)?$/;
+    my $v2unknown = $v2 !~ m/^\d{3}(?:snap)?$/;
+    return $v1 cmp $v2 if $v1unknown and $v2unknown;
+    return -1 if $v2unknown;
+    return 1 if $v1unknown;
+    
     ($v1, my $v1snap) = $v1 =~ m/^(.*?)(snap)?$/;
     ($v2, my $v2snap) = $v2 =~ m/^(.*?)(snap)?$/;
+
+    
     my $c = $v1 <=> $v2;
     if ($c == 0) {
         return -1 if $v1snap and not defined $v2snap;
