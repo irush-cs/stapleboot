@@ -1,0 +1,9 @@
+staple 006snap
+
+	* Added MANUAL
+	* Added ChangeLog
+	* staplectl: copy script function
+	* don't delete autos on debug
+	* pager support in stapleboot
+	* additional info in staple log
+	* minor bug fixes

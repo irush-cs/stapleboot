@@ -1,0 +1,991 @@
+
+
+Table of Contents
+-----------------
+1. Preface
+
+2. Terminology
+
+3. Staple Parts
+  3.1. Database 
+  3.2. Libraries
+  3.3. Binaries
+
+4. Stapleboot
+  4.1. Init
+  4.1.1. Group List
+  4.1.2. Configuration List
+  4.1.3. Tokens List
+  4.2. Auto
+  4.3. Mount
+  4.4. Sysinit
+  4.5. Final
+  4.6. Done
+
+5. Staple Configuration
+  5.1. Staplectl
+  5.2. Tokens
+  5.2.1. Tokens Restrictions
+  5.2.2. Tokens Types
+  5.2.3. Tokens Files
+  5.2.4. Staple Tokens
+  5.2.5. Auto Tokens
+  5.3. Templates
+  5.4. Scripts
+  5.5. Autos
+  5.6. Mounts
+  5.7. Versions
+
+6. Debugging
+  6.1. Mail
+  6.2. Log
+  6.3. Verbose
+  6.4. Debug Mode
+
+7. Staple Internals
+  7.1. Databases
+  7.1.1. Staple::DB::FS
+  7.1.2. Staple::DB::SQL
+  7.2. Modules
+  7.3. Internal Data Structures
+  7.3.1. Hashes
+  7.3.2. Classes
+
+
+
+
+
+1. Preface
+-----------
+
+Staple is a framework for diskless boot management. Its purpose is to simplify
+the configuration of machines that boot from the same root filesystem but might
+need a different set of applications/configurations.
+
+Staple itself is a collection of perl scripts and modules, that at boot
+identifies the machine and the root filesystem and apply the appropriate
+configurations accordingly. Configurations can be mounting disks, copying
+templates, or running scripts. 
+
+
+2. Terminology
+---------------
+
+Following are the main terms used in staple:
+
+Host - A single machine. The host is the machine's domain name.
+
+Distribution - A single root filesystem.
+
+Configuration - A configuration is a collection of settings: scripts,
+                templates, mounts, etc. The configurations have a per
+                distribution tree layout, with an additional common tree shared
+                between all distribution. 
+
+Group - A group is a collection of configurations and other groups. The groups
+        layout is a single tree structure shared with for all distributions and
+        hosts. The host and the distribution are represented as special types
+        of groups.
+
+Token - A token is a variable. Tokens' values are replaced in templates before
+        they are copied, and in scripts before they run. Tokens also control
+        the mounts and other aspects of staple. Tokens can be set and changed
+        in groups (including hosts and distributions), in configurations and in
+        via special scripts.
+
+Script - A script is a script file in the normal sense. As this is a general
+         script, it can be used for practically any configuration on the
+         host. 
+
+Auto - Auto, or autogroup, is a special form of script. It can configure the
+       staple to add additional groups dynamically in addition to the static
+       configured groups in the staple database.
+
+Template - Template is a single file which is copied at boot (after token
+           values substitution). 
+
+Mount - Mount is a single mount point that staple will mount. Mounts are
+        configured using tokens, and are either mounted by staple or inserted
+        into the fstab for later mount.
+
+
+3. Staple Parts
+----------------
+
+3.1. Database 
+--------------
+
+Staple currently supports two types of databases: filesystem (aka fs) and sql
+database. These are the back-ends where staple saves its configurations. fs is
+the default and easier to maintain. Whatever database is used, it should be
+available at boot, if it's fs, it should be mounted before stapleboot runs. The
+fs database can be located on the distribution itself, however for several
+distributions it is best to keep it outside and mount it at boot.
+
+3.2. Libraries
+---------------
+
+Most of the staple code is written in the Staple perl modules. These modules
+should be accessible to staple when it runs. They can be installed on the
+distribution itself or mounted before the staple runs (they can be on the same
+location as an fs database). 
+
+3.3. Binaries
+--------------
+
+stapleboot
+
+  The boot program. Identifies the machine and the distributions, reads the
+  staple database, and applies the appropriate configurations. For it to
+  properly work it required two things: the Staple perl modules, and the staple
+  database.
+
+staplectl
+
+  A staple configuration command line utility. reads and writes to the staple
+  database.
+
+stapler
+
+  A configuration application utility. Used to apply configuration after the
+  machine has already booted. This is usually used for testings, or for
+  configurations with scripts that do actual work, e.g. starts/stops
+  daemons/services, partition the disk, etc.
+
+
+4. Stapleboot
+--------------
+
+stapleboot is intended to be one of the first program that init will
+execute. It is built as a wrapper around the standard boot script of the system
+such that it can configure the system properly, run the standard boot scripts,
+and run any additional configurations after the standard scripts. e.g. On SysV
+like systems, it is supposed to run around runlevel S, i.e. the sysinit action
+in the inittab.
+
+The staple has six stages during the boot: init, auto, mount, sysinit, final
+and done (and an init and done pseudo stages). The four main stages: auto,
+mount, sysinit, and final, do the main operations of the staple (scripts,
+templates, etc.), the init and done are for the startup and termination of
+stapleboot.
+
+If a script, template, auto or mount fails, stapleboot will print error message
+on the screen, and adds the error message to a mail sent in the done stage. A
+script fails if it's error status is not 0. stapleboot will also send mail for
+scripts which produce anything to the standard error. 
+
+Some errors are defined as critical e.g. staple can't find the database, host
+or distribution, and scripts and mounts can also be defined as critical. In
+which case the error mail is sent immediately, and stapleboot performs critical
+action as defined by the __STAPLE_CRITICAL__ token (See the staple tokens
+section).
+
+
+4.1. Init
+----------
+
+In this stage, stapleboot connects to the database, identifies the host and the
+distributions, and builds the appropriate groups, configurations and tokens
+lists for this boot. Another action of the init stage is mounting a tmp
+directory where staple and the scripts can save temporary files (this is
+usually not /tmp, to not interfere with the normal mount procedure).
+
+4.1.1. Group List
+------------------
+
+The initial group list is the distribution group followed by the host group. As
+each group can contain a list of other groups these groups are expanded before
+the originating group (order preserved). As the groups are in a tree structure,
+each group is also expanded to the groups above it in the tree. If a group
+already appears in the list, it will not appear again.
+
+For example for host 'h' in distribution 'd', if the 'd' contains group
+'/group1/a' and 'h' contains group '/group2/b' the initial group list is:
+  d
+  h
+and the final group list is: 
+  /group1
+  /group1/a
+  d
+  /group2
+  /group2/b
+  h
+
+4.1.2. Configuration List
+--------------------------
+
+Each group has a configuration list (can be empty). Each configuration in the
+group's configuration list has an active/inactive flag. To build the final
+configuration list, for each group in the group list, the active configurations
+are added to the list (order preserved), and the inactive configuration are
+removed if they were previously on the list. Before each configuration is
+added, it is first expanded to its parent configurations in the configurations
+tree. Also as configuration also contains a list of active/inactive
+configurations, those are also expanded in the same way.
+
+Using this method, the host group can practically override any configuration
+that other groups have added, as the host group is always the last.
+
+The scripts, templates, autos, mounts, etc. for the current boot are taken from
+the final configuration list and are run according to the order in which the
+configurations appear.
+
+4.1.3. Tokens List
+-------------------
+
+The initial tokens list is taken from the /etc/staple/staple.conf tokens file.
+
+Each configuration and group (including hosts and distributions) contains a
+list of tokens. After the final groups and configurations lists are built, each
+configuration's tokens list is added to the list of tokens. If a token appears
+more than once (i.e. in different configurations), the last one takes
+affect. This way a sub-configuration can override it's parent tokens (as
+sub-configurations always appears after their parents).
+
+After adding the configuration tokens, the groups tokens are added to the list
+in the same way, overriding any of the configurations tokens. This way the
+tokens in the host group will override any tokens in other groups or
+configurations (as the host group is always the last).
+
+4.2. Auto
+----------
+
+The auto stage is responsible for running the auto scripts. First it runs any
+preliminary (normal) scripts so that the auto script will work properly,
+e.g. mounting /proc or /dev, etc. Then it runs the auto scripts themselves. The
+auto scripts add additional groups to the final group list. These groups are
+added between the distribution and the host group, so the initial groups list
+is the distribution followed by the auto groups (if any) followed by the host
+group. At this point the final group, configuration and tokens list are
+re-calculated to produce the new final lists.
+
+4.3. Mount
+-----------
+
+This stage mounts essential mount points (and add other to the fstab). First
+template are copied to their appropriate locations (as most of the system is
+probably read only, any template will probably have to be copied to the tmp
+directory). Then any required mount scripts are run. These scripts can be
+related to activating any raid or lvm, or even partitioning the disk
+appropriately. 
+
+Each configuration has a mount list. Each mount entry contains the mount point
+and an active/inactive flag. This flag is used to add or remove a mount point
+from the final mount list (the same as with configurations). The rest of the
+mount parameters (device, options, etc.) are taken from the tokens list. If a
+mount fails for any reason, it can be configured to try another configuration
+to mount the same mount point. For configuring mounts see the configuration
+section.
+
+4.4. Sysinit
+-------------
+
+The sysinit stage runs the original init script that the stapleboot is a
+wrapper for, i.e. what the system should originally run. e.g
+"/etc/init.d/rcS". The exact command can be configured using the
+__STAPLE_SYSINIT__ token. This command can also be "/bin/true", for systems
+that have a very different boot management.
+
+Before it runs the sysinit, appropriate templates are copied and scripts are
+run. Example of templates on this stage are configuration files for services
+that will start in the sysinit, and the scripts that enable or disable such
+services (that use e.g. chkconfig or insserv).
+
+4.5. Final
+-----------
+
+The final stage runs copies templates and run scripts that should run after the
+sysinit (e.g. things that configure the rest of the boot, or start services
+that can't be started during the sysinit); Unmounts the tmp directories that it
+mounted at the init stage; and writes to a log boot information (groups,
+configurations, tokens, scripts, templates, etc.).
+
+4.6. Done
+----------
+
+Prints "Done", sends mail if any errors occurred, and exists stapleboot.
+
+
+5. Staple Configuration
+------------------------
+
+Most of the staple configuration is done in the staple database. However there
+is also an /etc/staple/ configurations directory for stapleboot initial
+configuration. This directory contains two (or more) files: distribution, and
+staple.conf.
+
+/etc/staple/distribution is a single line text file with the name of the
+distribution. It can be anything and uniquely identifies the distribution (try
+not to put spaces or other weird characters in there). This is how the staple
+chooses the distribution group and the appropriate configuration tree.
+
+/etc/staple/staple.conf is a tokens file (old style, not xml) with the initial
+tokens for stapleboot. See the tokens section later for the file
+structure. Specifically, the most important is the __STAPLE_DB__ token, which
+tells stapleboot to which database to connect (the __STAPLE_MAILTO__, and
+__STAPLE_SMTP_SERVER__ are also important in case the database is
+inaccessible). The rest of the tokens can be taken from the database once it is
+connected.
+
+5.1. Staplectl
+---------------
+
+staplectl is an interactive command line tool for editing every aspect of the
+database. While running, it has a notion of current database, initially set by
+/etc/staple/staple.conf or the --db parameter, and current distribution set
+from /etc/staple/distribution or the --dist parameter. Both can be changed at
+run time (the sdb - "set db" and sd - "set distribution" commands).
+
+Most of the staplectl commands follow the same pattern of "<action> <subject>
+[<object> [<param>]]]", e.g. "add group configuration <group1> <conf1>
+[<location>]" will add the configuration <conf1> to the group <group1> at
+location <location>. All of the staplectl commands are abbreviated with two or
+three letters commands for simplicity and are it is highly encouraged to use
+them. e.g. "add group configuration" -> "agc".
+
+Other types of command are e.g. ghi - "get host info" will show all info on a
+particular host or gac - "get all configurations" to show a list of all
+configurations.
+
+Every operation on a configuration, is based on the current distribution (as
+there is a configuration tree per distribution). This is true except the
+"common/" configuration tree which is shared by all distributions.
+
+staplectl has an internal help system, with description about every
+command. e.g. "help", "h", "help groups", "help all", "help agc".
+
+Some commands can be run by staplectl on the command line (with the -c
+argument) and not in interactive mode. e.g.: "staplectl -c gah"
+
+5.2. Tokens
+------------
+
+Tokens are variable that controls the various aspects of the staple boot, and
+are substituted inside templates and script before they are run and copied (and
+as such, change the script's behavior). The tokens in the scripts and templates
+are replaced as is, so it is important to give the tokens distinguishable names
+that won't appear in scripts accidentally. I.e. if a token named 'a' has a
+value 'b'. Then all 'a'-s in the scripts and templates will be replaced with
+'b'-s. As a general rule, it is preferred that tokens are all capital, and
+start and end with two _. e.g. __MY_TOKEN__.
+
+5.2.1. Tokens Restrictions
+---------------------------
+
+There are some restrictions on token names. They can't contain '='. They can
+contain any other character but for proper use keep it alphanumeric capital
+letters with _ instead of spaces. Also they cannot start with '#'. Tokens
+starting with '#' are renamed to start with '_'. This is for the tokens script
+(See the scripts section).
+Tokens starting with "__STAPLE_" are for staple configurations.  
+Tokens starting with "__MOUNT_" are for mount configurations. 
+Tokens starting with "__AUTO_" are automatically assigned tokens, and cannot be
+changed by script or in the database.
+
+The only restriction on token values is that it can't contain ";\n" (that is
+semi-colon + new line). 
+
+5.2.2. Tokens Types
+--------------------
+
+There are three types of tokens: static, dynamic, and regexp, which differ in
+the way their raw value (as it appears in the database) is interpreted.
+
+static tokens are the most simple tokens. Their raw value is the end value. The
+tokens in /etc/staple/staple.conf are considered static values.
+
+dynamic tokens can contain other tokens in their raw value. After each change
+in the tokens list, all the dynamic tokens' raw values are expanded with the
+value of other tokens.
+
+The value of regexp tokens is a concatenation of all the tokens which their
+names matches the name of the token as a perl's regular expression. The matched
+tokens are sorted by name, and concatenated by the tokens' raw value. For
+example, if we have a regexp token "__A_.*_TOKEN__" with raw value of ", ". And
+there are two tokens "__A_1_TOKEN__" and "__A_2_TOKEN__" with the values "A"
+and "B" respectively. The regexp token's final value will be "A, B".
+
+5.2.3. Tokens Files
+--------------------
+
+There are several usages for token files. The fs database saves tokens in token
+files (the user shouldn't need to edit them manually though); The
+/etc/staple/staple.conf is a token file; token scripts produce token files (See
+the scripts section); And the tokens part of the staple log is a tokens file
+format. stapleboot also maintains a tokens.xml file in its tmp directory during
+execution, for scripts that wants a complete list of tokens.
+
+There are two types of tokens files. The old style and the xml. The old style
+file is a simple text file with lines of the form:
+<token>=<value>;
+This is why tokens can't have "=" and values can't have ";\n". 
+
+The xml tokens file is defined by the schema file located in
+misc/tokens.xsd. The value and source elements are only used as a references
+for when printing the tokens (e.g. in the log).
+
+5.2.4. Staple Tokens
+---------------------
+
+Following is a list of tokens that affect the staple behavior:
+
+__STAPLE_SYSINIT__: This controls what to run in the sysinit stage. The default
+                    is /etc/init.d/rcS
+
+__STAPLE_VERBOSE__: This controls the verbose level of the stapleboot. It isn't
+                    quite configured yet, but basically the values are:
+                    0 quite (only errors)
+                    1 stages + sysinit (default)
+                    2 print scripts/templates/mount commands
+                    3 print scripts output
+                    4 print scripts error
+
+__STAPLE_DISABLE__: Disables staple. default is 0.
+
+__STAPLE_DEBUG__: Enter debug mode on boot (See debug section), possible values
+                  are:
+                  0      - does nothing(default)
+                  bash   - enters bash after each stage
+                  prompt - enters prompt mode
+
+__STAPLE_SMTP_SERVER__: The smtp server to connect in order to send errors
+                        to. The default is "smtp"
+
+__STAPLE_MAILTO__: The mail address to send errors to. The default is
+                   root@localhost. This should probably change in the
+                   /etc/staple/staple.conf as the localhost isn't up yet... 
+                   A value of 0 means don't send any mail.
+
+__STAPLE_BASH__: When in debug mode and entering a shell, this is the command
+                 to execute. The default is:
+                 PS1='(STAPLE)\u@\h:\w\$ ' /bin/bash --narc
+
+__STAPLE_CRITICAL__: What to do on critical error. The options are:
+                     0/ignore         - continue as usual (stapleboot exit with != 0)
+                     bash             - enter bash
+                     prompt           - enter prompt
+                     halt(\.\d+)?     - halt in $1 seconds
+                     reboot(\.\d+)?   - reboot in $1 seconds
+                     poweroff(\.\d+)? - poweroff in $1 seconds
+
+__STAPLE_CRITICAL_halt__,
+__STAPLE_CRITICAL_reboot__,
+__STAPLE_CRITICAL_poweroff__: The halt, reboot and poweroff commands to use for
+                              when the critical action is halt reboot or
+                              poweroff. The default values are: "/sbin/halt
+                              -f", "/sbin/reboot -f" and "/sbin/poweroff -f".
+
+__STAPLE_FIND_LABEL__: The script to run to find partition label used for the
+                       mount (See the mounts section). Empty by default.
+
+__STAPLE_LOG__: The log file for staple: /var/log/staple
+
+__STAPLE_MOUNT__: The basic mount command. Default to "mount -n".
+
+__STAPLE_FSCK_CMD__: The basic fsck command. Default to "/sbin/fsck -a"
+
+__STAPLE_FSCK_EXIT_OK__: A comma separated list of values that considered OK
+                         exit codes of the fsck. Default to "0,1".
+
+__STAPLE_CONF__: The staple conf file. Can't really be changed. Defaults to
+                 /etc/staple/staple.conf
+
+__STAPLE_DB__: The staple database. Can be configured only in
+               staple.conf. Default to "fs /boot/staple".
+
+__STAPLE_TMP__: The tmp directory. Can only be configured in staple.conf. There
+                is no default. If not set, stapleboot searches in
+                /boot/staple/tmp, /private/staple/tmp, /staple/tmp, for available
+                tmp directory.
+
+5.2.5. Auto Tokens
+-------------------
+
+Auto tokens are tokens with values automatically assigned by staple. They
+cannot be changed in the database or via scripts. 
+
+__AUTO_DISTRIBUTION__: The distribution's name.
+
+__AUTO_HOSTNAME__: The hostname
+
+__AUTO_TMP__: The staple's tmp directory. This should be set by __STAPLE_TMP__
+              in staple.conf.
+
+__AUTO_CONFIGURATION__: For scripts and templates. This tokens holds the value
+                        of the configuration where the script or template
+                        appears. This token cannot appear in dynamic or regexp
+                        tokens.
+
+__AUTO_SCRIPT__: For scripts, this token holds the name of the script. This
+                 token cannot appear in dynamic or regexp tokens.
+
+__AUTO_STAGE__: For scripts and templates, this token is holds the staple's
+                stage when the script or template was applied. i.e. its value
+                is one of: auto, mount, sysinit or final. This token cannot
+                appear in dynamic or regexp tokens.
+
+
+5.3. Templates
+---------------
+
+Templates are files which are copied during the mount, sysinit or final
+stages. Before coping, the templates tokens are substituted according to the
+tokens in the tokens list. After coping, the template's mode, uid and gid are
+set appropriately.
+
+The template's copy destination is defined by a full path when configuring the
+template. One exception is the /__AUTO_TMP__/ path, which will copy templates
+to the staple's tmp directory (which can be read by later scripts). This is the
+only exception, tokens are currently not substituted in the templates'
+destinations.
+
+Note for using the fs database, the database keeps the templates as files with
+their proper mode, uid and gid. As such if e.g. the staple database is nfs
+mounted with root squash, templates which are root read-only, will fail to be
+copied.
+
+
+5.4. Scripts
+-------------
+
+Scripts can be ran during the auto, mount, sysinit or final stages. They are
+run after the templates of those stages were copied. The order of the scripts
+is preserved, and they run according to the configuration list order, and as
+configured in each configuration (for multiple scripts in a configuration).
+
+In scripts, token substitutions is optional. If tokens substitution occurs, the
+scripts is copied to the staple's tmp directory and run from there. Another
+method for scripts to get tokens is through the /__AUTO_TMP__/tokens.xml
+file. This file is a dump of all the current tokens for read only purposes
+(stapleboot doesn't reread this file). Perl scripts can use
+Staple::Misc::readTokensXMLFile("/__AUTO_TMP__/tokens.xml") to get the tokens
+hash.
+
+A script can be defined as a token script (not to confuse with tokens
+substitution). These scripts' output should be a valid token file, which
+stapleboot reads and adds to the current tokens list. The author of the script
+should ensure that no other output is printed (standard error will work as
+usual). Note that any tokens added by scripts before the auto stage will be
+deleted in the auto stage as the tokens list is recalculated at the end of the
+stage.
+
+For simplifying the token script output, tokens starting with # are
+automatically converted to start with _. This is because 
+  echo "__A_TOKEN__=a;"
+will first substitute the current value of __A_TOKEN__ (if token substitution
+is enabled in the script), and won't print what's needed. So instead one can do
+echo "#_A_TOKEN__=a;".
+
+A script can be defined as critical. In which case, if the scripts exit code is
+non zero, stapleboot executes the critical action as defined by the
+__STAPLE_CRITICAL__ token.
+
+If anything is printed to the standard error, or the script exists with non
+zero status, mail is sent with the script's output, error and exit status.
+
+5.5. Autos
+-----------
+
+Autos are special scripts run at the auto stage. The autos output should be a
+list of valid groups which will be added to the group list. As with scripts,
+autos can be configured to have tokens substitutions, and be configured as
+critical.
+
+These scripts are good for adding the proper groups on hardware depended
+software such as kernel modules, video graphic card configurations, disk
+partitions, etc.
+
+5.6. Mounts
+------------
+
+Stapleboot can either mount curtain mount points at the mount stage, or add
+them to the fsbab for later mount. At the mount stage, stapleboot goes through
+the mounts in the mount list (See the mount stage section), and tries to mount
+them. 
+
+Each mount is defined by the mount point (destination), and configured by
+tokens of the form __MOUNT_<destination>_<option>__. e.g. __MOUNT_/tmp_SOURCE__
+will defined the source (device) of the /tmp mount (if this mount is on the
+mount list). Valid options are:
+
+SOURCE: The source (device) of the mount. If this is not set, staple uses the
+        find label script (defined by __STAPLE_FIND_LABEL__). This script
+        receives one parameter - the destination, and outputs the device that
+        should be used for this mount point.
+
+TYPE: The mount/filesystem type, e.g. tmpfs, unionfs, bind, etc. "bind" type
+      has a special configuration and currently will probably only work on
+      linux.
+
+OPTIONS: Any extra options to pass to the mount command.
+
+PERMISSIONS: An octal chmod value. If set, after the mount stapleboot will
+             chmod the mount point.
+
+MANUAL: Can be either 0 (default) or 1. If set, stapleboot will do the
+        mount. Otherwise, only an fstab entry will be added.
+
+NEXT: A valid configuration. If the mount fails staple will read this
+      configuration and try to mount using the new tokens read. Note that the
+      tokens are not merges, so the next configuration should contain all the
+      necessary tokens. Implies manual mount.
+
+CRITICAL: Either 0 (default) or 1. If set and the mount fails, it causes
+          stapleboot to execute the critical action as defined by
+          __STAPLE_CRITICAL__. Implies manual mount.
+
+COPY_SOURCE: If set, points to a directory to copy files from. Useful for
+             initializing tmpfs mounts. e.g. /etc.
+
+COPY_FILES: The files to copy from __MOUNT_<dest>_COPY_SOURCE__. Defaults the
+            whole directory (i.e. ".").
+
+COPY_EXCLUDE: Space separated files to exclude from coping (none by default).
+
+COPY_LINKS: Files to link instead of copy (none by default).
+
+FSCK: Whether to run fsck before mount (1) or not (0). default to 1.
+
+FSCK_CMD: Fsck command to use for this mount. If set, overrides
+          __STAPLE_FSCK_CMD__. Only meaningful for manual mounts.
+
+FSCK_EXIT_OK: Override __STAPLE_FSCK_EXIT_OK__ for this mount. A comma
+              separated list of values that considered OK exit codes of the
+              fsck.
+
+5.7. Versions
+--------------
+
+When upgrading staple, there might be a situation where there are two
+distributions with two versions of staple booting with the same database. As
+the database internal data structure might change over versions, and though it
+should have backwards compatibility this might cause problems. 
+
+As a partial solution, each distribution in the database saves the minimum
+version of staple it can support. stapleboot will fail if the distribution
+version is not lower than the stapleboot's version.
+
+Once a newer version of staple is installed on a distribution, the distribution
+version in the database can be updated (usually using staplectl).
+
+
+6. Debugging
+-------------
+
+This section describes several methods in which stapleboot helps debugging the
+boot process. 
+
+6.1. Mail
+----------
+
+After stapleboot has finished, if there were any errors during the boot they
+are all concatenated into an email sent to __STAPLE_MAILTO__. stapleboot
+considers any of the following a mail worthy error:
+
+- A script fails. i.e. exit status != 0.
+- A script has written to its standard error.
+- Can't load configuration (i.e. identify host or the distribution). 
+- A critical error has occurred. 
+- Unknown group or configuration (e.g. from an autogroup script, or a
+  configuration that is available in other distribution but not the current
+  one).
+- Any internal error/configuration.
+
+While scripts sending mails for printing to standard error might seem annoying
+at first, it is a good practice to have scripts print errors into their
+standard error and as such stapleboot reports them. Also this gives an option
+to have stapleboot send mails if curtain scripts does curtain actions that
+shouldn't normally happen (e.g. detect a new hard disk and notify that it was
+formatted).
+
+6.2. Log
+---------
+
+Although currently stapleboot doesn't send a log to syslog, it does save a boot
+log in __STAPLE_LOG__ (default to /var/log/staple). This log is rotated
+internally by stapleboot after each boot. The log contains:
+
+- basic information such as: time, host, distribution (and version), staple
+  version, staple database.
+- group list (final group list, after autogroup scripts).
+- configuration list (final).
+- auto script that run (and their output groups)
+- templates that were copied.
+- scripts.
+- tokens, their values and their source
+
+6.3. Verbose
+-------------
+
+Stapleboot has several levels of verbosity set by __STAPLE_VERBOSE__, which
+control the amount of data printed to the console. These levels are currently
+not fixed, and will probably change in the future. The current levels are:
+
+ 0 quite (only errors)
+ 1 stages + sysinit (default)
+ 2 print scripts/templates/mount commands
+ 3 print scripts output
+ 4 print scripts error
+
+6.4. Debug Mode
+----------------
+
+Stapleboot supports an internal debug mode. There are two main ways to enter
+debug mode. The first is setting the __STAPLE_DEBUG__ token, this can be set
+anywhere in the database (i.e. host, groups, configurations, etc.), or through
+a tokens script. The second is through critical action. 
+
+There are two debug modes: bash (obsolete) and prompt. bash will give a bash
+shell, and prompt will give an internal interactive stapleboot prompt. bash can
+be executed from this prompt and as such bash mode is not necessary.
+
+Once stapleboot enters debug mode, an email is sent to __STAPLE_MAILTO__. This
+mail is separate from the errors mail at the end of staple boot and should act
+as a security warning as it can give root access. Once the mail has been sent
+it wont be sent again (even if stapleboot leaves and enters debug mode again).
+
+In debug mode, stapleboot will pause before each new stage and will give the
+debug prompt, or in case of a critical error, will pause after the error
+occurred. This usually excludes the init stage, as the __STAPLE_DEBUG__
+variable is read in that stage.
+
+As long as the stapleboot is in debug mode scripts and autos with tokens
+evaluation will not be deleted from the staple tmp directory, so they can be
+checked (as long as the tmp directory is still mounted). 
+
+The only effect of setting __STAPLE_DEBUG__ when running stapler is that the
+scripts are not deleted, it does not send mail or enters debug mode.
+
+The debug prompt itself has inline help with the list of the available
+commands. Most commands are informative, and gives a glimpse of the stapleboot
+internal data. e.g. the current mounts, groups, templates, configurations,
+autos, scripts, or tokens lists, the current and available stages, etc. Other
+commands include stage manipulation, i.e. the ability to skip, run, re-run any
+of the stages. and token manipulation. i.e. setting tokens values. Note that
+setting tokens will re-evaluate any dependant regexp or dynamic tokens, and
+will change any internal staple mode or mount. i.e. one can exit the debug mode
+by setting the __STAPLE_DEBUG__ to 0;
+
+Finally, there are the bash command which enters bash, and the quit command
+which completely exits stapleboot.
+
+
+7. Staple Internals
+--------------------
+
+This section is mainly for people who want to develop staple and/or to mess
+with the database outside the staplectl.
+
+7.1. Databases
+---------------
+
+7.1.1. Staple::DB::FS
+----------------------
+
+The fs database stores all it's data in a directory hierarchy. Each group,
+distribution, and configuration has it's own directory. 
+
+Group: A group directory contains the followings:
+  groups         - A text file. one group per line. This is the group's group
+                   list.
+  configurations - A text file. One configuration per line. Each configuration
+                   is prefixed with a '+' or '-' specifying whether it's active
+                   or not. This is the group's configuration list. 
+  tokens.xml     - An xml tokens file. The group's tokens.
+  note           - A text file. A note. Can be viewed and changed with
+                   staplectl. Has no effect on stapleboot.
+  subgroups/     - A directory. Contains a group directory for each subgroup
+                   for this group. 
+
+Configuration: A configuration directory contains the followings:
+  configurations - The configuration's configuration list (same as in group).
+  mounts         - A text file. The configuration's mount list. Each mount
+                   point is prefixed with '+' or '-' for active and inactive
+                   mounts. 
+  tokens.xml     - The configuration's tokens.
+  note           - A note. The same as in group. 
+  scripts/       - The scripts directory. Contains a directory for each stage
+                   (auto, mount, sysinit and final). Each stage directory
+                   contains the scripts themselves. Each script is named
+                   "#.<c><t><m>.<name>", Where # is the order number, <c>, <t>,
+                   and <m> are indicators for whether this script is critical,
+                   tokened or a token script (i.e. a critical script will have
+                   "c" and non critical won't), and the name is the script's
+                   name.
+  autos/         - The autos directory. Contains the auto scripts. Each auto is
+                   named "#.<c><t>.<name>", with the same naming conventions as
+                   scripts. 
+  templates/     - The templates directory. Contains a directory for each
+                   stage. Each stage directory contains the template's full
+                   path.
+  subconfs/      - A directory. Contains a configuration directory for each
+                   subconfiguration 
+
+Host: As a host is basically a group. A host directory has the same structure
+as a group directory, with the exception of the subgroups/ directory, which
+does not exists for hosts.
+
+Distribution: The distribution directory is similar to the host directory
+(group without subgroups). But it contains in addition:
+  version   - A text file. The distribution version.
+  subconfs/ - The configuration tree for the distribution. 
+
+Under the base database filesystem, there are the following directories:
+groups/        - Contains the groups directories.
+distributions/ - Contains the distributions directories (including their
+                 configurations trees).
+common/        - Contains a 'subconfs' directory with the common configurations
+                 directories.
+hosts/         - Contains the hosts directories.
+
+
+7.1.2. Staple::DB::SQL
+-----------------------
+
+Staple::DB::SQL saves all the staple's database in an sql database (whichever
+is supported by perl's DBI module).
+
+The database tables are pretty straight forward (table for configuration, table
+for distributions, table for groups, table for scripts, table for a group's
+configuration list, etc.). For the create tables commands, see
+lib/Staple/DB/SQL/Init.pm or misc/sqlcommands.sql.
+
+
+
+7.2. Modules
+-------------
+
+Staple modules includes the followings:
+
+Staple.pm - Originally the base module. Now includes mostly the documentation
+            for the hash structures of staple, and some default values and
+            token mappings. There are some leftovers code there but they will
+            eventually move elsewhere (probably).
+
+Staple/DB.pm - The abstract database class. Controls all aspects of database.
+
+Staple/DB/* - The different concrete database classes. Currently FS.pm and
+              SQL.pm.
+
+Staple/DBFactory.pm - Factory functions for creating database instances.
+
+Staple/DBSync.pm - Sync function to sync between two databases. 
+
+Staple/Application.pm - Application classes. Used for applying scripts,
+                        templates etc. 
+
+Staple/Application/* - Specialized subclasses for Application.pm. Used by
+                       stapleboot and stapler.
+
+Staple/Misc.pm - Miscellaneous functions that didn't fit elsewhere.
+
+Staple/Hangman.pm - Used to hang people.
+
+
+7.3. Internal Data Structures
+------------------------------
+
+All the functions in the staple modules are documented in the modules
+themselves (perldoc). Most elements in staple are represented by perl hashes,
+some are represented by classes. 
+
+7.3.1. Hashes
+--------------
+
+group hash - represents a group. 
+  name - The name of the group
+  type - The type, can be one of: group, distribution or host.
+  path - used by the database internally (on fs, it's the path...)
+
+configuration hash - represents a configuration. A configuration hash is
+                     considered full, if it has a distribution attached to
+                     it. To get a full configuration from an incomplete
+                     configuration, one needs to call DB::getFullConfigurations
+  name   - The name of the configuration
+  type   - the string "configuration" (to distinguish from groups)
+  active - Whether the configuration is active (1) or not (0)
+  group  - Originating group hash (if any)
+  dist   - The distribution
+  path   - Used by the database internally (on fs, it's the path)
+
+
+token hash - A token
+  key    - The token name
+  value  - The token's final value (after expansion for regexp and dynamic)
+  type   - The token type (static, regexp, or dynamic)
+  raw    - The raw value as appears in the database. 
+  source - The origin of the token as free text. Isn't used by staple itself,
+           just for the logging and debugging.
+
+mount hash - A mount. The keys for this hash are equivalent to the
+             __MOUNT_<dest>_*__ tokens, with the mapping done by the
+             %Staple::mountTokenToOption map.
+
+Template hash - Represents a template
+  source        - The source of the template (i.e. the full pathed location in
+                  the filesystem) 
+  data          - If (and only if) 'source' is empty, contains the actual data
+                  of the template. 
+  destination   - The destination path (where to copy)
+  stage         - The stage this template should be copied (mount, sysinit, or
+                  final) 
+  configuration - The configuration of this template (hash ref)
+  mode          - The mode (octal) for the template
+  gid           - The gid for the template
+  uid           - The uid for the template
+
+Script hash - Represents a script
+  name          - The name of the script
+  source        - The source of the script (i.e. the full pathed location in
+                  the filesystem) 
+  data          - If (and only if) 'source' is empty, contains the actual data
+                  of the script. 
+  configuration - The configuration of this script (hash ref)
+  stage         - The stage this script should run in (auto, mount, sysinit, or
+                  final) 
+  order         - The location of this script in the local order (a number).
+                  Used in configurations with more than one script. 
+  critical      - Whether this script should invoke critical action when it
+                  fails (0 or 1) 
+  tokens        - Whether this script should pass through tokens substitution
+                  before running (0 or 1).
+  tokenScript   - Whether this script is a token script. i.e. outputs a valid
+                  token file change the tokens (0 or 1). 
+
+Auto hash - Represents an auto (autogroup)
+  name          - The name of the auto
+  source        - The source of the auto (i.e. the full pathed location of the
+                  script).
+  data          - If (and only if) 'source' is empty, contains the actual data
+                  of the script.  
+  configuration - The configuration of this auto (hash ref)
+  order         - The location of this auto in the local order (a number)
+  critical      - Whether this auto should invoke critical action when it fails
+                  (0 or 1) 
+  tokens        - Whether this auto should pass through tokens substitution
+                  before running (0 or 1) 
+
+7.3.2. Classes
+---------------
+
+There are two main classes in staple: Staple::DB and Staple::Application.
+
+Staple::DB is used for managing the backend database. There are currently two
+databases Staple::DB::FS and Staple::DB::SQL (There's also the pseudo
+Staple::DB::Error database which is what returned in case a real database can't
+be created).
+
+Staple::Application is responsible for applying everything: templates, scripts,
+mounts. It keeps the internal groups, configurations and tokens lists, and
+updates them when needed. The main difference between the Staple::Application's
+subclasses (Stapler and Boot) are the why they handle output, error, mail and
+debugging.
+
+
+
+
+?. 
+-----
+
+Site: http://stapleboot.googlecode.com/
+Author: Yair Yarom <irush@cs.huji.ac.il>
