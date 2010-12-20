@@ -10,8 +10,6 @@ package Staple::DBFactory;
 use strict;
 use warnings;
 use Staple::Misc;
-use Staple::DB::FS;
-use Staple::DB::SQL;
 use File::Find;
 require Exporter;
 
@@ -84,10 +82,14 @@ sub createDB {
     }
     $type = "fs" unless $type;
     my $db;
-    if ($dbs{$type} and $type ne "error") {
-        $db = $dbs{$type}->{new}(@params);
+    if ($type eq "error") {
+        $db = $dbs{$type}->{new}($params[0] || "Error database with no error");
     } else {
-        $db = $dbs{error}->{new}("Unknown database type \"$type\"");
+        if ($dbs{$type}) {
+            $db = $dbs{$type}->{new}(@params);
+        } else {
+            $db = $dbs{error}->{new}("Unknown database type \"$type\"");
+        }
     }
     return $db;
 }
@@ -130,7 +132,7 @@ create - create function
 sub listDB {
     my %results;
     my @dbs;
-    find(sub {$_ =~ m/\.pm$/ and push @dbs, $_;}, grep {-d "$_"} map {"$_/Staple/DB/"} @INC);
+    find({wanted => sub {$_ =~ m/\.pm$/ and $File::Find::name =~ s,.*/Staple/DB/,, and push @dbs, $File::Find::name;}}, grep {-d "$_"} map {"$_/Staple/DB/"} @INC);
     foreach my $db (@dbs) {
         (my $name) = $db =~ m/(.*)\.pm$/;
         eval {require "Staple/DB/$db"};

@@ -44,53 +44,14 @@ sub new {
     my $proto = shift;
     my $class = ref($proto) || $proto;
     my $self = {};
-    my @params = @_;
-    $params[0] = "dbi:SQLite:/tmp/staple.sqlite3" unless $params[0];
-    $params[1] = "$params[1]" if defined $params[1];
-    $params[1] = undef if defined $params[1] and $params[1] eq "undef";
-    $self->{error} = "";
-    $self->{schema} = $params[1];
-    $self->{connectionParams} = [$params[0], $params[2], $params[3], {
-                                                                      #HandleError => \&sigDBError,
-                                                                      PrintError => 0,
-                                                                      AutoCommit => 1,
-                                                                      RaiseError => 0,
-                                                                      pg_server_prepare => 1}];
-    $self->{schema} .= "." if $self->{schema};
-    $self->{schema} = "" unless defined $self->{schema};
-    return createDB("error", DBI::errstr) unless DBI->connect_cached(@{$self->{connectionParams}});
     bless ($self, $class);
-    return $self;
+    return $self->_init(@_);
 }
 
 sub create {
     my $self = new(@_);
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
-    return createDB("error", DBI::errstr) unless $dbh;
-    return createDB("error", $dbh->errstr) if $dbh->errstr;
-    my $schema = $self->{schema};
-    $schema =~ s/\.$//;
-    my $sth = $dbh->table_info(undef, $schema ? $schema : undef, undef, "TABLE");
-    return createDB("error", $dbh->errstr) unless $sth;
-    my $tables = $sth->fetchall_hashref("TABLE_NAME");
-    return createDB("error", $sth->errstr) if $sth->errstr;
-    foreach my $create (@Staple::DB::SQL::Init::createTables) {
-        $create =~ s/_SCHEMA_/$self->{schema}/g;
-        (my $name) = $create =~ m/^CREATE TABLE ([^\s]*)/;
-        $name =~ s/^$self->{schema}//;
-        next if ($tables->{$name});
-        $dbh->do($create);
-        return createDB("error", $dbh->errstr) if $dbh->errstr;
-    }
-    foreach my $insert (@Staple::DB::SQL::Init::insertInto) {
-        $insert =~ s/_SCHEMA_/$self->{schema}/;
-        (my $name) = $insert =~ m/^INSERT INTO ([^\s(]*)/;
-        $name =~ s/^$self->{schema}//;
-        next if ($tables->{$name});
-        $dbh->do($insert);
-        return createDB("error", $dbh->errstr) if $dbh->errstr;
-    }
-    return $self;
+    return $self if $self->{error};
+    return $self->_buildDB();
 }
 
 sub describe {
@@ -1383,6 +1344,60 @@ sub getNote {
 ################################################################################
 #   Internals
 ################################################################################
+
+# input: database parameters
+# output: $self (can be Staple::DB::Error)
+sub _init {
+    my $self = shift;
+    my @params = @_;
+    $params[0] = "dbi:SQLite:/tmp/staple.sqlite3" unless $params[0];
+    $params[1] = "$params[1]" if defined $params[1];
+    $params[1] = undef if defined $params[1] and $params[1] eq "undef";
+    $self->{error} = "";
+    $self->{schema} = $params[1];
+    $self->{connectionParams} = [$params[0], $params[2], $params[3], {
+                                                                      #HandleError => \&sigDBError,
+                                                                      PrintError => 0,
+                                                                      AutoCommit => 1,
+                                                                      RaiseError => 0,
+                                                                      pg_server_prepare => 1}];
+    $self->{schema} .= "." if $self->{schema};
+    $self->{schema} = "" unless defined $self->{schema};
+    return createDB("error", DBI::errstr) unless DBI->connect_cached(@{$self->{connectionParams}});
+    return $self;
+}
+
+# input: ($self)
+# output: $self (can be Staple::DB::Error);
+sub _buildDB {
+    my $self = shift;
+    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    return createDB("error", DBI::errstr) unless $dbh;
+    return createDB("error", $dbh->errstr) if $dbh->errstr;
+    my $schema = $self->{schema};
+    $schema =~ s/\.$//;
+    my $sth = $dbh->table_info(undef, $schema ? $schema : undef, undef, "TABLE");
+    return createDB("error", $dbh->errstr) unless $sth;
+    my $tables = $sth->fetchall_hashref("TABLE_NAME");
+    return createDB("error", $sth->errstr) if $sth->errstr;
+    foreach my $create (@Staple::DB::SQL::Init::createTables) {
+        $create =~ s/_SCHEMA_/$self->{schema}/g;
+        (my $name) = $create =~ m/^CREATE TABLE ([^\s]*)/;
+        $name =~ s/^$self->{schema}//;
+        next if ($tables->{$name});
+        $dbh->do($create);
+        return createDB("error", $dbh->errstr) if $dbh->errstr;
+    }
+    foreach my $insert (@Staple::DB::SQL::Init::insertInto) {
+        $insert =~ s/_SCHEMA_/$self->{schema}/;
+        (my $name) = $insert =~ m/^INSERT INTO ([^\s(]*)/;
+        $name =~ s/^$self->{schema}//;
+        next if ($tables->{$name});
+        $dbh->do($insert);
+        return createDB("error", $dbh->errstr) if $dbh->errstr;
+    }
+    return $self;
+}
 
 # input: location to open, table, [where], [values, ...]
 # output: 1 or undef
