@@ -522,29 +522,29 @@ sub addTemplates {
     my @templates = @_;
     my @errors = ();
     foreach my $template (@templates) {
-        unless ($template->{destination}) {
+        unless ($template->destination()) {
             push @errors, "Template missing destination";
             next;
         }
-        if ($template->{uid} !~ /^\d+$/) {
+        if ($template->uid() !~ /^\d+$/) {
             my $uid;
-            (undef, undef, $uid) = getpwnam($template->{uid});
+            (undef, undef, $uid) = getpwnam($template->uid());
             unless (defined $uid) {
-                push @errors, "can't find uid of \"$template->{uid}\"";
+                push @errors, "can't find uid of \"".$template->uid()."\"";
                 next;
             }
-            $template->{uid} = $uid;
+            $template->uid($uid);
         }
-        if ($template->{gid} !~ /^\d+$/) {
+        if ($template->gid() !~ /^\d+$/) {
             my $gid;
-            (undef, undef, $gid) = getgrnam($template->{gid});
+            (undef, undef, $gid) = getgrnam($template->gid());
             unless (defined $gid) {
-                push @errors, "can't find gid of \"$template->{gid}\"";
+                push @errors, "can't find gid of \"".$template->gid()."\"";
                 next;
             }
-            $template->{gid} = $gid;
+            $template->gid($gid);
         }
-        my $path = "$template->{configuration}->{path}/templates/$template->{stage}/$template->{destination}";
+        my $path = $template->configuration()->{path}."/templates/".$template->stage()."/".$template->destination();
         if (-e $path) {
             unless (unlink $path) {
                 push @errors, "can't remove previous template \"$path\": $!";
@@ -554,27 +554,25 @@ sub addTemplates {
         my $dir = $path;
         $dir =~ s,/[^/]*$,,;
         unless ($self->mkdirs($dir)) {
-            push @errors, $self->{error};
+            push @errors, $self->error();
             next;
         }
-        if ($template->{source}) {
-            unless(system("cp $template->{source} $path >/dev/null 2>&1") == 0) {
-                push @errors, "can't copy \"$template->{source}\" to \"$path\"";
-                next;
-            }
-        } else {
-            unless (open(FILE, ">$path")) {
-                push @errors, "can't open \"$path\" for writing: $!";
-                next;
-            }
-            print FILE $template->{data};
-            close(FILE);
+        my $data = $template->data();
+        if ($template->error()) {
+            push @errors, $template->error();
+            next;
         }
-        unless (chown $template->{uid}, $template->{gid}, $path) {
+        unless (open(FILE, ">$path")) {
+            push @errors, "can't open \"$path\" for writing: $!";
+            next;
+        }
+        print FILE $data;
+        close(FILE);
+        unless (chown $template->uid(), $template->gid(), $path) {
             push @errors, "can't chown \"$path\": $!";
             next;
         }
-        unless (chmod($template->{mode}, $path)) {
+        unless (chmod($template->mode(), $path)) {
             push @errors, "can't chmod \"$path\": $!";
             next;
         }
@@ -591,9 +589,9 @@ sub removeTemplates {
     my @templates = @_;
     my @errors = ();
     foreach my $template (@templates) {
-        my $path = "$template->{configuration}->{path}/templates/$template->{stage}/$template->{destination}";
+        my $path = $template->configuration()->{path}."/templates/".$template->stage()."/".$template->destination();
         unless (-e $path) { 
-            push @errors, "Template \"$template->{destination}\" does not exist in the configuration \"$template->{configuration}->{name}\"";
+            push @errors, "Template \"".$template->destination().\" does not exist in the configuration \"".$template->configuration()->{name}."\"";
             next;
         }
         unless (unlink $path) {

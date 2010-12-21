@@ -179,14 +179,14 @@ sub syncTemplates {
         push @toTemplates, $to->getTemplates(shift @toConfigurations);
     }
 
-    unless ($to->removeTemplates(@toTemplates)) {
+    unless ($to->removeTemplates(Staple::Template->new(@toTemplates))) {
         $error = $to->{error};
         return 0;
     }
 
     map {($_->{configuration}) = $to->getFullConfigurations([$_->{configuration}->{name}], $_->{configuration}->{dist})} @fromTemplates;
     
-    unless ($to->addTemplates(@fromTemplates)) {
+    unless ($to->addTemplates(Staple::Template->new(@fromTemplates))) {
         $error = $to->{error};
         return 0;
     }

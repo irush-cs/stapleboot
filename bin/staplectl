@@ -32,6 +32,7 @@ use Staple::Misc;
 use Staple::DBSync;
 use Staple::DBFactory;
 use Staple::Hangman;
+use Staple::Template;
 use Term::ReadLine;
 use Term::ANSIColor qw(:constants);
 use Net::DNS;
@@ -2320,7 +2321,7 @@ sub rt {
             print "No such template \"$template_name\" in \"$configuration\"\n";
             return;
         }
-        unless ($db->removeTemplates($template)) {
+        unless ($db->removeTemplates(Staple::Template->new($template))) {
             perror $db->{error}."\n";
             return;
         }
@@ -2370,7 +2371,7 @@ sub at {
             $template{destination} = prompt "destination";
         } until ($template{destination});
         $template{configuration} = $conf;
-        perror $db->{error}."\n" unless ($db->addTemplates(\%template));
+        perror $db->{error}."\n" unless ($db->addTemplates(Staple::Template->new(\%template)));
     };
     if ($@) {
         print "\n";
@@ -2436,8 +2437,8 @@ sub ut {
             } until ($newTemplate{stage} =~ m/^(?:mount|sysinit|final)$/);
             $newTemplate{destination} = prompt "destination", $template->{destination};
             $newTemplate{configuration} = $template->{configuration};
-            perror $db->{error}."\n" unless ($db->removeTemplates($template));
-            perror $db->{error}."\n" unless ($db->addTemplates(\%newTemplate));
+            perror $db->{error}."\n" unless ($db->removeTemplates(Staple::Template->new($template)));
+            perror $db->{error}."\n" unless ($db->addTemplates(Staple::Template->new(\%newTemplate)));
         };
         if ($@) {
             print "\n";

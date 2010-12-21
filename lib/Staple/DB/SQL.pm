@@ -523,33 +523,28 @@ sub addTemplates {
     my @errors = ();
     my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
     foreach my $template (@templates) {
-        if ($self->count("SELECT COUNT(*) FROM $self->{schema}templates WHERE configuration = ? AND distribution = ? AND destination = ? AND stage = ?", $template->{configuration}->{name}, $template->{configuration}->{dist}, $template->{destination}, $template->{stage})) {
+        if ($self->count("SELECT COUNT(*) FROM $self->{schema}templates WHERE configuration = ? AND distribution = ? AND destination = ? AND stage = ?", $template->configuration()->{name}, $template->configuration()->{dist}, $template->destination(), $template->stage())) {
             my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}templates WHERE configuration = ? AND distribution = ? AND destination = ? AND stage = ?");
-            unless ($sth->execute($template->{configuration}->{name}, $template->{configuration}->{dist}, $template->{destination}, $template->{stage})) {
+            unless ($sth->execute($template->configuration()->{name}, $template->configuration()->{dist}, $template->destination(), $template->stage())) {
                 push @errors, $sth->errstr;
                 next;
             }
         }
-        if ($template->{source}) {
-            unless (open(FILE, "<$template->{source}")) {
-                push @errors, "Can't open template for coping \"$template->{source}\": $!";
-                next;
-            }
-            $template->{data} = join "", <FILE>;
-            close(FILE);
-            $template->{source} = "";
+        unless ($template->useData()) {
+            push @errors, $template->error();
+            next;
         }
         my $sth = $dbh->prepare_cached("INSERT INTO $self->{schema}templates(destination, configuration, distribution, source, data, comment, stage, mode, gid, uid) VALUES(?,?,?,?,?,?,?,?,?,?)");
-        unless ($sth->execute($template->{destination},
-                              $template->{configuration}->{name},
-                              $template->{configuration}->{dist},
-                              $template->{source},
-                              $template->{data},
-                              $template->{comment},
-                              $template->{stage},
-                              sprintf("%04o", $template->{mode}),
-                              $template->{gid},
-                              $template->{uid})) {
+        unless ($sth->execute($template->destination(),
+                              $template->configuration()->{name},
+                              $template->configuration()->{dist},
+                              "", # $template->source(),
+                              $template->data(),
+                              $template->note(),
+                              $template->stage(),
+                              sprintf("%04o", $template->mode()),
+                              $template->gid(),
+                              $template->uid())) {
             push @errors, $sth->errstr;
             next;
         }
@@ -569,7 +564,7 @@ sub removeTemplates {
     my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
     my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}templates WHERE configuration = ? AND distribution = ? AND destination = ? AND stage = ?");
     foreach my $template (@templates) {
-        unless ($sth->execute($template->{configuration}->{name}, $template->{configuration}->{dist}, $template->{destination}, $template->{stage})) {
+        unless ($sth->execute($template->configuration()->{name}, $template->configuration()->{dist}, $template->destination(), $template->stage())) {
             push @errors, $sth->errstr;
             next;
         }

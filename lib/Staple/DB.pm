@@ -332,7 +332,7 @@ sub getTemplates {
 
 =item B<addTemplates(I<template [template [...]]>)>
 
-Adds the given templates (hashes) to their distributions.
+Adds the given templates (Staple::Template) to their distributions.
 
 If I<source> is available, it will be taken as the source for the
 template. otherwise I<data> will be taken. The source will be copied, so it can
@@ -450,8 +450,7 @@ sub removeAutos {
 
 =item B<removeTemplates(I<template [template [...]]>)>
 
-Removes the given templates (hashes with configuration hash (name +
-distribution), destination and stage).
+Removes the given templates (Staple::Template).
 
 Returns 1 or undef;
 
