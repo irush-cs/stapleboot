@@ -48,7 +48,7 @@ noted). Most of them are set automatically by the member functions.
 
 =item I<mounts>            - List of mounts (hashes)
 
-=item I<templates>         - List of templates (hashes)
+=item I<templates>         - List of templates (Staple::Template)
 
 =item I<autos>             - List of autos (hashes)
 
@@ -438,28 +438,25 @@ sub applyTemplates {
     my $self = shift;
     my $stage = shift;
     foreach my $template (@{$self->{templates}}) {
-        next if $template->{stage} ne $stage;
-        my $configurationPath = "$template->{configuration}->{path}/templates/$stage";
-        my $data = $template->{data};
-        if ($template->{source}) {
-            if (open(FILE, "<$template->{source}")) {
-                $data = join "", <FILE>;
-                close(FILE);
-            } else {
-                $self->error("applyTemplates: can't read $template->{source}: $!");
-                $self->addMail("Error reading template $template->{configuration}->{name}/${stage}$template->{destination}: $!");
-                next;
-            }
+        next if $template->stage() ne $stage;
+        my $configurationPath = $template->configuration()->{path}."/templates/$stage";
+        
+        my $data = $template->data();
+        if ($template->error()) {
+            $self->error("applyTemplates: ".$template->error());
+            $self->addMail("Error reading template: ".$template->error());
+            next;
         }
+
         $self->{tokens}->{__AUTO_CONFIGURATION__} = {key => "__AUTO_CONFIGURATION__",
-                                                     value => $template->{configuration}->{name},
-                                                     raw => $template->{configuration}->{name},
+                                                     value => $template->configuration()->{name},
+                                                     raw => $template->configuration()->{name},
                                                      type => "auto"};
         $data = applyTokens($data, $self->{tokens});
         delete $self->{tokens}->{__AUTO_CONFIGURATION__};
-        my $destination = "$self->{rootDir}$template->{destination}";
-        if ($template->{destination} =~ m@^/__AUTO_TMP__/@) {
-            $destination = "$template->{destination}";
+        my $destination = "$self->{rootDir}".$template->destination();
+        if ($template->destination() =~ m@^/__AUTO_TMP__/@) {
+            $destination = $template->destination();
             $destination =~ s@^/__AUTO_TMP__@$self->{tmpDir}@;
         }
         $destination = fixPath($destination);
@@ -480,16 +477,16 @@ sub applyTemplates {
             #(my $mode, my $uid, my $gid) = (stat("$template->{source}"))[2,4,5];
             #chown $uid, $gid, "$rootDir$template->{destination}";
             #chmod $mode & 07777, "$rootDir$template->{destination}";
-            chown $template->{uid}, $template->{gid}, "$destination";
-            chmod $template->{mode}, "$destination";
-            if ($template->{source}) {
-                push @{$self->{applied}->{templates}}, $template->{source};
+            chown $template->uid(), $template->gid(), "$destination";
+            chmod $template->mode(), "$destination";
+            if ($template->source()) {
+                push @{$self->{applied}->{templates}}, $template->source();
             } else {
                 push @{$self->{applied}->{templates}}, $destination;
             }
         } else {
-            $self->error("applyTemplates error ($template->{destination}): $!");
-            $self->addMail("Error coping template $template->{destination} from $template->{configuration}->{name}: $!");
+            $self->error("applyTemplates error (".$template->destination()."): $!");
+            $self->addMail("Error coping template ".$template->destination()." from ".$template->configuration()->{name}.": $!");
         }
     }
 }
@@ -759,10 +756,10 @@ sub printTemplates {
     #return if $self->{verbose} < 2;
     my @templates = @{$self->{templates}};
     my $output = "templates:\n";
-    foreach my $template (@templates) {
-        $output .= "   $template->{destination}";
-        $output .= ":\n".join("\n",  map {if (ref $template->{$_}) {"      $_ => $template->{$_}->{name}"} else {defined $template->{$_} ? "      $_ => $template->{$_}" : "      $_ => (undef)"}} keys %$template) if $self->{verbose} > 2;
-        $output .="\n";
+    if ($self->{verbose} > 2) {
+        $output .= join("\n", map {$_->description(1)} @templates);
+    } else {
+        $output .= join("\n", map {$_->destination()} @templates);
     }
     chomp $output;
     $self->output($output);

@@ -13,6 +13,7 @@ require Exporter;
 use Staple::DB;
 use Staple::Misc;
 use File::Path;
+use Staple::Template;
 
 our @ISA = ("Staple::DB");
 our $VERSION = '006snap';
@@ -514,7 +515,8 @@ sub getTemplates {
             }
         }
     }
-    return values %templates;
+    return Staple::Template->new(values %templates) if %templates;
+    return ();
 }
 
 sub addTemplates {

@@ -129,31 +129,7 @@ B<mount hash>
 
 =back
 
-B<Template hash>
-
-=over
-
-=over
-
-=item I<source>        - The source of the template (i.e. the full pathed location in the filesystem)
-
-=item I<data>          - If (and only if) I<source> is empty, contains the actual data of the template.
-
-=item I<destination>   - The destination path
-
-=item I<stage>         - The stage this template should be copied (mount, sysinit, or final)
-
-=item I<configuration> - The configuration of this template (hash ref)
-
-=item I<mode>          - The mode (octal) for the template
-
-=item I<gid>           - The gid for the template
-
-=item I<uid>           - The uid for the template
-
-=back
-
-=back
+B<Staple::Template>
 
 B<Script hash>
 

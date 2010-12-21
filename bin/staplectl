@@ -2316,12 +2316,12 @@ sub rt {
         return;
     }
     if (@templates and $templates[0]) {
-        (my $template) = grep {$_->{stage} eq $stage and $_->{destination} eq $template_name} @templates;
+        (my $template) = grep {$_->stage() eq $stage and $_->destination() eq $template_name} @templates;
         unless ($template) {
             print "No such template \"$template_name\" in \"$configuration\"\n";
             return;
         }
-        unless ($db->removeTemplates(Staple::Template->new($template))) {
+        unless ($db->removeTemplates($template)) {
             perror $db->{error}."\n";
             return;
         }
@@ -2394,19 +2394,15 @@ sub ut {
         return;
     }
     if (@templates and $templates[0]) {
-        (my $template) = grep {$_->{stage} eq $stage and $_->{destination} eq $template_name} @templates;
+        (my $template) = grep {$_->stage() eq $stage and $_->destination() eq $template_name} @templates;
         unless ($template) {
             print "No such template \"$template_name\" in \"$configuration\"\n";
             return;
         }
-        my $data = $template->{data};
-        if ($template->{source}) {
-            unless (open(FILE, "<$template->{source}")) {
-                print "Can't open template \"$template->{source}\"\n";
-                return;
-            }
-            $data = join "", <FILE>;
-            close(FILE);
+        my $data = $template->data();
+        if ($template->error()) {
+            print $template->error()."\n";
+            return;
         }
         my $tmpFile = `mktemp /tmp/staplectl.XXXXXXXX 2>/dev/null`;
         if ($? != 0) {
@@ -2429,15 +2425,15 @@ sub ut {
             local $SIG{INT} = sub {die "SIGINT"};
             my %newTemplate;
             $newTemplate{source} = $tmpFile;
-            $newTemplate{uid} = prompt "uid", $template->{uid};
-            $newTemplate{gid} = prompt "gid", $template->{gid};
-            $newTemplate{mode} = oct(prompt "mode", sprintf("%04o", $template->{mode}));
+            $newTemplate{uid} = prompt "uid", $template->uid();
+            $newTemplate{gid} = prompt "gid", $template->gid();
+            $newTemplate{mode} = oct(prompt "mode", sprintf("%04o", $template->mode()));
             do {
-                $newTemplate{stage} = prompt "stage (mount, sysinit, final)", $template->{stage};
+                $newTemplate{stage} = prompt "stage (mount, sysinit, final)", $template->stage();
             } until ($newTemplate{stage} =~ m/^(?:mount|sysinit|final)$/);
-            $newTemplate{destination} = prompt "destination", $template->{destination};
-            $newTemplate{configuration} = $template->{configuration};
-            perror $db->{error}."\n" unless ($db->removeTemplates(Staple::Template->new($template)));
+            $newTemplate{destination} = prompt "destination", $template->destination();
+            $newTemplate{configuration} = $template->configuration();
+            perror $db->{error}."\n" unless ($db->removeTemplates($template));
             perror $db->{error}."\n" unless ($db->addTemplates(Staple::Template->new(\%newTemplate)));
         };
         if ($@) {
@@ -2465,33 +2461,20 @@ sub gts {
         return;
     }
     if (@templates and $templates[0]) {
-        (my $template) = grep {$_->{stage} eq $stage and $_->{destination} eq $template_name} @templates;
+        (my $template) = grep {$_->stage() eq $stage and $_->destination() eq $template_name} @templates;
         unless ($template) {
             print "No such template \"$template_name\" in \"$configuration\"\n";
             return;
         }
-        if ($template->{source}) {
-            unless (open(FILE, "<$template->{source}")) {
-                perror "Error opening \"$template->{source}\": $!\n";
-                return;
-            }
-            my $data = join "", <FILE>;
-            close(FILE);
-            print $data;
-            if ($data !~ m/\n$/) {
-                print "\n";
-                print "(template doesn't end with \\n)\n";
-            }
-        } elsif ($template->{data}) {
-            print $template->{data};
-            if ($template->{data} !~ m/\n$/) {
-                print "\n";
-                print "(template doesn't end with \\n)\n";
-            }
-        } else {
-            print "Bad template, no source or data\n";
+        my $data = $template->data();
+        if ($template->error()) {
+            perror $template->error()."\n";
             return;
         }
+        if ($data !~ m/\n$/) {
+            $data .= "\n(template doesn't end with \\n)\n";
+        }
+        print $data;        
     } else {
         print "No such template \"$template_name\" in \"$configuration\"\n";
         return;
@@ -2503,9 +2486,9 @@ sub gtm {
     (my @templates) = localgettemplates(@_);
     if (@templates and $templates[0]) {
         foreach my $stage ("mount", "sysinit", "final") {
-            next unless grep {$_->{stage} eq $stage} @templates;
+            next unless grep {$_->stage() eq $stage} @templates;
             print "  $stage:\n";
-            print join "", map {"     ($_->{uid}:$_->{gid} ".sprintf("%04o", $_->{mode})." ".($_->{source} ? "file" : "data")."): $_->{destination}\n"} grep {$_->{stage} eq $stage} @templates;
+            print join "", map {"     ".$_->description()} grep {$_->stage() eq $stage} @templates;
         }
     }
 }
@@ -4179,7 +4162,7 @@ sub template_completion {
         (my @templates) = localgettemplates($configuration);
         $echooff = 0;
         return () unless (@templates and $templates[0]);
-        @templates = map {$_->{destination}} grep {$_->{stage} eq $stage} @templates;
+        @templates = map {$_->destination()} grep {$_->stage() eq $stage} @templates;
         @currentCompletionList = grep {index($_, $text) == 0} @templates;
     }
     return $currentCompletionList[$count];
@@ -4221,7 +4204,7 @@ sub template_stage_completion {
         (my @templates) = localgettemplates($configuration);
         $echooff = 0;
         return () unless (@templates and $templates[0]);
-        my @stages = map {$_->{stage}} @templates;
+        my @stages = map {$_->stage()} @templates;
         my %stages;
         @stages{@stages} = @stages;
         @stages = sort {$a eq $b ? 0 :

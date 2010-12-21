@@ -24,6 +24,8 @@ Staple::Template module.
 use strict;
 use warnings;
 
+our $VERSION = '006snap';
+
 =item B<new(I<\%attr>, [I<\%attr> [...]])>
 
 Creates a new template with attributes (see B<init> for list of attributes). If
@@ -104,7 +106,7 @@ current configuration.
 =cut
 
 sub configuration {
-    param(shift, "configuration", shift);
+    return param(shift, "configuration", shift);
 }
 
 =item B<destination(I<destination>)>
@@ -116,7 +118,7 @@ current one.
 =cut
 
 sub destination {
-    param(shift, "destination", shift);
+    return param(shift, "destination", shift);
 }
 
 =item B<stage(I<stage>)>
@@ -127,7 +129,7 @@ I<stage> is undef don't change it, just return the current one.
 =cut
 
 sub stage {
-    param(shift, "stage", shift);
+    return param(shift, "stage", shift);
 }
 
 =item B<note(I<note>)>
@@ -138,7 +140,7 @@ is undef don't change it, just return the current one.
 =cut
 
 sub note {
-    param(shift, "note", shift);
+    return param(shift, "note", shift);
 }
 
 
@@ -150,7 +152,7 @@ undef don't change it, just return the current one.
 =cut
 
 sub mode {
-    param(shift, "mode", shift);
+    return param(shift, "mode", shift);
 }
 
 =item B<uid(I<uid>)>
@@ -161,7 +163,7 @@ uid. If I<uid> is undef don't change it, just return the current one.
 =cut
 
 sub uid {
-    param(shift, "uid", shift);
+    return param(shift, "uid", shift);
 }
 
 =item B<gid(I<gid>)>
@@ -172,14 +174,29 @@ I<gid> is undef don't change it, just return the current one.
 =cut
 
 sub gid {
-    param(shift, "gid", shift);
+    return param(shift, "gid", shift);
+}
+
+=item B<source(I<source>)>
+
+Sets this templates' source (full path), and returns the previous source. If
+I<source> is undef don't change it, just return the current one. This deletes
+the templates data (even if the file doesn't exists).
+
+=cut
+
+sub source {
+    my $self = shift;
+    my $insource = shift;
+    delete $self->{data} if defined $insource;
+    return $self->param("source", $insource);
 }
 
 =item B<data(I<data>)>
 
 If I<data> is defined, changes the templates' data and empty the
 source. Returns the previous data, i.e. if source is defined, read it, if not
-then the previous data.
+then the previous data. Returns undef on error.
 
 =cut
 
@@ -244,6 +261,41 @@ Gets the last error or an empty string.
 sub error {
     my $self = shift;
     return $self->{error};
+}
+
+=item B<description(I<level>)>
+
+Returns a string describing this template. I<level> will specify the format:
+
+=over
+
+=item 0 - Default, one line: (uid:gid mode file|data): destination
+
+=item 1 - Long, all available information (excluding "data" if available)
+
+=back
+
+=cut
+
+sub description {
+    my $self = shift;
+    my $level = shift;
+    my $result = "";
+    if ($level) {
+        $result .= "$self->{destination}:\n";
+        $result .= "  source => $self->{source}\n";
+        $result .= "  data => ".($self->{data} ? "(trimmed)" : "(undef)")."\n";
+        $result .= "  destination => $self->{destination}\n";
+        $result .= "  stage => $self->{stage}\n";
+        $result .= "  configuration => ".($self->{configuration} ? $self->{configuration}->{name} : "(undef)")."\n";
+        $result .= "  mode => ".sprintf("%04o", $self->{mode})."\n";
+        $result .= "  gid => $self->{gid}\n";
+        $result .= "  uid => $self->{uid}\n";
+        $result .= "  note => ".($self->{note} ? $self->{note} : "(undef)")."\n";
+    } else {
+        $result .= "($self->{uid}:$self->{gid} ".sprintf("%04o", $self->mode())." ".($self->source() ? "file" : "data")."): ".$self->{destination}."\n";
+    }
+    return $result;
 }
 
 ################################################################################

@@ -14,6 +14,7 @@ use Staple::Misc;
 use DBI;
 use Staple::DBFactory;
 use Staple::DB::SQL::Init;
+use Staple::Template;
 
 our @ISA = ("Staple::DB");
 our $VERSION = '006snap';
@@ -514,7 +515,8 @@ sub getTemplates {
         }
         push @templates, map { +{configuration => $configuration, destination => $_->[0], source => $_->[1], data => $_->[2], stage => $_->[3], mode => oct($_->[4]), gid => $_->[5], uid => $_->[6]}} @$resultArray;
     }
-    return @templates;
+    return Staple::Template->new(@templates) if @templates;
+    return ();
 }
 
 sub addTemplates {

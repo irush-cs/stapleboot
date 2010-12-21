@@ -881,6 +881,7 @@ Staple/Misc.pm - Miscellaneous functions that didn't fit elsewhere.
 
 Staple/Hangman.pm - Used to hang people.
 
+Staple/Template.pm - Represents a template.
 
 7.3. Internal Data Structures
 ------------------------------
@@ -921,19 +922,6 @@ mount hash - A mount. The keys for this hash are equivalent to the
              __MOUNT_<dest>_*__ tokens, with the mapping done by the
              %Staple::mountTokenToOption map.
 
-Template hash - Represents a template
-  source        - The source of the template (i.e. the full pathed location in
-                  the filesystem) 
-  data          - If (and only if) 'source' is empty, contains the actual data
-                  of the template. 
-  destination   - The destination path (where to copy)
-  stage         - The stage this template should be copied (mount, sysinit, or
-                  final) 
-  configuration - The configuration of this template (hash ref)
-  mode          - The mode (octal) for the template
-  gid           - The gid for the template
-  uid           - The uid for the template
-
 Script hash - Represents a script
   name          - The name of the script
   source        - The source of the script (i.e. the full pathed location in
@@ -968,20 +956,34 @@ Auto hash - Represents an auto (autogroup)
 7.3.2. Classes
 ---------------
 
-There are two main classes in staple: Staple::DB and Staple::Application.
+Staple classes are divided into two main groups: data structures, and
+program/logic classes. The data structure classes are usually simple hashes
+with accessors and some utility methods. They do not represent a "real-time"
+database state of the object they represent (i.e. changes won't propagate to
+the backend).
 
-Staple::DB is used for managing the backend database. There are currently two
-databases Staple::DB::FS and Staple::DB::SQL (There's also the pseudo
-Staple::DB::Error database which is what returned in case a real database can't
-be created).
+Staple::DB 
 
-Staple::Application is responsible for applying everything: templates, scripts,
-mounts. It keeps the internal groups, configurations and tokens lists, and
-updates them when needed. The main difference between the Staple::Application's
-subclasses (Stapler and Boot) are the why they handle output, error, mail and
-debugging.
+  This class hierarchy is used for managing the backend database. There are
+  currently two databases Staple::DB::FS and Staple::DB::SQL (There's also the
+  pseudo Staple::DB::Error database which is what returned in case a real
+  database can't be created).
 
+Staple::Application 
 
+  This class hierarchy is responsible for applying everything: templates,
+  scripts, mounts. It keeps the internal groups, configurations and tokens
+  lists, and updates them when needed. The main difference between the
+  Staple::Application's subclasses (Stapler and Boot) are the why they handle
+  output, error, mail and debugging.
+
+Staple::Template
+
+  This data structure represents a single template. It contains all the
+  template's data (stage, mode, uid, gid, etc.). The template itself can be
+  specified using the data or source attributes. "source" is a full path to use
+  as input. "data" is the actual data. "source" has precedence over "data" if
+  both are available (one will usually delete the other).
 
 
 ?. 

@@ -316,9 +316,9 @@ sub getRawMounts {
 
 =item B<getTemplates(I<configuration, [configuration [...]]>)>
 
-Get templates hashes from the database. Recives an ordered list of full
-configurations, and returns an (unordered) list of templates (same templates +
-stage will be overriden by the last one).
+Get templates (Staple::Template) from the database. Recives an ordered list of
+full configurations, and returns an (unordered) list of templates (same
+templates + stage will be overriden by the last one).
 
 Returns undef on error and sets the error.
 
