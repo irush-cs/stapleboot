@@ -532,16 +532,21 @@ sub addTemplates {
                 next;
             }
         }
-        unless ($template->useData()) {
-            push @errors, $template->error();
-            next;
+        if ($self->{checkData}) {
+            $template->data();
+            if ($template->error()) {
+                push @errors, $template->error();
+                next;
+            }
         }
         my $sth = $dbh->prepare_cached("INSERT INTO $self->{schema}templates(destination, configuration, distribution, source, data, comment, stage, mode, gid, uid) VALUES(?,?,?,?,?,?,?,?,?,?)");
         unless ($sth->execute($template->destination(),
                               $template->configuration()->{name},
                               $template->configuration()->{dist},
-                              "", # $template->source(),
-                              $template->data(),
+                              # use either data or source
+                              (($self->{saveData} or not $template->source()) ?
+                               ("", $template->data()) :
+                               ($template->source()), ""), 
                               $template->note(),
                               $template->stage(),
                               sprintf("%04o", $template->mode()),
@@ -1360,6 +1365,8 @@ sub _init {
                                                                       pg_server_prepare => 1}];
     $self->{schema} .= "." if $self->{schema};
     $self->{schema} = "" unless defined $self->{schema};
+    $self->{saveData} = 1; # save data rather then source on templates
+    $self->{checkData} = 1; # check data of templates before adding (for DB::FSQL to override)
     return createDB("error", DBI::errstr) unless DBI->connect_cached(@{$self->{connectionParams}});
     return $self;
 }

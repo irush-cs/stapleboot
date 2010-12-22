@@ -1188,7 +1188,7 @@ Removes {+|-}<configuration2> from <configuration1>'s list of configurations.
 ",
 );
 
-my @singleCommandCommands = ("ahc", "rhc", "gag", "ghc", "wht", "whc", "whg", "ghi", "ggi", "gci", "bad", "badcommandorfilename", "gt", "gdt", "gct", "gah", "gac", "gas", "gss", "gts", "gm", "ah", "gad", "ghn", "ggn", "gdn", "gcn", "debug", "undebug");
+my @singleCommandCommands = ("ahc", "rhc", "gag", "ghc", "wht", "whc", "whg", "ghi", "ggi", "gci", "bad", "badcommandorfilename", "gt", "gdt", "gct", "gah", "gac", "gas", "gss", "gts", "gm", "ah", "gad", "ghn", "ggn", "gdn", "gcn", "debug", "undebug", "ndb");
 
 sub help {
     my %topics = (a              => "helpall",

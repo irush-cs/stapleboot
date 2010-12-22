@@ -192,6 +192,32 @@ sub source {
     return $self->param("source", $insource);
 }
 
+=item B<writeSource(I<source>)>
+
+Writes the templates data (from previous source or data) to I<source>. Sets the
+templates source to I<source> and empties its data. Returns 1 on success or
+undef on error.
+
+=cut
+
+sub writeSource {
+    my $self = shift;
+    my $insource = shift;
+    $self->{error} = "";
+    my $data = $self->data();
+    return undef if $self->{error};
+    unless (open(FILE, ">$insource")) {
+        $self->{error} = "Can't open \"$insource\" for writing: $!";
+        return undef;
+    }
+    print FILE $data;
+    close(FILE);
+
+    $self->{source} = $insource;
+    delete $self->{data};
+    return 1;
+}
+
 =item B<data(I<data>)>
 
 If I<data> is defined, changes the templates' data and empty the
