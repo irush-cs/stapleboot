@@ -162,12 +162,8 @@ sub debug {
                     printPager($temp);
                 } elsif ($line eq "scripts") {
                     my @temp = @{$boot->{scripts}};
-                    my $temp = "";
-                    foreach my $script (@temp) {
-                        $temp .= "   $script->{name}";
-                        $temp .= ":\n". join "\n", map {if (ref $script->{$_}) {"      $_ => $script->{$_}->{name}"} else {"      $_ => $script->{$_}"}} keys %$script;
-                        $temp .= "\n";
-                    }
+                    my $temp = join("\n", map {$_->description(1)} @temp);
+                    $temp .= "\n";
                     printPager($temp);
                 } elsif ($line eq "autos") {
                     my @temp = @{$boot->{autos}};

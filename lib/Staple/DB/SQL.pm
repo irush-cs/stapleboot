@@ -15,6 +15,7 @@ use DBI;
 use Staple::DBFactory;
 use Staple::DB::SQL::Init;
 use Staple::Template;
+use Staple::Script;
 
 our @ISA = ("Staple::DB");
 our $VERSION = '006snap';
@@ -525,6 +526,8 @@ sub addTemplates {
     my @errors = ();
     my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
     foreach my $template (@templates) {
+                                         
+        # delete previous
         if ($self->count("SELECT COUNT(*) FROM $self->{schema}templates WHERE configuration = ? AND distribution = ? AND destination = ? AND stage = ?", $template->configuration()->{name}, $template->configuration()->{dist}, $template->destination(), $template->stage())) {
             my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}templates WHERE configuration = ? AND distribution = ? AND destination = ? AND stage = ?");
             unless ($sth->execute($template->configuration()->{name}, $template->configuration()->{dist}, $template->destination(), $template->stage())) {
@@ -532,6 +535,8 @@ sub addTemplates {
                 next;
             }
         }
+
+        # check data
         if ($self->{checkData}) {
             $template->data();
             if ($template->error()) {
@@ -539,6 +544,8 @@ sub addTemplates {
                 next;
             }
         }
+
+        # add template
         my $sth = $dbh->prepare_cached("INSERT INTO $self->{schema}templates(destination, configuration, distribution, source, data, comment, stage, mode, gid, uid) VALUES(?,?,?,?,?,?,?,?,?,?)");
         unless ($sth->execute($template->destination(),
                               $template->configuration()->{name},
@@ -605,7 +612,8 @@ sub getScripts {
         my @scripts = map { +{configuration => $configuration, name => $_->[0], source => $_->[1], data => $_->[2], stage => $_->[3], order => $_->[4], critical => $_->[5], tokens => $_->[6], tokenScript => $_->[7]}} @$resultArray;
         push @results, sort {$a->{stage} eq $b->{stage} ? $a->{order} <=> $b->{order} : stageCmp($a->{stage}, $b->{stage})} @scripts;
     }
-    return @results;
+    return Staple::Script->new(@results) if @results;
+    return ();    
 }
 
 sub addScripts {
@@ -613,39 +621,46 @@ sub addScripts {
     my @scripts = @_;
     my @errors = ();
     my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
-    my $sth = $dbh->prepare_cached("INSERT INTO $self->{schema}scripts(name, data, configuration, distribution, stage, ordering, critical, tokens, tokenScript, comment) VALUES(?,?,?,?,?,?,?,?,?,?)");
+    my $sth = $dbh->prepare_cached("INSERT INTO $self->{schema}scripts(name, source, data, configuration, distribution, stage, ordering, critical, tokens, tokenScript, comment) VALUES(?,?,?,?,?,?,?,?,?,?,?)");
+    if ($dbh->errstr) {
+        $self->{error} = "addScripts: ".$dbh->errstr;
+        return undef;
+    }
     foreach my $script (@scripts) {
-        if ($script->{source}) {
-            unless (open(FILE, "<$script->{source}")) {
-                push @errors, "Can't open script for coping \"$script->{source}\": $!";
+
+        if ($self->{checkData}) {
+            $script->data();
+            if ($script->error()) {
+                push @errors, $script->error();
                 next;
             }
-            $script->{data} = join "", <FILE>;
-            close(FILE);
-            $script->{source} = "";
         }
+
         $self->{error} = "";
-        my $location = $self->count("SELECT COUNT(*) FROM $self->{schema}scripts WHERE configuration = ? AND distribution = ? AND stage = ?", $script->{configuration}->{name}, $script->{configuration}->{dist}, $script->{stage});
+        my $location = $self->count("SELECT COUNT(*) FROM $self->{schema}scripts WHERE configuration = ? AND distribution = ? AND stage = ?", $script->configuration()->{name}, $script->configuration()->{dist}, $script->stage());
         if ($self->{error}) {
             push @errors, "addScripts: ".$self->{error};
             next;
         }
         $location = 0 unless $location;
-        $script->{order} = $location + 1 if not defined $script->{order} or $script->{order} > $location or $script->{order} < 1;
-        unless ($self->openOrdering($script->{order}, "$self->{schema}scripts", "configuration = ? AND distribution = ? AND stage = ?", $script->{configuration}->{name}, $script->{configuration}->{dist}, $script->{stage})) {
+        $script->order($location + 1) if not defined $script->order() or $script->order() > $location or $script->order() < 1;
+        unless ($self->openOrdering($script->order(), "$self->{schema}scripts", "configuration = ? AND distribution = ? AND stage = ?", $script->configuration()->{name}, $script->configuration()->{dist}, $script->stage())) {
             push @errors, "addScripts: ".$self->{error};
             next;
         }
-        unless ($sth->execute($script->{name},
-                              $script->{data},
-                              $script->{configuration}->{name},
-                              $script->{configuration}->{dist},
-                              $script->{stage},
-                              $script->{order},
-                              $script->{critical},
-                              $script->{tokens},
-                              $script->{tokenScript},
-                              $script->{comment})) {
+        unless ($sth->execute($script->name(),
+                              # use either data or source
+                              (($self->{saveData} or not $script->source()) ?
+                               ("", $script->data()) :
+                               ($script->source()), ""), 
+                              $script->configuration()->{name},
+                              $script->configuration()->{dist},
+                              $script->stage(),
+                              $script->order(),
+                              $script->critical(),
+                              $script->tokens(),
+                              $script->tokenScript(),
+                              $script->note())) {
             push @errors, "addScripts: ".$sth->errstr;
             next;
         }
@@ -664,13 +679,13 @@ sub removeScripts {
     my @errors = ();   
     my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
     my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}scripts WHERE configuration = ? AND distribution = ? AND stage = ? AND ordering = ?");
-    foreach my $script (sort {$b->{order} <=> $a->{order}} @scripts) {
-        $sth->execute($script->{configuration}->{name}, $script->{configuration}->{dist}, $script->{stage}, $script->{order});
+    foreach my $script (sort {$b->order() <=> $a->order()} @scripts) {
+        $sth->execute($script->configuration()->{name}, $script->configuration()->{dist}, $script->stage(), $script->order());
         if ($sth->errstr) {
             push @errors, $sth->errstr;
             next;
         }
-        push @errors, $self->{error} unless ($self->closeOrdering($script->{order}, "$self->{schema}scripts", "configuration = ? AND distribution = ? AND stage = ?", $script->{configuration}->{name}, $script->{configuration}->{dist}, $script->{stage}));
+        push @errors, $self->{error} unless ($self->closeOrdering($script->order(), "$self->{schema}scripts", "configuration = ? AND distribution = ? AND stage = ?", $script->configuration()->{name}, $script->configuration()->{dist}, $script->stage()));
     }
     if (@errors) {
         chomp @errors;

@@ -350,9 +350,9 @@ sub addTemplates {
 
 =item B<getScripts(I<configuration [configuration [...]]>)>
 
-Returns an ordered list of scripts hashes. The script are ordered first by the
-configurations (with the given order) and second by the internal order per
-configuration.
+Returns an ordered list of scripts (Staple::Script). The script are ordered
+first by the configurations (with the given order) and second by the internal
+order per configuration.
 
 On error undef is returned.
 
@@ -403,7 +403,7 @@ sub addAutos {
 
 =item B<removeScripts(I<script [script [...]]>)>
 
-Removes the given scripts (full script hashes).
+Removes the given scripts (Staple::Script).
 
 Returns 1 or undef;
 
@@ -417,8 +417,8 @@ sub removeScripts {
 
 =item B<addScripts(I<script [script [...]]>)>
 
-Adds the given scripts (hashes, contains the configurations to add to). The
-scripts will be inserted in the specified location (order).
+Adds the given scripts (Staple::Script). The scripts will be inserted in the
+specified location (order).
 
 If I<source> is available, it will be taken as the source for the
 script. otherwise I<data> will be taken. The source will be copied, so it can

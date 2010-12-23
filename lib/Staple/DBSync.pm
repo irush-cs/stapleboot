@@ -148,7 +148,7 @@ sub syncScripts {
         return 0;
     }
 
-    map {($_->{configuration}) = $to->getFullConfigurations([$_->{configuration}->{name}], $_->{configuration}->{dist})} @fromScripts;
+    map {$_->configuration($to->getFullConfigurations([$_->configuration()->{name}], $_->configuration()->{dist}))} @fromScripts;
 
     unless ($to->addScripts(@fromScripts)) {
         $error = "syncScripts failed(adding): ".$to->{error};

@@ -33,6 +33,7 @@ use Staple::DBSync;
 use Staple::DBFactory;
 use Staple::Hangman;
 use Staple::Template;
+use Staple::Script;
 use Term::ReadLine;
 use Term::ANSIColor qw(:constants);
 use Net::DNS;
@@ -1568,7 +1569,7 @@ sub cs {
     if (not defined $scripts1[0]) {
         return;
     }
-    (my $script1) = grep {$_->{stage} eq $stage1 and ($_->{name} eq $script1_name or $_->{order} eq $script1_name)} @scripts1;
+    (my $script1) = grep {$_->stage() eq $stage1 and ($_->name() eq $script1_name or $_->order() eq $script1_name)} @scripts1;
     unless ($script1) {
         perror "No such script \"$script1_name\" in \"$conf1\" (under distribution \"$dist1\")\n";
         return;
@@ -1619,7 +1620,7 @@ sub cs {
     } else {
         (my @scripts2) = localgetscripts($conf2, $dist2);
         if (@scripts2 and $scripts2[0]) {
-            (my $script2) = grep {$_->{stage} eq $stage2 and ($_->{name} eq $script2_name or $_->{order} eq $script2_name)} @scripts2;
+            (my $script2) = grep {$_->stage() eq $stage2 and ($_->name() eq $script2_name or $_->order() eq $script2_name)} @scripts2;
             if ($script2) {
                 print "Removing previous script $script2_name in $conf2 of $dist2\n";
                 unless ($db->removeScripts($script2)) {
@@ -1632,15 +1633,15 @@ sub cs {
 
     my %script = ();
     $script{name} = $script2_name;
-    $script{source} = $script1->{source};
+    $script{source} = $script1->source();
     $script{configuration} = $conf2full;
     $script{stage} = $stage2;
     $script{order} = $location2;
     $script{order} = undef if $location2 and $script{order} !~ m/^\d+$/;
-    $script{critical} = $script1->{critical};
-    $script{tokens} = $script1->{tokens};
-    $script{tokenScript} = $script1->{tokenScript};
-    perror $db->{error}."\n" unless ($db->addScripts(\%script));
+    $script{critical} = $script1->critical();
+    $script{tokens} = $script1->tokens();
+    $script{tokenScript} = $script1->tokenScript();
+    perror $db->{error}."\n" unless ($db->addScripts(Staple::Script->new(\%script)));
 }
 
 sub gdi {
@@ -2082,7 +2083,7 @@ sub rs {
         return;
     }
     if (@scripts and $scripts[0]) {
-        (my $script) = grep {$_->{stage} eq $stage and ($_->{name} eq $script_name or $_->{order} eq $script_name)} @scripts;
+        (my $script) = grep {$_->stage() eq $stage and ($_->name() eq $script_name or $_->order() eq $script_name)} @scripts;
         unless ($script) {
             print "No such script \"$script_name\" in \"$configuration\"\n";
             return;
@@ -2111,20 +2112,18 @@ sub us {
         return;
     }
     if (@scripts and $scripts[0]) {
-        (my $script) = grep {$_->{stage} eq $stage and ($_->{name} eq $script_name or ($script_name =~ m/^\d+$/ and $_->{order} == $script_name))} @scripts;
+        (my $script) = grep {$_->stage() eq $stage and ($_->name() eq $script_name or ($script_name =~ m/^\d+$/ and $_->order() == $script_name))} @scripts;
         unless ($script) {
             print "No such script \"$script_name\" in \"$configuration\"\n";
             return;
         }
-        my $data = $script->{data};
-        if ($script->{source}) {
-            unless (open(FILE, "<$script->{source}")) {
-                print "Can't open script \"$script->{source}\"\n";
-                return;
-            }
-            $data = join "", <FILE>;
-            close(FILE);
+        
+        my $data = $script->data();
+        if ($script->error()) {
+            print $script->error()."\n";
+            return;
         }
+
         my $tmpFile = `mktemp /tmp/staplectl.XXXXXXXX 2>/dev/null`;
         if ($? != 0) {
             print "Can't create temporary file on /tmp/\n";
@@ -2146,18 +2145,18 @@ sub us {
             local $SIG{INT} = sub {die "SIGINT"};
             my %newScript;
             $newScript{source} = $tmpFile;
-            $newScript{name} = prompt "name", $script->{name};
+            $newScript{name} = prompt "name", $script->name();
             do {
-                $newScript{stage} = prompt "stage (auto, mount, sysinit, final)", $script->{stage};
+                $newScript{stage} = prompt "stage (auto, mount, sysinit, final)", $script->stage();
             } until ($newScript{stage} =~ m/^(?:auto|mount|sysinit|final)$/);
-            $newScript{order} = prompt "order", $script->{order};
+            $newScript{order} = prompt "order", $script->order();
             $newScript{order} = undef unless $newScript{order} =~ m/^\d+$/;
-            $newScript{critical} = boolprompt "critical", $script->{critical};
-            $newScript{tokens} = boolprompt "tokens", $script->{tokens};
-            $newScript{tokenScript} = boolprompt "tokenScript", $script->{tokenScript};
-            $newScript{configuration} = $script->{configuration};
+            $newScript{critical} = boolprompt "critical", $script->critical();
+            $newScript{tokens} = boolprompt "tokens", $script->tokens();
+            $newScript{tokenScript} = boolprompt "tokenScript", $script->tokenScript();
+            $newScript{configuration} = $script->configuration();
             perror $db->{error}."\n" unless ($db->removeScripts($script));
-            perror $db->{error}."\n" unless ($db->addScripts(\%newScript));
+            perror $db->{error}."\n" unless ($db->addScripts(Staple::Script->new(\%newScript)));
         };
         if ($@) {
             print "\n";
@@ -2212,7 +2211,7 @@ sub as {
         $script{critical} = boolprompt "critical", "no";
         $script{tokens} = boolprompt "tokens", "no";
         $script{tokenScript} = boolprompt "tokenScript", "no";
-        perror $db->{error}."\n" unless ($db->addScripts(\%script));
+        perror $db->{error}."\n" unless ($db->addScripts(Staple::Script->new(\%script)));
     };
     if ($@) {
         print "\n";
@@ -2237,28 +2236,20 @@ sub gss {
     if (@scripts and $scripts[0]) {
         my $script;
         if ($script_name =~ m/^\d+$/) {
-            ($script) = grep {$_->{stage} eq $stage and $_->{order} == $script_name} @scripts;
+            ($script) = grep {$_->stage() eq $stage and $_->order() == $script_name} @scripts;
         } else {
-            ($script) = grep {$_->{stage} eq $stage and $_->{name} eq $script_name} @scripts;
+            ($script) = grep {$_->stage() eq $stage and $_->name() eq $script_name} @scripts;
         }
         unless ($script) {
             print "No such script \"$script_name\" in \"$configuration\"\n";
             return;
         }
-        if ($script->{source}) {
-            unless (open(FILE, "<$script->{source}")) {
-                perror "Error opening script \"$script->{source}\": $!\n";
-                return;
-            }
-            my $data = join "", <FILE>;
-            close(FILE);
-            print $data;
-        } elsif ($script->{data}) {
-            print $script->{data};
-        } else {
-            print "Bad script, no source or data\n";
+        my $data = $script->data();
+        if ($script->error()) {
+            print $script->error()."\n";
             return;
         }
+        print $data;
     } else {
         print "No such script \"$script_name\" in \"$configuration\"\n";
         return;
@@ -2269,9 +2260,9 @@ sub gs {
     (my @scripts) = localgetscripts($_[0]);
     if (@scripts and $scripts[0]) {
         foreach my $stage ("auto", "mount", "sysinit", "final") {
-            next unless grep {$_->{stage} eq $stage} @scripts;
+            next unless grep {$_->stage() eq $stage} @scripts;
             print "  $stage:\n";
-            print join "", map {"     $_->{order}. $_->{name}   (".($_->{critical} ? "critical " : "").($_->{tokens} ? "tokened " : "").($_->{tokenScript} ? "tokenScript " : "").($_->{source} ? "file" : "data").")\n"} sort {$a->{order} <=> $b->{order}} grep {$_->{stage} eq $stage} @scripts;
+            print join "", map {"     ".$_->description()} sort {$a->order() <=> $b->order()} grep {$_->stage() eq $stage} @scripts;
         }
     }
 }
@@ -4144,7 +4135,7 @@ sub script_completion {
         (my @scripts) = localgetscripts($configuration, $dist);
         $echooff = 0;
         return () unless (@scripts and $scripts[0]);        
-        @scripts = map {$_->{name}} grep {$_->{stage} eq $stage} @scripts;
+        @scripts = map {$_->name()} grep {$_->stage() eq $stage} @scripts;
         @currentCompletionList = grep {index($_, $text) == 0} @scripts;
     }
     return $currentCompletionList[$count];
@@ -4180,7 +4171,7 @@ sub script_stage_completion {
         (my @scripts) = localgetscripts($configuration, $dist);
         $echooff = 0;
         return () unless (@scripts and $scripts[0]);
-        my @stages = map {$_->{stage}} @scripts;
+        my @stages = map {$_->stage()} @scripts;
         my %stages;
         @stages{@stages} = @stages;
         @stages = sort {$a eq $b ? 0 :

@@ -271,78 +271,80 @@ sub applyScripts {
     my @scripts = @{$self->{scripts}};
     my $tokens = $self->{tokens};
     
-    @scripts = grep {$_->{stage} eq $stage} @scripts;
+    @scripts = grep {$_->stage() eq $stage} @scripts;
     my @toDelete = ();
     foreach my $script (@scripts) {
-        my $runnable;
-        if ($script->{source}) {
-            $runnable = $script->{source};
-            push @{$self->{applied}->{scripts}}, $runnable;
-        } else {
-            $runnable = `mktemp $self->{tmpDir}/script.XXXXXXXX 2>/dev/null`;
-            chomp($runnable);
-            open(FILE, ">$runnable");
-            print FILE $script->{data};
-            close(FILE);
-            push @toDelete, $runnable;
-            chmod 0755, $runnable;
-            push @{$self->{applied}->{scripts}}, "$self->{distribution}:$script->{configuration}->{name}/$script->{stage}/$script->{name}";
+        my $data = $script->data();
+        if ($script->error()) {
+            $self->error("Failed getting ".$script->configuration()->{name}."/".$script->name()." (".$script->error().")");
+            my $body = "Failed getting ".$script->configuration()->{name}."/".$script->stage()."/".$script->name().":\n".$script->error()."\n\n";
+            if ($script->critical()) {
+                $self->addMail("Critical script failed!\n\n$body");
+                $self->doCriticalAction();
+            } else {
+                $self->addMail("$body");
+            }
+            next;
         }
-        if ($script->{tokens}) {
-            open(FILE, "<$runnable");
-            my $data = join "", <FILE>;
-            close(FILE);
+                
+        if ($script->source()) {
+            push @{$self->{applied}->{scripts}}, $script->source();
+        } else {
+            push @{$self->{applied}->{scripts}}, "$self->{distribution}:".$script->configuration()->{name}."/".$script->stage()."/".$script->name();
+        }
+        
+        if ($script->tokens()) {
             $tokens->{__AUTO_CONFIGURATION__} = {key => "__AUTO_CONFIGURATION__",
-                                                 value => $script->{configuration}->{name},
-                                                 raw => $script->{configuration}->{name},
+                                                 value => $script->configuration()->{name},
+                                                 raw => $script->configuration()->{name},
                                                  type => "static",
                                                  source => "auto"};
             $tokens->{__AUTO_SCRIPT__} = {key => "__AUTO_SCRIPT__",
-                                          value => $script->{name},
-                                          raw => $script->{name},
+                                          value => $script->name(),
+                                          raw => $script->name(),
                                           type => "static",
                                           source => "auto"};
             $tokens->{__AUTO_STAGE__} = {key => "__AUTO_STAGE__",
-                                         value => $script->{stage},
-                                         raw => $script->{stage},
+                                         value => $script->stage(),
+                                         raw => $script->stage(),
                                          type => "static",
                                          source => "auto"};
             $data = applyTokens($data, $tokens);
             delete $tokens->{__AUTO_SCRIPT__};
             delete $tokens->{__AUTO_CONFIGURATION__};
             delete $tokens->{__AUTO_STAGE__};
-            $runnable = `mktemp $self->{tmpDir}/script.XXXXXXXX 2>/dev/null`;
-            chomp($runnable);
-            push @toDelete, $runnable;
-            open(FILE, ">$runnable");
-            print FILE $data;
-            close(FILE);
-            chmod 0755, $runnable;
         }
-        #$runnable .= " >/dev/null" if $verbose == 0;
-        $self->output("Running script: $script->{name}", 2);
+        my $runnable = `mktemp $self->{tmpDir}/script.XXXXXXXX 2>/dev/null`;
+        chomp($runnable);
+        open(FILE, ">$runnable");
+        print FILE $data;
+        close(FILE);
+        push @toDelete, $runnable;
+        chmod 0755, $runnable;
+
+        $self->output("Running script: ".$script->name(), 2);
         my ($scriptExit, $scriptOutput, $scriptError) = runCommand($runnable, $self->{verbose} >= 2 ? \*STDOUT : undef);
         chomp $scriptOutput if $scriptOutput;
         chomp $scriptError if $scriptError;
-        $self->output("$script->{name} error:\n$scriptError") if $scriptError and $self->{verbose} == 1;
+        $self->output($script->name()." error:\n$scriptError") if $scriptError and $self->{verbose} == 1;
         if ($scriptExit) {
-            $self->error("$script->{configuration}->{name}/$script->{name} failed ($scriptExit)");
-            my $body = "$script->{configuration}->{name}/$script->{stage}/$script->{name} failed with exit code: $scriptExit\n\n";
+            $self->error($script->configuration()->{name}."/".$script->name()." failed ($scriptExit)");
+            my $body = $script->configuration()->{name}."/".$script->stage()."/".$script->name()." failed with exit code: $scriptExit\n\n";
             $body .= "output:\n-------\n$scriptOutput\n\n" if $scriptOutput;
             $body .= "error:\n------\n$scriptError\n\n" if $scriptError;
-            if ($script->{critical}) {
+            if ($script->critical()) {
                 $self->addMail("Critical script failed!\n\n$body");
                 $self->doCriticalAction();
             } else {
                 $self->addMail("$body");
             }
         } elsif ($scriptError) {
-            my $err = "$script->{configuration}->{name}/$script->{stage}/$script->{name} gave some errors:\n\n";
+            my $err = $script->configuration()->{name}."/".$script->stage()."/".$script->name()." gave some errors:\n\n";
             $err .= "output:\n-------\n$scriptOutput\n\n" if $scriptOutput;
             $err .= "error:\n------\n$scriptError\n\n" if $scriptError;
             $self->addMail($err);
         }
-        if ($script->{tokenScript}) {
+        if ($script->tokenScript()) {
             my $file = `mktemp $self->{tmpDir}/tokens.XXXXXXXX 2>/dev/null`;
             chomp($file);
             open(FILE, ">$file");
@@ -361,7 +363,7 @@ sub applyScripts {
             foreach my $token (values %rawTokens) {
                 $token->{key} =~ s/^#/_/;
             }
-            map {$_->{source} = "script:$script->{configuration}->{name}/$script->{stage}/$script->{name}"} values %newTokens;
+            map {$_->{source} = "script:".$script->configuration()->{name}."/".$script->stage()."/".$script->name()} values %newTokens;
             @$tokens{keys %newTokens} = values %newTokens;
             # setTokens for updateData
             $self->setTokens({$self->{db}->getCompleteTokens($tokens, $self->{host}, $self->{distribution})});

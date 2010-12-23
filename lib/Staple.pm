@@ -131,33 +131,7 @@ B<mount hash>
 
 B<Staple::Template>
 
-B<Script hash>
-
-=over
-
-=over
-
-=item I<name>          - The name of the script
-
-=item I<source>        - The source of the script (i.e. the full pathed location in the filesystem)
-
-=item I<data>          - If (and only if) I<source> is empty, contains the actual data of the script.
-
-=item I<configuration> - The configuration of this script (hash ref)
-
-=item I<stage>         - The stage this script should run in (auto, mount, sysinit, or final)
-
-=item I<order>         - The location of this script in the local order (a number)
-
-=item I<critical>      - Whether this script should invoke critical action when it fails (0 or 1)
-
-=item I<tokens>        - Whether this script should pass through tokens substitution before running (0 or 1)
-
-=item I<tokenScript>   - Whether this script is a token script, i.e. the output will change the tokens (0 or 1)
-
-=back
-
-=back
+B<Staple::Script>
 
 B<Auto hash>
 

@@ -13,7 +13,7 @@ package Staple::Template;
 
 =head1 DESCRIPTION
 
-Staple::Template module.
+Staple::Template module. Subclass of Staple::Setting
 
 =head1 METHODS
 
@@ -23,7 +23,10 @@ Staple::Template module.
 
 use strict;
 use warnings;
+use Staple::Setting;
+require Exporter;
 
+our @ISA = ("Staple::Setting");
 our $VERSION = '006snap';
 
 =item B<new(I<\%attr>, [I<\%attr> [...]])>
@@ -97,18 +100,6 @@ sub init {
     $self->{error} = "";
 }
 
-=item B<configuration(I<configuration>)>
-
-Sets this templates' configuration (hash), and returns the previous
-configuration. If I<configuration> is undef don't change it, just return the
-current configuration.
-
-=cut
-
-sub configuration {
-    return param(shift, "configuration", shift);
-}
-
 =item B<destination(I<destination>)>
 
 Sets this templates' destination (string), and returns the previous
@@ -118,31 +109,9 @@ current one.
 =cut
 
 sub destination {
-    return param(shift, "destination", shift);
+    my $self = shift;
+    return $self->param("destination", shift);
 }
-
-=item B<stage(I<stage>)>
-
-Sets this templates' stage (string), and returns the previous stage. If
-I<stage> is undef don't change it, just return the current one.
-
-=cut
-
-sub stage {
-    return param(shift, "stage", shift);
-}
-
-=item B<note(I<note>)>
-
-Sets this templates' note (string), and returns the previous note. If I<note>
-is undef don't change it, just return the current one.
-
-=cut
-
-sub note {
-    return param(shift, "note", shift);
-}
-
 
 =item B<mode(I<mode>)>
 
@@ -152,7 +121,8 @@ undef don't change it, just return the current one.
 =cut
 
 sub mode {
-    return param(shift, "mode", shift);
+    my $self = shift;
+    return $self->param("mode", shift);
 }
 
 =item B<uid(I<uid>)>
@@ -163,7 +133,8 @@ uid. If I<uid> is undef don't change it, just return the current one.
 =cut
 
 sub uid {
-    return param(shift, "uid", shift);
+    my $self = shift;
+    return $self->param("uid", shift);
 }
 
 =item B<gid(I<gid>)>
@@ -174,119 +145,8 @@ I<gid> is undef don't change it, just return the current one.
 =cut
 
 sub gid {
-    return param(shift, "gid", shift);
-}
-
-=item B<source(I<source>)>
-
-Sets this templates' source (full path), and returns the previous source. If
-I<source> is undef don't change it, just return the current one. This deletes
-the templates data (even if the file doesn't exists).
-
-=cut
-
-sub source {
     my $self = shift;
-    my $insource = shift;
-    delete $self->{data} if defined $insource;
-    return $self->param("source", $insource);
-}
-
-=item B<writeSource(I<source>)>
-
-Writes the templates data (from previous source or data) to I<source>. Sets the
-templates source to I<source> and empties its data. Returns 1 on success or
-undef on error.
-
-=cut
-
-sub writeSource {
-    my $self = shift;
-    my $insource = shift;
-    $self->{error} = "";
-    my $data = $self->data();
-    return undef if $self->{error};
-    unless (open(FILE, ">$insource")) {
-        $self->{error} = "Can't open \"$insource\" for writing: $!";
-        return undef;
-    }
-    print FILE $data;
-    close(FILE);
-
-    $self->{source} = $insource;
-    delete $self->{data};
-    return 1;
-}
-
-=item B<data(I<data>)>
-
-If I<data> is defined, changes the templates' data and empty the
-source. Returns the previous data, i.e. if source is defined, read it, if not
-then the previous data. Returns undef on error.
-
-=cut
-
-sub data {
-    my $self = shift;
-    my $indata = shift;
-    my $outdata = $self->readSource();
-    return undef if $self->{error};
-    $outdata ||= $self->{data};
-    if (defined $indata) {
-        delete $self->{source};
-        $self->{data} = $indata;
-    }
-    return $outdata;
-}
-
-=item B<readSource()>
-
-Reads the I<source> and returns it's data. Returns undef on error. Returns
-empty string if doesn't have source.
-
-=cut
-
-sub readSource {
-    my $self = shift;
-    $self->{error} = "";
-    my $out = "";
-    if ($self->{source}) {
-        unless (open(FILE, "<$self->{source}")) {
-            $self->{error} = "Can't open template source for reading \"$self->{source}\": $!";
-            return undef;
-        }
-        $out = join "", <FILE>;
-        close(FILE);
-    }
-    return $out;
-}
-
-=item B<useData()>
-
-Fills the data of this template from its source and remove the source from this
-template (doesn't delete the file). If doesn't have source, but has data, does
-nothing. Returns 1 on success or 0 on failure (failed open source).
-
-=cut
-
-sub useData {
-    my $self = shift;
-    my $data = $self->readSource();
-    return 0 if $self->{error};
-    $self->{data} = $data;
-    delete $self->{source};
-    return 1;
-}
-
-=item B<error()>
-
-Gets the last error or an empty string.
-
-=cut
-
-sub error {
-    my $self = shift;
-    return $self->{error};
+    return $self->param("gid", shift);
 }
 
 =item B<description(I<level>)>
@@ -328,18 +188,6 @@ sub description {
 # Internals
 ################################################################################
 
-# input: (self), name, value
-# output: old value
-# changed to new value if defined
-sub param {
-    my $self = shift;
-    my $key = shift;
-    my $value = shift;
-    my $old = $self->{$key};
-    $self->{$key} = $value if $value;
-    return $old;
-}
-
 1;
 
 __END__
@@ -349,6 +197,8 @@ __END__
 =head1 SEE ALSO
 
 L<Staple> - Staple main module.
+
+L<Staple::Setting> - Base class for all settings
 
 =head1 AUTHOR
 

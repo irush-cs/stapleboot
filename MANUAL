@@ -922,24 +922,6 @@ mount hash - A mount. The keys for this hash are equivalent to the
              __MOUNT_<dest>_*__ tokens, with the mapping done by the
              %Staple::mountTokenToOption map.
 
-Script hash - Represents a script
-  name          - The name of the script
-  source        - The source of the script (i.e. the full pathed location in
-                  the filesystem) 
-  data          - If (and only if) 'source' is empty, contains the actual data
-                  of the script. 
-  configuration - The configuration of this script (hash ref)
-  stage         - The stage this script should run in (auto, mount, sysinit, or
-                  final) 
-  order         - The location of this script in the local order (a number).
-                  Used in configurations with more than one script. 
-  critical      - Whether this script should invoke critical action when it
-                  fails (0 or 1) 
-  tokens        - Whether this script should pass through tokens substitution
-                  before running (0 or 1).
-  tokenScript   - Whether this script is a token script. i.e. outputs a valid
-                  token file change the tokens (0 or 1). 
-
 Auto hash - Represents an auto (autogroup)
   name          - The name of the auto
   source        - The source of the auto (i.e. the full pathed location of the
@@ -977,13 +959,17 @@ Staple::Application
   Staple::Application's subclasses (Stapler and Boot) are the why they handle
   output, error, mail and debugging.
 
-Staple::Template
+Staple::Setting
 
-  This data structure represents a single template. It contains all the
-  template's data (stage, mode, uid, gid, etc.). The template itself can be
-  specified using the data or source attributes. "source" is a full path to use
-  as input. "data" is the actual data. "source" has precedence over "data" if
-  both are available (one will usually delete the other).
+  Base class for settings (templates, scripts, etc.). Contains all the basic
+  setting's data (stage, source, data, note, etc.). Most settings can have
+  either data or source attributes. "source" is a full path to use as
+  input. "data" is the actual data. "source" has precedence over "data" if both
+  are available (one will usually delete the other).
+
+  The subclasses of Staple::Setting are:
+    Staple::Template
+    Staple::Script
 
 
 ?. 

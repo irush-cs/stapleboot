@@ -14,6 +14,7 @@ use Staple::DB;
 use Staple::Misc;
 use File::Path;
 use Staple::Template;
+use Staple::Script;
 
 our @ISA = ("Staple::DB");
 our $VERSION = '006snap';
@@ -634,7 +635,8 @@ sub getScripts {
         map {$_->{tokenScript} = $_->{tokenScript} ? 1 : 0} @scripts;
         push @results, sort {$a->{stage} eq $b->{stage} ? $a->{order} <=> $b->{order} : stageCmp($a->{stage}, $b->{stage})} @scripts;
     }
-    return @results;
+    return Staple::Script->new(@results) if @results;
+    return ();
 }
 
 sub addScripts {
@@ -642,26 +644,23 @@ sub addScripts {
     my @scripts = @_;
     my @errors = ();
     foreach my $script (@scripts) {
-        my $data = $script->{data};
-        if ($script->{source}) {
-            unless (open(FILE, "<$script->{source}")) {
-                push @errors, "can't open source \"$script->{source}\" for reading: $!";
-                next;
-            }
-            $data = join "", <FILE>;
-            close(FILE);
+        my $data = $script->data();
+        if ($script->error()) {
+            push @errors, $script->error();
+            next;
         }
-        my @oldScripts = grep {$_->{stage} eq $script->{stage}} $self->getScripts($script->{configuration});
-        $script->{order} = scalar(@oldScripts) + 1 if not defined $script->{order} or $script->{order} > scalar(@oldScripts) or $script->{order} < 1;
-        unless($self->mkdirs("$script->{configuration}->{path}/scripts/$script->{stage}/")) {
+
+        my @oldScripts = grep {$_->stage() eq $script->stage()} $self->getScripts($script->{configuration});
+        $script->order(scalar(@oldScripts) + 1) if not defined $script->order() or $script->order() > scalar(@oldScripts) or $script->order() < 1;
+        unless($self->mkdirs($script->configuration()->{path}."/scripts/".$script->stage()."/")) {
             push @errors, $self->{error};
             next;
         }
-        unless ($self->openOrdering($script->{order}, "$script->{configuration}->{path}/scripts/$script->{stage}/")) {
+        unless ($self->openOrdering($script->order(), $script->configuration()->{path}."/scripts/".$script->stage()."/")) {
             push @errors, $self->{error};
             next;
         }
-        my $file = "$script->{configuration}->{path}/scripts/$script->{stage}/$script->{order}.".($script->{critical} ? "c" : "").($script->{tokens} ? "t" : "").($script->{tokenScript} ? "m" : "").".$script->{name}";
+        my $file = $script->configuration()->{path}."/scripts/".$script->stage()."/".$script->order().".".($script->critical() ? "c" : "").($script->tokens() ? "t" : "").($script->tokenScript() ? "m" : "").".".$script->name();
         unless (open(FILE, ">$file")) {
             push @errors, "can't open file for writing \"$file\": $!";
             next;
@@ -684,13 +683,13 @@ sub removeScripts {
     my $self = shift;
     my @scripts = @_;
     my @errors = ();
-    foreach my $script (sort {$b->{order} <=> $a->{order}} @scripts) {
-        unless (unlink $script->{source}) {
-            push @errors, "Can't delete \"$script->{source}\": $!";
+    foreach my $script (sort {$b->order() <=> $a->order()} @scripts) {
+        unless (unlink $script->source()) {
+            push @errors, "Can't delete \"".$script->source()."\": $!";
             next;
         }
-        (my $dir) = $script->{source} =~ m,^(.*/)[^/]+$,;
-        unless ($self->closeOrdering($script->{order}, $dir)) {
+        (my $dir) = $script->source() =~ m,^(.*/)[^/]+$,;
+        unless ($self->closeOrdering($script->order(), $dir)) {
             push @errors, $self->{error};
             next;
         }
