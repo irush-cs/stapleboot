@@ -64,18 +64,30 @@ sub sync {
     return 0 unless $db1;
     return 0 unless $db2;
 
+    #print "Syncing hosts...\n";
     return 0 unless syncHosts($db1, $db2);
+    #print "Syncing groups...\n";
     return 0 unless syncGroups($db1, $db2);
+    #print "Syncing distributions...\n";
     return 0 unless syncDistributions($db1, $db2);
+    #print "Syncing configurations...\n";
     return 0 unless syncConfigurations($db1, $db2);
 
+    #print "Syncing tokens...\n";
     return 0 unless syncTokens($db1, $db2);
+    #print "Syncing group groups...\n";
     return 0 unless syncGroupGroups($db1, $db2);
+    #print "Syncing group configurations...\n";
     return 0 unless syncGroupConfigurations($db1, $db2);
+    #print "Syncing mounts...\n";
     return 0 unless syncMounts($db1, $db2);
+    #print "Syncing templates...\n";
     return 0 unless syncTemplates($db1, $db2);
+    #print "Syncing scripts...\n";
     return 0 unless syncScripts($db1, $db2);
+    #print "Syncing autos...\n";
     return 0 unless syncAutos($db1, $db2);
+    #print "Syncing notes...\n";
     return 0 unless syncNotes($db1, $db2);
     
     return 1;
@@ -112,7 +124,7 @@ sub syncAutos {
         return 0;
     }
 
-    map {($_->{configuration}) = $to->getFullConfigurations([$_->{configuration}->{name}], $_->{configuration}->{dist})} @fromAutos;
+    map {$_->configuration($to->getFullConfigurations([$_->configuration()->{name}], $_->configuration()->{dist}))} @fromAutos;
 
     unless ($to->addAutos(@fromAutos)) {
         $error = $to->{error};
@@ -185,7 +197,7 @@ sub syncTemplates {
     }
 
     map {$_->configuration($to->getFullConfigurations([$_->configuration()->{name}], $_->configuration()->{dist}))} @fromTemplates;
-    
+
     unless ($to->addTemplates(@fromTemplates)) {
         $error = $to->{error};
         return 0;

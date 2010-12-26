@@ -16,6 +16,7 @@ use Staple::DBFactory;
 use Staple::DB::SQL::Init;
 use Staple::Template;
 use Staple::Script;
+use Staple::Autogroup;
 
 our @ISA = ("Staple::DB");
 our $VERSION = '006snap';
@@ -553,7 +554,7 @@ sub addTemplates {
                               # use either data or source
                               (($self->{saveData} or not $template->source()) ?
                                ("", $template->data()) :
-                               ($template->source()), ""), 
+                               ($template->source(), "")), 
                               $template->note(),
                               $template->stage(),
                               sprintf("%04o", $template->mode()),
@@ -652,7 +653,7 @@ sub addScripts {
                               # use either data or source
                               (($self->{saveData} or not $script->source()) ?
                                ("", $script->data()) :
-                               ($script->source()), ""), 
+                               ($script->source(), "")), 
                               $script->configuration()->{name},
                               $script->configuration()->{dist},
                               $script->stage(),
@@ -716,7 +717,8 @@ sub getAutos {
         my @autos = map { +{configuration => $configuration, name => $_->[0], source => $_->[1], data => $_->[2], order => $_->[3], critical => $_->[4], tokens => $_->[5]}} @$resultArray;
         push @results, sort {$a->{order} <=> $b->{order}} @autos;
     }
-    return @results;
+    return Staple::Autogroup->new(@results) if @results;
+    return ();
 }
 
 
@@ -725,36 +727,39 @@ sub addAutos {
     my @autos = @_;
     my @errors = ();
     my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
-    my $sth = $dbh->prepare_cached("INSERT INTO $self->{schema}autos(name, data, configuration, distribution, ordering, critical, tokens) VALUES(?,?,?,?,?,?,?)");
+    my $sth = $dbh->prepare_cached("INSERT INTO $self->{schema}autos(name, source, data, configuration, distribution, ordering, critical, tokens) VALUES(?,?,?,?,?,?,?,?)");
     foreach my $auto (@autos) {
-        if ($auto->{source}) {
-            unless (open(FILE, "<$auto->{source}")) {
-                push @errors, "Can't open auto for coping \"$auto->{source}\": $!";
+
+        if ($self->{checkData}) {
+            $auto->data();
+            if ($auto->error()) {
+                push @errors, $auto->error();
                 next;
             }
-            $auto->{data} = join "", <FILE>;
-            close(FILE);
-            $auto->{source} = "";
         }
+
         $self->{error} = "";
-        my $location = $self->count("SELECT COUNT(*) FROM $self->{schema}autos WHERE configuration = ? AND distribution = ?", $auto->{configuration}->{name}, $auto->{configuration}->{dist});
+        my $location = $self->count("SELECT COUNT(*) FROM $self->{schema}autos WHERE configuration = ? AND distribution = ?", $auto->configuration()->{name}, $auto->configuration()->{dist});
         if ($self->{error}) {
             push @errors, $self->{error};
             next;
         }
         $location = 0 unless $location;
-        $auto->{order} = $location + 1 if not defined $auto->{order} or $auto->{order} > $location or $auto->{order} < 1;
-        unless ($self->openOrdering($auto->{order}, "$self->{schema}autos", "configuration = ? AND distribution = ?", $auto->{configuration}->{name}, $auto->{configuration}->{dist})) {
+        $auto->order($location + 1) if not defined $auto->order() or $auto->order() > $location or $auto->order() < 1;
+        unless ($self->openOrdering($auto->order(), "$self->{schema}autos", "configuration = ? AND distribution = ?", $auto->configuration()->{name}, $auto->configuration()->{dist})) {
             push @errors, $self->{error};
             next;
         }
-        unless ($sth->execute($auto->{name},
-                              $auto->{data},
-                              $auto->{configuration}->{name},
-                              $auto->{configuration}->{dist},
-                              $auto->{order},
-                              $auto->{critical},
-                              $auto->{tokens})) {
+        unless ($sth->execute($auto->name(),
+                              # use either data or source
+                              (($self->{saveData} or not $auto->source()) ?
+                               ("", $auto->data()) :
+                               ($auto->source(), "")), 
+                              $auto->configuration()->{name},
+                              $auto->configuration()->{dist},
+                              $auto->order(),
+                              $auto->critical(),
+                              $auto->tokens())) {
             push @errors, $sth->errstr;
             next;
         }
@@ -773,13 +778,13 @@ sub removeAutos {
     my @errors = ();   
     my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
     my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}autos WHERE configuration = ? AND distribution = ? AND ordering = ?");
-    foreach my $auto (sort {$b->{order} <=> $a->{order}} @autos) {
-        $sth->execute($auto->{configuration}->{name}, $auto->{configuration}->{dist}, $auto->{order});
+    foreach my $auto (sort {$b->order() <=> $a->order()} @autos) {
+        $sth->execute($auto->configuration()->{name}, $auto->configuration()->{dist}, $auto->order());
         if ($sth->errstr) {
             push @errors, $sth->errstr;
             next;
         }
-        push @errors, $self->{error} unless ($self->closeOrdering($auto->{order}, "$self->{schema}autos", "configuration = ? AND distribution = ?", $auto->{configuration}->{name}, $auto->{configuration}->{dist}));
+        push @errors, $self->{error} unless ($self->closeOrdering($auto->order(), "$self->{schema}autos", "configuration = ? AND distribution = ?", $auto->configuration()->{name}, $auto->configuration()->{dist}));
     }
     if (@errors) {
         chomp @errors;

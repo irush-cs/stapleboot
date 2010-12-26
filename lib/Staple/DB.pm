@@ -367,8 +367,8 @@ sub getScripts {
 
 =item B<getAutos(I<configuration [configuration [...]]>)>
 
-Returns an ordered list of autos hashes. The autos are ordered first by the
-configurations (with the given order) and second by the internal order per
+Returns an ordered list of autos (Staple::Auto). The autos are ordered first by
+the configurations (with the given order) and second by the internal order per
 configuration (like I<getScripts>).
 
 On error undef is retuned
@@ -383,8 +383,8 @@ sub getAutos {
 
 =item B<addAutos(I<auto [auto [...]]>)>
 
-Adds the given autos (hashes, contains the configurations to add to). The
-autos will be inserted in the specified location (order).
+Adds the given autos (Staple::Autogroup, contains the configurations to add
+to). The autos will be inserted in the specified location (order).
 
 If I<source> is available, it will be taken as the source for the
 auto. otherwise I<data> will be taken. The source will be copied, so it can
@@ -436,7 +436,7 @@ sub addScripts {
 
 =item B<removeAutos(I<auto [auto [...]]>)>
 
-Removes the given autos (full auto hashes).
+Removes the given autos (Staple::Autogroup).
 
 Returns 1 or undef;
 

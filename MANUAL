@@ -922,19 +922,6 @@ mount hash - A mount. The keys for this hash are equivalent to the
              __MOUNT_<dest>_*__ tokens, with the mapping done by the
              %Staple::mountTokenToOption map.
 
-Auto hash - Represents an auto (autogroup)
-  name          - The name of the auto
-  source        - The source of the auto (i.e. the full pathed location of the
-                  script).
-  data          - If (and only if) 'source' is empty, contains the actual data
-                  of the script.  
-  configuration - The configuration of this auto (hash ref)
-  order         - The location of this auto in the local order (a number)
-  critical      - Whether this auto should invoke critical action when it fails
-                  (0 or 1) 
-  tokens        - Whether this auto should pass through tokens substitution
-                  before running (0 or 1) 
-
 7.3.2. Classes
 ---------------
 
@@ -970,6 +957,8 @@ Staple::Setting
   The subclasses of Staple::Setting are:
     Staple::Template
     Staple::Script
+    Staple::Autogroup
+
 
 
 ?. 

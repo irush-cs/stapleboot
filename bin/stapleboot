@@ -167,12 +167,8 @@ sub debug {
                     printPager($temp);
                 } elsif ($line eq "autos") {
                     my @temp = @{$boot->{autos}};
-                    my $temp = "";
-                    foreach my $auto (@temp) {
-                        $temp .= "   $auto->{name}";
-                        $temp .= ":\n". join "\n", map {if (ref $auto->{$_}) {"      $_ => $auto->{$_}->{name}"} else {"      $_ => $auto->{$_}"}} keys %$auto;
-                        $temp .= "\n";
-                    }
+                    my $temp = join("\n", map {$_->description(1)} @temp);
+                    $temp .= "\n";
                     printPager($temp);
                 } elsif ($line eq "quit") {
                     $currentStage = undef;

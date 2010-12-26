@@ -387,47 +387,50 @@ sub applyAutos {
     my @groups = ();
     my @toDelete = ();
     foreach my $auto (@{$self->{autos}}) {
-        my $runnable;
-        my $autoname;
-        if ($auto->{source}) {
-            $runnable = $auto->{source};
-            $autoname = $runnable;
-        } else {
-            $runnable = `mktemp $self->{tmpDir}/auto.XXXXXXXX 2>/dev/null`;
-            chomp($runnable);
-            open(FILE, ">$runnable");
-            print FILE $auto->{data};
-            close(FILE);
-            push @toDelete, $runnable;
-            chmod 0755, $runnable;
-            $autoname = "$self->{distribution}:$auto->{configuration}->{name}/$auto->{stage}/$auto->{name}";
-        }        
-        if ($auto->{tokens}) {
-            open(FILE, "<$runnable");
-            my $data = join "", <FILE>;
-            close(FILE);
-            $data = applyTokens($data, $self->{tokens});
-            $runnable = `mktemp $self->{tmpDir}/auto.XXXXXXXX 2>/dev/null`;
-            chomp($runnable);
-            push @toDelete, $runnable;
-            open(FILE, ">$runnable");
-            print FILE $data;
-            close(FILE);
-            chmod 0755, $runnable;
+        my $data = $auto->data();
+        if ($auto->error()) {
+            $self->error("Failed getting ".$auto->configuration()->{name}."/".$auto->name()." (".$auto->error().")");
+            my $body = "Failed getting ".$auto->configuration()->{name}."/".$auto->name().":\n".$auto->error()."\n\n";
+            if ($auto->critical()) {
+                $self->addMail("Critical auto failed!\n\n$body");
+                $self->doCriticalAction();
+            } else {
+                $self->addMail("$body");
+            }
+            next;
         }
+
+        my $autoname;
+        if ($auto->source()) {
+            $autoname = $auto->source();
+        } else {
+            $autoname = "$self->{distribution}:".$auto->configuration()->{name}."/".$auto->{name};
+        }
+        
+        if ($auto->tokens()) {
+            $data = applyTokens($data, $self->{tokens});
+        }
+
+        my $runnable = `mktemp $self->{tmpDir}/auto.XXXXXXXX 2>/dev/null`;
+        chomp($runnable);
+        open(FILE, ">$runnable");
+        print FILE $data;
+        close(FILE);
+        push @toDelete, $runnable;
+        chmod 0755, $runnable;
 
         my ($autoExit, $autoOutput, $autoError) = runCommand($runnable);
         $self->{applied}->{autos}->{$autoname} = [split /\n/, $autoOutput];
         push @groups, @{$self->{applied}->{autos}->{$autoname}};
-        $self->error("$auto->{configuration}->{name}/$auto->{name} failed ($autoExit)") if $autoExit;
-        $self->error("$auto->{configuration}->{name}/$auto->{name}\n$autoError") if $autoError;
-        $self->addMail("$auto->{configuration}->{name}/$auto->{name} failed:\nerror: $autoError\n exit code: $autoExit;") if $autoError or $autoExit;
+        $self->error($auto->configuration()->{name}."/".$auto->name()." failed ($autoExit)") if $autoExit;
+        $self->error($auto->configuration()->{name}."/".$auto->name()."\n$autoError") if $autoError;
+        $self->addMail($auto->configuration()->{name}."/".$auto->name()." failed:\nerror: $autoError\n exit code: $autoExit;") if $autoError or $autoExit;
     }
     unlink @toDelete unless $self->{debug};
     @groups = grep {$_} @groups;
     return @groups;
 }
-  
+ 
 
 =item B<applyTemplates(I<stage>)>
 

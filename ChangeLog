@@ -1,6 +1,6 @@
 staple 006snap
 
-	* Use proper classes instead of hashes
+	* Use proper classes instead of hashes (some API change)
 	* Added MANUAL
 	* Added ChangeLog
 	* staplectl: copy script function

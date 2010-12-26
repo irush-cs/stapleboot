@@ -34,6 +34,7 @@ use Staple::DBFactory;
 use Staple::Hangman;
 use Staple::Template;
 use Staple::Script;
+use Staple::Autogroup;
 use Term::ReadLine;
 use Term::ANSIColor qw(:constants);
 use Net::DNS;
@@ -1856,8 +1857,8 @@ sub localgetautos {
 sub ga {
     (my @autos) = localgetautos(@_);
     if (@autos and $autos[0]) {
-        print join "", map {"   $_->{order}. $_->{name}   (".($_->{critical} ? "critical " : "").($_->{tokens} ? "tokened " : "").($_->{source} ? "file" : "data").")\n"} sort {$a->{order} <=> $b->{order}} @autos;
-    } 
+        print join "", map {"   ".$_->description()} sort {$a->order() <=> $b->order()} @autos;
+    }
 }
 
 sub gas {
@@ -1871,28 +1872,23 @@ sub gas {
     if (@autos and $autos[0]) {
         my $auto;
         if ($auto_name =~ m/^\d+$/) {
-            ($auto) = grep {$_->{order} == $auto_name} @autos;
+            ($auto) = grep {$_->order() == $auto_name} @autos;
         } else {
-            ($auto) = grep {$_->{name} eq $auto_name} @autos;
+            ($auto) = grep {$_->name() eq $auto_name} @autos;
         }
         unless ($auto) {
             print "No such auto \"$auto_name\" in \"$configuration\"\n";
             return;
         }
-        if ($auto->{source}) {
-            unless (open(FILE, "<$auto->{source}")) {
-                perror "Error opening auto \"$auto->{source}\": $!\n";
-                return;
-            }
-            my $data = join "", <FILE>;
-            close(FILE);
-            print $data;
-        } elsif ($auto->{data}) {
-            print $auto->{data};
-        } else {
-            print "Bad auto, no source or data\n";
+        my $data = $auto->data();
+        if ($auto->error()) {
+            print $auto->error()."\n";
             return;
         }
+        if ($data !~ m/\n$/) {
+            $data .= "\n(auto doesn't end with \\n)\n";
+        }
+        print $data;
     } else {
         print "No such auto \"$auto_name\" in \"$configuration\"\n";
         return;
@@ -1936,7 +1932,7 @@ sub aa {
         $auto{order} = undef unless $auto{order} =~ m/^\d+$/;
         $auto{critical} = boolprompt "critical", "no";
         $auto{tokens} = boolprompt "tokens", "no";
-        perror $db->{error}."\n" unless ($db->addAutos(\%auto));
+        perror $db->{error}."\n" unless ($db->addAutos(Staple::Autogroup->new(\%auto)));
     };
     if ($@) {
         print "\n";
@@ -1954,7 +1950,7 @@ sub ra {
         return;
     }
     if (@autos and $autos[0]) {
-        (my $auto) = grep {$_->{name} eq $auto_name or $_->{order} eq $auto_name} @autos;
+        (my $auto) = grep {$_->name() eq $auto_name or $_->order() eq $auto_name} @autos;
         unless ($auto) {
             print "No such auto \"$auto_name\" in \"$configuration\"\n";
             return;
@@ -1978,19 +1974,15 @@ sub ua {
         return;
     }
     if (@autos and $autos[0]) {
-        (my $auto) = grep {$_->{name} eq $auto_name or $_->{order} eq $auto_name} @autos;
+        (my $auto) = grep {$_->name() eq $auto_name or $_->order() eq $auto_name} @autos;
         unless ($auto) {
             print "No such auto \"$auto_name\" in \"$configuration\"\n";
             return;
         }
-        my $data = $auto->{data};
-        if ($auto->{source}) {
-            unless (open(FILE, "<$auto->{source}")) {
-                print "Can't open auto \"$auto->{source}\"\n";
-                return;
-            }
-            $data = join "", <FILE>;
-            close(FILE);
+        my $data = $auto->data();
+        if ($auto->error()) {
+            print $auto->error()."\n";
+            return;
         }
         my $tmpFile = `mktemp /tmp/staplectl.XXXXXXXX 2>/dev/null`;
         if ($? != 0) {
@@ -2013,14 +2005,14 @@ sub ua {
             local $SIG{INT} = sub {die "SIGINT"};
             my %newAuto;
             $newAuto{source} = $tmpFile;
-            $newAuto{name} = prompt "name", $auto->{name};
-            $newAuto{order} = prompt "order", $auto->{order};
+            $newAuto{name} = prompt "name", $auto->name();
+            $newAuto{order} = prompt "order", $auto->order();
             $newAuto{order} = undef unless $newAuto{order} =~ m/^\d+$/;
-            $newAuto{critical} = boolprompt "critical", $auto->{critical};
-            $newAuto{tokens} = boolprompt "tokens", $auto->{tokens};
-            $newAuto{configuration} = $auto->{configuration};
+            $newAuto{critical} = boolprompt "critical", $auto->critical();
+            $newAuto{tokens} = boolprompt "tokens", $auto->tokens();
+            $newAuto{configuration} = $auto->configuration();
             print $db->{errro}."\n" unless ($db->removeAutos($auto));
-            perror $db->{error}."\n" unless ($db->addAutos(\%newAuto));
+            perror $db->{error}."\n" unless ($db->addAutos(Staple::Autogroup->new(\%newAuto)));
         };
         if ($@) {
             print "\n";
@@ -4116,7 +4108,7 @@ sub auto_completion {
         (my @autos) = localgetautos($configuration);
         $echooff = 0;
         return () unless (@autos and $autos[0]);
-        @autos = map {$_->{name}} @autos;
+        @autos = map {$_->name()} @autos;
         @currentCompletionList = grep {index($_, $text) == 0} @autos;
     }
     return $currentCompletionList[$count];

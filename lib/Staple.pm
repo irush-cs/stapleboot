@@ -133,29 +133,7 @@ B<Staple::Template>
 
 B<Staple::Script>
 
-B<Auto hash>
-
-=over
-
-=over
-
-=item I<name>          - The name of the auto
-
-=item I<source>        - The source of the auto (i.e. the full pathed location of the script)
-
-=item I<data>          - If (and only if) I<source> is empty, contains the actual data of the script.
-
-=item I<configuration> - The configuration of this auto (hash ref)
-
-=item I<order>         - The location of this auto in the local order (a number)
-
-=item I<critical>      - Whether this auto should invoke critical action when it fails (0 or 1)
-
-=item I<tokens>        - Whether this auto should pass through tokens substitution before running (0 or 1)
-
-=back
-
-=back
+B<Staple::Autogroup>
 
 =head1 EXPORT
 

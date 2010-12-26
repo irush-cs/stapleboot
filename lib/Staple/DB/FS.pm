@@ -724,7 +724,8 @@ sub getAutos {
     }
     map {$_->{critical} = $_->{critical} ? 1 : 0} @results;
     map {$_->{tokens} = $_->{tokens} ? 1 : 0} @results;
-    return sort {$a->{order} <=> $b->{order}} @results;
+    return Staple::Autogroup->new(sort {$a->{order} <=> $b->{order}} @results) if @results;
+    return ();
 }
 
 
@@ -733,26 +734,23 @@ sub addAutos {
     my @autos = @_;
     my @errors = ();
     foreach my $auto (@autos) {
-        my $data = $auto->{data};
-        if ($auto->{source}) {
-            unless (open(FILE, "<$auto->{source}")) {
-                push @errors, "can't open source \"$auto->{source}\" for reading: $!";
-                next;
-            }
-            $data = join "", <FILE>;
-            close(FILE);
+        my $data = $auto->data();
+        if ($auto->error()) {
+            push @errors, $auto->error();
+            next;
         }
-        my @oldAutos = $self->getAutos($auto->{configuration});
-        $auto->{order} = scalar(@oldAutos) + 1 if not defined $auto->{order} or $auto->{order} > scalar(@oldAutos) or $auto->{order} < 1;
-        unless($self->mkdirs("$auto->{configuration}->{path}/autos/")) {
+
+        my @oldAutos = $self->getAutos($auto->configuration());
+        $auto->order(scalar(@oldAutos) + 1) if not defined $auto->order() or $auto->order() > scalar(@oldAutos) or $auto->order() < 1;
+        unless($self->mkdirs($auto->configuration()->{path}."/autos/")) {
             push @errors, $self->{error};
             next;
         }
-        unless ($self->openOrdering($auto->{order}, "$auto->{configuration}->{path}/autos/")) {
+        unless ($self->openOrdering($auto->order(), $auto->configuration()->{path}."/autos/")) {
             push @errors, $self->{error};
             next;
         }
-        my $file = "$auto->{configuration}->{path}/autos/$auto->{order}.".($auto->{critical} ? "c" : "").($auto->{tokens} ? "t" : "").".$auto->{name}";
+        my $file = $auto->configuration()->{path}."/autos/".$auto->order().".".($auto->critical() ? "c" : "").($auto->tokens() ? "t" : "").".".$auto->name();
         unless (open(FILE, ">$file")) {
             push @errors, "can't open file for writing \"$file\": $!";
             next;
@@ -775,13 +773,13 @@ sub removeAutos {
     my $self = shift;
     my @autos = @_;
     my @errors = ();
-    foreach my $auto (sort {$b->{order} <=> $a->{order}} @autos) {
-        unless (unlink $auto->{source}) {
-            push @errors, "Can't delete \"$auto->{source}\": $!";
+    foreach my $auto (sort {$b->order() <=> $a->order()} @autos) {
+        unless (unlink $auto->source()) {
+            push @errors, "Can't delete \"".$auto->source()."\": $!";
             next;
         }
-        (my $dir) = $auto->{source} =~ m,^(.*/)[^/]+$,;
-        unless ($self->closeOrdering($auto->{order}, $dir)) {
+        (my $dir) = $auto->source() =~ m,^(.*/)[^/]+$,;
+        unless ($self->closeOrdering($auto->order(), $dir)) {
             push @errors, $self->{error};
             next;
         }
