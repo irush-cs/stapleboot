@@ -89,6 +89,10 @@ sub writeSource {
     $self->{error} = "";
     my $data = $self->data();
     return undef if $self->{error};
+    unless (defined $data) {
+        $self->{error} = "Can't get data for ".$self->source()."\n";
+        return undef;
+    }
     unless (open(FILE, ">$insource")) {
         $self->{error} = "Can't open \"$insource\" for writing: $!";
         return undef;
@@ -112,9 +116,13 @@ data. Returns undef on error.
 sub data {
     my $self = shift;
     my $indata = shift;
-    my $outdata = $self->readSource();
-    return undef if $self->{error};
-    $outdata ||= $self->{data};
+    my $outdata;
+    if ($self->{source}) {
+        $outdata = $self->readSource();
+        return undef if $self->{error};
+    } else {
+        $outdata = $self->{data};
+    }
     if (defined $indata) {
         delete $self->{source};
         $self->{data} = $indata;

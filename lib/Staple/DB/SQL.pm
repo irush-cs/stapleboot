@@ -107,9 +107,15 @@ sub addConfiguration {
     my $self = shift;
     my $distribution = shift;
     my $configuration = shift;
+    my @distributions;
+    my $common = 0;
     return undef if ($self->{error} = invalidDistribution($distribution));
     return undef if ($self->{error} = invalidConfiguration($configuration));
-    $distribution = $self->getCommonPath() if index($configuration, "common/") == 0;
+    if (index($configuration, "common/") == 0) {
+        $distribution = $self->getCommonPath();
+        @distributions = grep {versionCompare($self->getDistributionVersion($_), "005") > 0} $self->getAllDistributions();
+        $common = 1;
+    }
     $configuration = fixPath($configuration);
     $configuration =~ s/\/$//;
     if ($self->count("SELECT COUNT(name) FROM $self->{schema}configurations WHERE name = ? AND distribution = ?", $configuration, $distribution)) {
@@ -118,9 +124,11 @@ sub addConfiguration {
     };
     foreach my $subconf (splitData($configuration)) {
         next if ($subconf eq "common");
-        unless ($self->count("SELECT COUNT(name) FROM $self->{schema}configurations WHERE name = ? AND distribution = ?", $subconf, $distribution)) {
-            unless ($self->insert("$self->{schema}configurations(name, distribution)", "$subconf", "$distribution")) {
-                return undef;
+        foreach my $dist ($distribution, @distributions) {
+            unless ($self->count("SELECT COUNT(name) FROM $self->{schema}configurations WHERE name = ? AND distribution = ?", $subconf, $dist)) {
+                unless ($self->insert("$self->{schema}configurations(name, distribution)", "$subconf", "$dist")) {
+                    return undef;
+                }
             }
         }
     }
@@ -133,14 +141,24 @@ sub addDistribution {
     my $version = shift;
     $version = $Staple::VERSION unless defined $version;
     return 0 if ($self->{error} = invalidDistribution($distribution));
-    return $self->insert("$self->{schema}distributions(name, version)", "$distribution", "$version");
+    return 0 unless $self->insert("$self->{schema}distributions(name, version)", "$distribution", "$version");
+    my @confs = $self->getAllConfigurations($distribution);
+    # must/should be just common configurations, but still, add only above 005
+    if (versionCompare($version, "005") > 0) {
+        foreach my $conf (@confs) {
+            unless ($self->insert("$self->{schema}configurations(name, distribution)", "$conf", "$distribution")) {
+                return undef;
+            }
+        }
+    }
+    return 1;
 }
 
 sub removeHost {
     my $self = shift;
     my $host = shift;
     return 0 if ($self->{error} = invalidHost($host));
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}hosts WHERE host = ?");
     my $rv = $sth->execute("$host");
     if ($dbh->errstr) {
@@ -161,7 +179,7 @@ sub removeGroup {
         $self->{error} = "Group does not exists";
         return undef;
     };
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached("SELECT name FROM $self->{schema}groups WHERE name LIKE ? AND type = 'group'");
     unless ($sth->execute("$group/%")) {
         $self->{error} = $sth->errstr;
@@ -189,28 +207,37 @@ sub removeConfiguration {
     my $self = shift;
     my $distribution = shift;
     my $configuration = shift;
+    my $common = 0;
     return undef if ($self->{error} = invalidDistribution($distribution));
     return undef if ($self->{error} = invalidConfiguration($configuration));
-    $distribution = $self->getCommonPath() if index($configuration, "common/") == 0;
+    if (index($configuration, "common/") == 0) {
+        $common = 1;
+        $distribution = $self->getCommonPath();
+    }
     $configuration = fixPath($configuration);
     $configuration =~ s/\/$//;
     unless ($self->count("SELECT COUNT(name) FROM $self->{schema}configurations WHERE name = ? AND distribution = ?", $configuration, $distribution)) {
         $self->{error} = "Configuration does not exists";
         return undef;
     };
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
-    my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}configurations WHERE name LIKE ? AND distribution = ?");
+    my $dbh = $self->{dbh};
+    my $sth = $dbh->prepare_cached($common ?
+                                   "DELETE FROM $self->{schema}configurations WHERE name LIKE ?" :
+                                   "DELETE FROM $self->{schema}configurations WHERE name LIKE ? AND distribution = ?"
+                                  );
     my $like = $configuration;
     $like =~ s/_/\\_/g;
     $like =~ s/%/\\%/g;
-    my $rv = $sth->execute("$like/%", $distribution);
+    # remove subconfs
+    my $rv = $sth->execute($common ? ("$like/%") : ("$like/%", $distribution));
     if ($dbh->errstr) {
-        $self->{error} = $dbh->errstr;
+        $self->{error} = "Error removing $configuration: ".$dbh->errstr;
         return undef;
     }
-    $sth->execute($like, $distribution);
+    # remove conf itself
+    $sth->execute($common ? ($like) : ($like, $distribution));
     if ($dbh->errstr) {
-        $self->{error} = $dbh->errstr;
+        $self->{error} = "Error removing $configuration: ".$dbh->errstr;
         return undef;
     }
     return 1;
@@ -248,7 +275,7 @@ sub copyConfiguration {
     
     # configurations
     my $sqlstring = "INSERT INTO $self->{schema}configurations SELECT name, '$to' AS distribution, comment FROM $self->{schema}configurations WHERE distribution = ? AND ( name LIKE ? OR name = ?)";
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached($sqlstring);
     $sth->execute("$from", "$conf/%", "$conf");
     if ($dbh->errstr) {
@@ -331,7 +358,7 @@ sub removeDistribution {
     my $self = shift;
     my $distribution = shift;
     return undef if ($self->{error} = invalidDistribution($distribution));
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}distributions WHERE name = ?");
     my $rv = $sth->execute("$distribution");
     if ($dbh->errstr) {
@@ -377,7 +404,7 @@ sub removeTokens {
     my $self = shift;
     my $tokens = shift;
     my $group = shift;
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     if ($group->{type} and $group->{type} ne "configuration") {
         #group
         my $stmt = "DELETE FROM $self->{schema}$group->{type}_tokens WHERE key = ? AND ";
@@ -409,10 +436,44 @@ sub removeTokens {
     return 1;
 }
 
+sub setTokens {
+    my $self = shift;
+    my $tokens = shift;
+    my $group = shift;
+    my $dbh = $self->{dbh};
+
+    if ($group->{type} and $group->{type} ne "configuration") {
+        # group
+        my $stmt = "DELETE FROM $self->{schema}$group->{type}_tokens WHERE ";
+        if ($group->{type} eq "host") {
+            $stmt .= "host = ?";
+        } elsif ($group->{type} eq "distribution") {
+            $stmt .= "distribution = ?";
+        } elsif ($group->{type} eq "group") {
+            $stmt .= "group_name = ?";
+        }
+        my $sth = $dbh->prepare_cached($stmt);
+        unless ($sth->execute($group->{name})) {
+            $self->{error} = $sth->errstr;
+            return undef;
+        }
+    } else {
+        #configuration
+        my $stmt = "DELETE FROM $self->{schema}configuration_tokens WHERE configuration = ? AND distribution = ?";
+        my $sth = $dbh->prepare_cached($stmt);
+        unless ($sth->execute($group->{name}, $group->{dist})) {
+            $self->{error} = $sth->errstr;
+            return undef;
+        }
+    }
+
+    return $self->addTokens($tokens, $group);
+}
+
 sub getTokens {
     my $self = shift;
     my @groupsAndConfigurations = @_;
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $sth;
     my %tokens = ();    
     foreach my $gorc (@groupsAndConfigurations) {
@@ -476,7 +537,7 @@ sub getMounts {
     my @configurations = @_;
     my @mounts = ();
     my @errors = ();
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached("SELECT destination, active FROM $self->{schema}mounts WHERE configuration = ? AND distribution = ? ORDER BY ordering");
 
     foreach my $configuration (@configurations) {
@@ -500,7 +561,7 @@ sub getTemplates {
     my $self = shift;
     my @configurations = @_;
     my @templates = ();
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached("SELECT destination, source, data, stage, mode, gid, uid FROM $self->{schema}templates WHERE configuration = ? AND distribution = ?");
 
     foreach my $configuration (@configurations) {
@@ -525,7 +586,7 @@ sub addTemplates {
     my $self = shift;
     my @templates = @_;
     my @errors = ();
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     foreach my $template (@templates) {
                                          
         # delete previous
@@ -576,7 +637,7 @@ sub removeTemplates {
     my $self = shift;
     my @templates = @_;
     my @errors = ();
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}templates WHERE configuration = ? AND distribution = ? AND destination = ? AND stage = ?");
     foreach my $template (@templates) {
         unless ($sth->execute($template->configuration()->{name}, $template->configuration()->{dist}, $template->destination(), $template->stage())) {
@@ -596,7 +657,7 @@ sub getScripts {
     my $self = shift;
     my @configurations = @_;
     my @results = ();
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached("SELECT name, source, data, stage, ordering, critical, tokens, tokenscript FROM $self->{schema}scripts WHERE configuration = ? AND distribution = ?");
     foreach my $configuration (@configurations) {
         unless ($sth->execute($configuration->{name}, $configuration->{dist})) {
@@ -621,7 +682,7 @@ sub addScripts {
     my $self = shift;
     my @scripts = @_;
     my @errors = ();
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached("INSERT INTO $self->{schema}scripts(name, source, data, configuration, distribution, stage, ordering, critical, tokens, tokenScript, comment) VALUES(?,?,?,?,?,?,?,?,?,?,?)");
     if ($dbh->errstr) {
         $self->{error} = "addScripts: ".$dbh->errstr;
@@ -678,7 +739,7 @@ sub removeScripts {
     my $self = shift;
     my @scripts = @_;
     my @errors = ();   
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}scripts WHERE configuration = ? AND distribution = ? AND stage = ? AND ordering = ?");
     foreach my $script (sort {$b->order() <=> $a->order()} @scripts) {
         $sth->execute($script->configuration()->{name}, $script->configuration()->{dist}, $script->stage(), $script->order());
@@ -700,7 +761,7 @@ sub getAutos {
     my $self = shift;
     my @configurations = @_;
     my @results = ();
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached("SELECT name, source, data, ordering, critical, tokens FROM $self->{schema}autos WHERE configuration = ? AND distribution = ?");
     foreach my $configuration (@configurations) {
         unless ($sth->execute($configuration->{name}, $configuration->{dist})) {
@@ -726,7 +787,7 @@ sub addAutos {
     my $self = shift;
     my @autos = @_;
     my @errors = ();
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached("INSERT INTO $self->{schema}autos(name, source, data, configuration, distribution, ordering, critical, tokens) VALUES(?,?,?,?,?,?,?,?)");
     foreach my $auto (@autos) {
 
@@ -776,7 +837,7 @@ sub removeAutos {
     my $self = shift;
     my @autos = @_;
     my @errors = ();   
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}autos WHERE configuration = ? AND distribution = ? AND ordering = ?");
     foreach my $auto (sort {$b->order() <=> $a->order()} @autos) {
         $sth->execute($auto->configuration()->{name}, $auto->configuration()->{dist}, $auto->order());
@@ -804,7 +865,7 @@ sub addMount {
         $mount->{configuration} = $configuration;
         return undef unless $self->removeMounts($mount);
     }
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $max = $self->count("SELECT MAX(ordering) FROM $self->{schema}mounts WHERE configuration = ? AND distribution = ?", $configuration->{name}, $configuration->{dist});
     $max = 0 unless $max;
     if ($location and $max and $location <= $max) { 
@@ -821,7 +882,7 @@ sub removeMounts {
     my @mounts = @_;
     my @errors = ();
 
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}mounts WHERE configuration = ? AND distribution = ? AND destination = ? AND active = ?");
     
     foreach my $mount (@mounts) {
@@ -856,7 +917,7 @@ sub removeConfigurationConfigurations {
     my $col;
     my @errors = ();
     return undef unless $col = $self->getGroupColumn($conf); # conf_id
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}$conf->{type}_configurations WHERE configuration = ? AND active = ? AND $col = ? AND distribution = ?");
     foreach my $torm (@configurations) {
         my $location = $self->count("SELECT ordering FROM $self->{schema}$conf->{type}_configurations WHERE configuration = ? AND active = ? AND $col = ? AND distribution = ?", $torm->{name}, $torm->{active}, $conf->{name}, $conf->{dist});
@@ -890,7 +951,7 @@ sub getConfigurationConfigurations {
     my $col = $self->getGroupColumn($conf); # conf_id
     return undef unless $col;
 
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $stmt = "SELECT configuration, active FROM $self->{schema}$conf->{type}_configurations WHERE $col = ? AND distribution = ? ORDER BY ordering";
     my $sth = $dbh->prepare_cached($stmt);
     unless ($sth->execute($conf->{name}, $conf->{dist})) {
@@ -921,12 +982,16 @@ sub addConfigurationConfiguration {
     }
     my $col;
     return undef unless $col = $self->getGroupColumn($conf); # conf_id
+    unless ($self->getFullConfigurations([$configuration], $conf->{dist})) {
+        $self->{error} = "distribution $conf->{dist} doesn't have $configuration->{name}";
+        return undef;
+    }
     my $stmt = "SELECT COUNT(configuration) FROM $self->{schema}$conf->{type}_configurations WHERE configuration = ? AND active = ? AND $col = ? AND distribution = ?";
     if ($self->count($stmt, $configuration->{name}, $configuration->{active}, $conf->{name}, $conf->{dist})) {
         # first remove if already there
         return undef unless $self->removeConfigurationConfigurations($conf, $configuration);
     }
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $max = $self->count("SELECT MAX(ordering) FROM $self->{schema}$conf->{type}_configurations WHERE $col = ? AND distribution = ?", $conf->{name}, $conf->{dist});
     $max = 0 unless $max;
     if ($location and $max and $location <= $max) { 
@@ -944,7 +1009,7 @@ sub getGroupConfigurations {
     my $col = $self->getGroupColumn($group);
     return undef unless $col;
 
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached("SELECT configuration, active FROM $self->{schema}$group->{type}_configurations WHERE $col = ? ORDER BY ordering");
     unless ($sth->execute($group->{name})) {
         $self->{error} = $sth->errstr;
@@ -973,7 +1038,7 @@ sub addGroupConfiguration {
     if ($self->count($stmt, $configuration->{name}, $configuration->{active}, $group->{name})) {
         return undef unless $self->removeGroupConfigurations($group, $configuration);
     }
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $max = $self->count("SELECT MAX(ordering) FROM $self->{schema}$group->{type}_configurations WHERE $col = ?", $group->{name});
     $max = 0 unless $max;
     if ($location and $max and $location <= $max) { 
@@ -992,7 +1057,7 @@ sub removeGroupConfigurations {
     my $col;
     my @errors = ();
     return undef unless $col = $self->getGroupColumn($group);
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}$group->{type}_configurations WHERE configuration = ? AND active = ? AND $col = ?");
     foreach my $conf (@configurations) {
         my $location = $self->count("SELECT ordering FROM $self->{schema}$group->{type}_configurations WHERE configuration = ? AND active = ? AND $col = ?", $conf->{name}, $conf->{active}, $group->{name});
@@ -1026,7 +1091,7 @@ sub addGroupGroup {
     if ($self->count($stmt, $name, $group->{name})) {
         return undef unless $self->removeGroupGroups($group, $name);
     }
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $max = $self->count("SELECT MAX(ordering) FROM $self->{schema}$group->{type}_groups WHERE $col = ?", $group->{name});
     $max = 0 unless $max;
     if ($location and $max and $location <= $max) { 
@@ -1045,7 +1110,7 @@ sub removeGroupGroups {
     my $col;
     my @errors = ();
     return undef unless $col = $self->getGroupColumn($group);
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}$group->{type}_groups WHERE group_name = ? AND $col = ?");
     foreach my $name (@names) {
         my $location = $self->count("SELECT ordering FROM $self->{schema}$group->{type}_groups WHERE group_name = ? AND $col = ?", $name, $group->{name});
@@ -1201,7 +1266,6 @@ sub whoHasToken {
     return ([@hosts, @distributions, @groups], [@configurations])
 }
 
-
 sub getAllHosts {
     my $self = shift;
     return sort {$a cmp $b} $self->getList("SELECT host FROM $self->{schema}hosts");
@@ -1215,7 +1279,19 @@ sub getAllGroups {
 sub getAllConfigurations {
     my $self = shift;
     my $distribution = shift;
-    return sort {$a cmp $b} $self->getList("SELECT name FROM $self->{schema}configurations WHERE distribution = ? OR distribution = '".$self->getCommonPath()."'", $distribution);
+    my $version = $self->getDistributionVersion($distribution);
+    my @confs;
+    if (versionCompare($version, "004") < 0) {
+        # before 004, no common configurations
+        @confs = sort {$a cmp $b} $self->getList("SELECT name FROM $self->{schema}configurations WHERE distribution = ? ", $distribution); 
+    } elsif (versionCompare($version, "005") <= 0) {
+        # on 004 and 005, common configuration but in special /common/ distribution
+        @confs = sort {$a cmp $b} $self->getList("SELECT name FROM $self->{schema}configurations WHERE distribution = ? OR distribution = '".$self->getCommonPath()."'", $distribution);
+    } else {
+        # on 006, common configuration on all distribution 
+        @confs = sort {$a cmp $b} $self->getList("SELECT name FROM $self->{schema}configurations WHERE distribution = ? ", $distribution); 
+    }
+    return @confs;
 }
 
 sub getFullConfigurations {
@@ -1241,15 +1317,21 @@ sub getDistributionVersion {
         $version = "004" if (versionCompare($version, "004") < 0);
         return $version;
     }
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $schema = $self->{schema};
     $schema =~ s/\.$//;
+  gdv_retry:
     my $sth = $dbh->column_info(undef, $schema, "distributions", undef);
     my $result = $sth->fetchall_hashref("COLUMN_NAME");
     if ($sth->err) {
         $self->{error} = $sth->errstr;
         chomp ($self->{error});
         return undef;
+    }
+    if (not exists $result->{version} and defined $schema and length($schema) == 0) {
+        # on e.g. sqlite, need to set undef
+        $schema = undef;
+        goto gdv_retry;
     }
     if (exists $result->{version}) {
         my $ver = $self->count("SELECT version FROM $self->{schema}distributions WHERE name = ?", $dist);
@@ -1266,7 +1348,33 @@ sub setDistributionVersion {
     my $ver = shift;
     $ver = "none" unless defined $ver;
     my $old = $self->getDistributionVersion($dist);
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+
+    if (versionCompare($old, $ver) > 0) {
+        $self->{error} = "Can't downgrade $dist (from $old to $ver)";
+        return undef;
+    }
+
+    # add all common to distribution in the configuration tables
+    if ((versionCompare($old, "005") <= 0) and
+        (versionCompare($ver, "005") > 0)) {
+        # first move to 004 so getAllConfigurations will show common configurations
+        if (versionCompare($old, "004") < 0) {
+            my $dbh = $self->{dbh};
+            my $sth = $dbh->prepare_cached("UPDATE $self->{schema}distributions SET version = ? WHERE name = ?");
+            unless ($sth->execute("004", $dist)) {
+                $self->{error} = $sth->errstr;
+                return undef;
+            }
+        }
+        my @confs = grep m/^common\//, $self->getAllConfigurations($dist);
+        foreach my $conf (@confs) {
+            unless ($self->insert("$self->{schema}configurations(name, distribution)", "$conf", "$dist")) {
+                return undef;
+            }
+        }
+    }
+    
+    my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached("UPDATE $self->{schema}distributions SET version = ? WHERE name = ?");
     unless ($sth->execute($ver, $dist)) {
         $self->{error} = $sth->errstr;
@@ -1327,7 +1435,7 @@ sub setNote {
     my $group = shift;
     my $note = shift;
     my $col = $group->{type} eq "host" ? "host" : "name";
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     if ($group->{type} eq "configuration") {
         my $sth = $dbh->prepare_cached("UPDATE $self->{schema}configurations SET comment = ? WHERE name = ? AND distribution = ?");
         unless ($sth->execute($note, $group->{name}, $group->{dist})) {
@@ -1387,15 +1495,22 @@ sub _init {
     $self->{schema} = "" unless defined $self->{schema};
     $self->{saveData} = 1; # save data rather then source on templates
     $self->{checkData} = 1; # check data of templates before adding (for DB::FSQL to override)
-    return createDB("error", DBI::errstr) unless DBI->connect_cached(@{$self->{connectionParams}});
+    $self->{dbh} = DBI->connect_cached(@{$self->{connectionParams}});
+    return createDB("error", DBI::errstr) unless $self->{dbh};
+    if ($self->{connectionParams}[0] =~ m/^dbi:SQLite:/) {
+        unless (defined $self->{dbh}->do("PRAGMA foreign_keys = ON")) {
+            return createDB("error", DBI::errstr);
+        }
+    }
     return $self;
 }
 
+# assumes _init was already called
 # input: ($self)
 # output: $self (can be Staple::DB::Error);
 sub _buildDB {
     my $self = shift;
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     return createDB("error", DBI::errstr) unless $dbh;
     return createDB("error", $dbh->errstr) if $dbh->errstr;
     my $schema = $self->{schema};
@@ -1432,7 +1547,7 @@ sub openOrdering {
     my $table = shift;
     my $where = shift;
     my @values = @_;
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     $dbh->begin_work;
     if ($where) {
         $where = "AND $where";
@@ -1464,7 +1579,7 @@ sub closeOrdering {
     my $table = shift;
     my $where = shift;
     my @values = @_;
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     $dbh->begin_work or die "a horrible death";
     if ($where) {
         $where = "AND $where";
@@ -1512,7 +1627,7 @@ sub count {
     my $stmt = shift;
     my @values = @_;
     $self->{error} = "";
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached($stmt);
     unless ($sth->execute(@values)) {
         $self->{error} = $sth->errstr;
@@ -1534,7 +1649,7 @@ sub getList {
     my $stmt = shift;
     my @values = @_;
     $self->{error} = "";
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached($stmt);
     unless ($sth) {
         $self->{error} = $dbh->errstr;
@@ -1563,7 +1678,7 @@ sub getList {
 #    my $key = shift;
 #    my @values = @_;
 #    $self->{error} = "";
-#    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+#    my $dbh = $self->{dbh};
 #    my $sth = $dbh->prepare_cached($stmt);
 #    unless ($sth->execute(@values)) {
 #        $self->{error} = $sth->errstr;
@@ -1586,7 +1701,7 @@ sub insert {
     my $self = shift;
     my $table = shift;
     my @values = @_;
-    my $dbh = DBI->connect_cached(@{$self->{connectionParams}});
+    my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached("INSERT INTO $table VALUES (".join(",",map {"?"} @values).")");
     goto inserterror unless $sth;
     my $rv = $sth->execute(@values);

@@ -237,7 +237,7 @@ sub addConfiguration {
     unless (-d $path) {
         return $self->mkdirs($path);
     }
-    $self->{error} = "Configuration \"$configuration\" already exists";
+    $self->{error} = "Configuration \"$configuration\" already exists on distribution \"$distribution\"";
     return 0;
 }
 
@@ -403,6 +403,29 @@ sub removeTokens {
     }
     
     return 1;
+}
+
+sub setTokens {
+    my $self = shift;
+    my $tokens = shift;
+    my $group = shift;
+
+    unless (-d $group->{path}) {
+        if ($group->{type} and $group->{type} ne "configuration") {
+            $self->{error} = "Group $group->{name} does not exist";
+        } else {
+            $self->{error} = "Configuration $group->{name} does not exist";
+        }
+        return undef;
+    }
+    unlink "$group->{path}/tokens.xml";
+
+    # not sure if we still need to care about these
+    if (versionCompare($self->getVersionOf($group), "004") < 0) {
+        unlink map {"$group->{path}/tokens/$_"} qw(static dynamic regexp)
+    }
+
+    return $self->addTokens($tokens, $group);
 }
 
 sub getTokens {
@@ -594,7 +617,7 @@ sub removeTemplates {
     foreach my $template (@templates) {
         my $path = $template->configuration()->{path}."/templates/".$template->stage()."/".$template->destination();
         unless (-e $path) { 
-            push @errors, "Template \"".$template->destination().\" does not exist in the configuration \"".$template->configuration()->{name}."\"";
+            push @errors, "Can't remove template \"".$template->destination()."\", it does not exist in the configuration \"".$template->configuration()->{name}."\"";
             next;
         }
         unless (unlink $path) {

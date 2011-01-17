@@ -250,10 +250,9 @@ sub fixPath {
 FIXME (I would have left this line empty, put it somewhat ruins the formatting. And yes, this is a complaint)
 
 =cut
-use Carp qw(cluck confess);
+
 sub getDirectoryList {
     my $currentDir = $_[0];
-    confess() unless $currentDir;
     my @results = ();
     unless (opendir(DIR, $currentDir)) {
         return ();

@@ -128,9 +128,9 @@ current version $Staple::VERSION.
 
 sub addDistribution {
     my $self = shift;
-    die "addDistribution not implemented in this database yet";
+    $self->{error} = "addDistribution not implemented in this database yet";
+    return undef;
 }
-
 
 =item B<removeDistribution(I<distribution>)>
 
@@ -140,7 +140,8 @@ Deletes a distribution, returns 1 on success, or undef on failure (and sets the 
 
 sub removeDistribution {
     my $self = shift;
-    die "removeDistribution not implemented in this database yet";
+    $self->{error} = "removeDistribution not implemented in this database yet";
+    return undef;
 }
 
 =item B<addConfiguration(I<distribution, configuration>)>
@@ -182,6 +183,30 @@ sub removeTokens {
     my $self = shift;
     $self->{error} = "removeTokens not implemented in this database yet";
     return undef;
+}
+
+=item B<setTokens(I<tokens name list ref, group|configuration>)>
+
+Sets the tokens (tokens hash ref) of the group or configuration in the
+database, returns 1 on success, or undef on failure. error is set to the error.
+
+The default implementation calls removeTokens(getTokens(group)), and then
+addTokens. Databases which support a faster method of replacing all tokens
+should reimplement this.
+
+=cut
+
+sub setTokens {
+    my $self = shift;
+    my $tokens = shift;
+    my $group = shift;
+    
+    my $origTokens = $self->getTokens($group);
+    return undef unless defined $origTokens;
+
+    return undef unless $self->removeTokens([keys %$origTokens], $group);
+
+    return $self->addTokens($tokens, $group);
 }
 
 =item B<addMount(I<configuration, mount, [location]>)>
@@ -912,7 +937,9 @@ sub getDistributionVersion {
 =item B<setDistributionVersion(I<distribution string>, I<version>)>
 
 Sets the distribution version on this database. version can be either version
-number or "none"/undef. Returns the old version or undef on error.
+number or "none"/undef. Returns the old version or undef on error. Not all
+databases support moving between all options of versions. Most accept upgrade
+though...
 
 =cut
 
@@ -1273,6 +1300,430 @@ Sets the temporary directory.
 sub setTmpDir {
     my $self = shift;
     $self->{tmpDir} = shift;
+}
+
+=item B<syncTo(I<db>, [I<debug>])>
+
+Gets another Staple::DB (should exist, i.e. created with create (or
+DBFactory::createDBInit)), and syncs all data from this DB to the given db,
+deleting any other data that was in the given db. On failure, the given db will
+be in inconsistent state.
+
+If I<debug> is defined, prints various debug messages.
+
+On error returns undef and sets the error.
+
+=cut
+
+sub syncTo {
+    my $self = shift;
+    my $from = $self;
+    my $to = shift;
+    my $debug = shift;
+    my %fromDists; # name => hash
+    my %toDists;   
+    my %fromGroups; # name => hash
+    my %toGroups;  
+    my %fromHosts; # name => hash
+    my %toHosts;
+    my %fromConfs; # dist/"/common/" => {name => fullconf}
+    my %toConfs;
+
+    local $| = 1;
+    
+    ################################################################################
+    print "Syncing distributions tree...\n" if $debug;
+    
+    my @from = $from->getAllDistributions();
+    my @to = $to->getAllDistributions();
+    @to = () unless $to[0];
+    return undef if (@from and not defined $from[0]);
+    
+    my %to = ();
+    my %from = ();
+    @from{@from} = @from if @from;
+    %fromDists = map {$_ => $from->getDistributionGroup($_)} keys %from;
+    @to{@to} = @to if @to;
+
+    
+    for my $distribution (@to) {
+        if ($from{$distribution}) {
+            # can't downgrade, need to delete. Otherwise, just upgrade version
+            if (versionCompare($from->getDistributionVersion($distribution), $to->getDistributionVersion($distribution)) < 0) {
+                unless ($to->removeDistribution($distribution)) {
+                    $self->{error} = $to->{error};
+                    return undef;
+                }
+            } else {
+                unless (defined $to->setDistributionVersion($distribution, $from->getDistributionVersion($distribution))) {
+                    $self->{error} = $to->{error};
+                    return undef;
+                }
+                delete $from{$distribution};
+            }
+        } else {
+            unless ($to->removeDistribution($distribution)) {
+                $self->{error} = $to->{error};
+                return undef;
+            }
+        }
+    }
+    
+    for my $distribution (keys %from) {
+        unless ($to->addDistribution($distribution, $from->getDistributionVersion($distribution))) {
+            $self->{error} = $to->{error};
+            return undef;
+        }
+        unless ($to->setDistributionVersion($distribution, $from->getDistributionVersion($distribution))) {
+            $self->{error} = $to->{error};
+            return undef;
+        }
+    }
+    %toDists = map {$_ => $to->getDistributionGroup($_)} keys %fromDists;
+
+    ################################################################################
+    print "Syncing configurations tree (" if $debug;
+    
+    my $commondist = 0;
+    foreach my $distribution (keys %fromDists) {
+        print "$distribution.. " if $debug;
+        my @from = $from->getAllConfigurations($distribution);
+        my @to = $to->getAllConfigurations($distribution);
+
+        @to = () unless $to[0];
+        return undef if (@from and not defined $from[0]);
+
+        $fromConfs{$distribution} = {map {$_->{name} => $_} $from->getFullConfigurations([grep !/^common\//, @from], $distribution)};
+        if (grep /^common\//, @from) {
+            $fromConfs{"/common/"} = {map {$_->{name} => $_} $from->getFullConfigurations([grep /^common\//, @from], $distribution)};
+            $commondist = $distribution;
+        }
+
+        # remove common configurations if any, we'll add them later
+        @from = grep !/^common\//, @from;
+
+        my %from;
+        my %to;
+        @from{@from} = @from if @from;
+        @to{@to} = @to if @to;
+
+        # remove configurations not in source
+        for my $configuration (sort {$b cmp $a} @to) {
+            if ($from{$configuration}) {
+                delete $from{$configuration};
+            } else {
+                unless ($to->removeConfiguration($distribution, $configuration)) {
+                    $self->{error} = $to->{error};
+                    return undef;
+                }
+            }
+        }
+        # add configurations not in destination
+        for my $configuration (sort {$a cmp $b} keys %from) {
+            unless ($to->addConfiguration($distribution, $configuration)) {
+                $self->{error} = $to->{error};
+                return undef;
+            }
+        }
+    }
+    
+    foreach my $distribution (grep {$_ ne "/common/"} keys %fromConfs) {
+        $toConfs{$distribution} = {map {$_->{name} => $_} $to->getFullConfigurations([keys %{$fromConfs{$distribution}}], $distribution)};
+    }
+    if ($fromConfs{"/common/"}) {
+        print "/common/.." if $debug;
+        for my $configuration (sort {$a cmp $b} keys %{$fromConfs{"/common/"}}) {
+            unless ($to->addConfiguration($commondist, $configuration)) {
+                $self->{error} = $to->{error};
+                return undef;
+            }
+        }
+        $toConfs{"/common/"} = {map {$_->{name} => $_} $to->getFullConfigurations([keys %{$fromConfs{"/common/"}}], $commondist)};
+    }
+    print ")\n" if $debug;
+
+    ################################################################################
+    print "Syncing groups tree...\n" if $debug;
+
+    @from = $from->getAllGroups();
+    @to = $to->getAllGroups();
+    @to = () unless $to[0];
+    return undef if (@from and not defined $from[0]);
+
+    %from = ();
+    %to = ();
+    @from{@from} = @from if @from;
+    @to{@to} = @to if @to;
+    %fromGroups = map {$_ => $from->getGroupsByName($_)} keys %from;
+    
+    for my $group (sort {$b cmp $a} @to) {
+        if ($from{$group}) {
+            delete $from{$group};
+        } else {
+            unless ($to->removeGroup($group)) {
+                $self->{error} = $to->{error};
+                return undef;
+            }
+        }
+    }
+    
+    for my $group (sort {$a cmp $b} keys %from) {
+        unless ($to->addGroup($group)) {
+            $self->{error} = $to->{error};
+            return undef;
+        }
+    }
+
+    %toGroups = map {$_ => $to->getGroupsByName($_)} keys %fromGroups;
+    
+    ################################################################################
+    print "Syncing hosts tree...\n" if $debug;
+
+    @from = $from->getAllHosts();
+    @to = $to->getAllHosts();
+    @to = () unless $to[0];
+    return undef if (@from and not defined $from[0]);
+
+    %from = ();
+    %to = ();
+    @from{@from} = @from;
+    @to{@to} = @to;
+    %fromHosts = map {$_ => $from->getHostGroup($_)} keys %from;
+    
+    for my $host (@to) {
+        if ($from{$host}) {
+            delete $from{$host};
+        } else {
+            unless ($to->removeHost($host)) {
+                $self->{error} = $to->{error};
+                return undef;
+            }
+        }
+    }
+    
+    for my $host (keys %from) {
+        unless ($to->addHost($host)) {
+            $self->{error} = $to->{error};
+            return undef;
+        }
+    }
+
+    %toHosts = map {$_ => $to->getHostGroup($_)} keys %fromHosts;
+    
+    ################################################################################
+    print "Syncing tokens/notes..." if $debug;
+    
+    my $sub = sub {
+        (my $from, my $to, my $fromGroup, my $toGroup) = @_;
+        unless ($to->setTokens($from->getTokens($fromGroup), $toGroup)) {
+            $from->{error} = $to->{error};
+            return undef;
+        }
+        
+        my $fromNote = $from->getNote($fromGroup);
+        return undef unless (defined $fromNote);
+        unless ($to->setNote($toGroup, $fromNote)) {
+            $from->{error} = $to->{error};
+            return undef;
+        }
+        return 1;
+    };
+
+    print " (distributions.." if $debug;
+    foreach my $fromDist (keys %fromDists) {
+        my $toDist = $toDists{$fromDist};
+        $fromDist = $fromDists{$fromDist};
+        return undef unless &$sub($from, $to, $fromDist, $toDist);
+    }
+    
+    print ", groups.." if $debug;
+    foreach my $fromGroup (keys %fromGroups) {
+        my $toGroup = $toGroups{$fromGroup};
+        $fromGroup = $fromGroups{$fromGroup};
+        return undef unless &$sub($from, $to, $fromGroup, $toGroup);
+    }
+    
+    print ", hosts.." if $debug;
+    foreach my $fromHost (keys %fromHosts) {
+        my $toHost = $toHosts{$fromHost};
+        $fromHost = $fromHosts{$fromHost};
+        return undef unless &$sub($from, $to, $fromHost, $toHost);
+    }
+    
+    print ", configurations.." if $debug;
+    foreach my $dist (keys %fromConfs) {
+        foreach my $fromConf (keys %{$fromConfs{$dist}}) {
+            my $toConf = $toConfs{$dist}{$fromConf};
+            $fromConf = $fromConfs{$dist}{$fromConf};
+            return undef unless &$sub($from, $to, $fromConf, $toConf);
+        }
+    }
+
+    print ")\n" if $debug;
+    
+
+    ################################################################################
+    print "Syncing group groups/configurations" if $debug;
+
+    $sub = sub {
+        my $from = shift;
+        my $to = shift;
+        my $fromGroup = shift;
+        my $toGroup = shift;
+
+        my @fromGroups = $from->getGroups($fromGroup);
+        my @toGroups = $to->getGroups($toGroup);
+        unless ($to->removeGroupGroups($toGroup, @toGroups)) {
+            $from->{error} = $to->{error};
+            return undef;
+        }
+        foreach my $group (@fromGroups) {
+            unless ($to->addGroupGroup($toGroup, $group)) {
+                $self->{error} = $to->{error};
+                return undef;
+            }
+        }
+
+        my @fromConfigurations = $from->getGroupConfigurations($fromGroup);
+        my @toConfigurations = $to->getGroupConfigurations($toGroup);
+        unless ($to->removeGroupConfigurations($toGroup, @toConfigurations)) {
+            $from->{error} = $to->{error};
+            return undef;
+        }
+        foreach my $configuration (@fromConfigurations) {
+            unless ($to->addGroupConfiguration($toGroup, $configuration)) {
+                $from->{error} = $to->{error};
+                return undef;
+            }
+        }
+        
+        return 1;
+    };
+
+    print " (distributions.." if $debug;
+    foreach my $fromDist (keys %fromDists) {
+        my $toDist = $toDists{$fromDist};
+        $fromDist = $fromDists{$fromDist};
+        return undef unless &$sub($from, $to, $fromDist, $toDist);
+    }
+    
+    print ", hosts.." if $debug;
+    foreach my $fromHost (keys %fromHosts) {
+        my $toHost = $toHosts{$fromHost};
+        $fromHost = $fromHosts{$fromHost};
+        return undef unless &$sub($from, $to, $fromHost, $toHost);
+    }
+    
+    print ", groups.." if $debug;
+    foreach my $fromGroup (keys %fromGroups) {
+        my $toGroup = $toGroups{$fromGroup};
+        $fromGroup = $fromGroups{$fromGroup};
+        return undef unless &$sub($from, $to, $fromGroup, $toGroup);
+    }
+
+    print ")\n" if $debug;
+
+    ################################################################################
+    print "Syncing settings (" if $debug;
+
+    
+    foreach my $dist (keys %fromConfs) {
+        print "$dist.. " if $debug;
+        foreach my $fromConf (keys %{$fromConfs{$dist}}) {
+            my $toConf = $toConfs{$dist}{$fromConf};
+            $fromConf = $fromConfs{$dist}{$fromConf};
+
+            # mounts
+            my @fromMounts = $from->getMounts($fromConf);
+            my @toMounts = $to->getMounts($toConf);
+
+            unless ($to->removeMounts(@toMounts)) {
+                $from->{error} = $to->{error};
+                return undef;
+            }
+
+            foreach my $mount (@fromMounts) {
+                unless ($to->addMount($toConf, $mount)) {
+                    $from->{error} = $to->{error};
+                    return undef;
+                }
+            }
+
+            # templates
+            my @fromTemplates = $from->getTemplates($fromConf);
+            my @toTemplates = $to->getTemplates($toConf);
+            
+            unless ($to->removeTemplates(@toTemplates)) {
+                $from->{error} = $to->{error};
+                return undef;
+            }
+
+            map {$_->configuration($toConf)} @fromTemplates;
+
+            unless ($to->addTemplates(@fromTemplates)) {
+                $from->{error} = $to->{error};
+                return undef;
+            }
+
+            # scripts
+            my @fromScripts = $from->getScripts($fromConf);
+            my @toScripts = $to->getScripts($toConf);
+
+            unless ($to->removeScripts(@toScripts)) {
+                $from->{error} = "syncScripts failed(removing): ".$to->{error};
+                return undef;
+            }
+
+            map {$_->configuration($toConf)} @fromScripts;
+
+            unless ($to->addScripts(@fromScripts)) {
+                $from->{error} = "syncScripts failed(adding): ".$to->{error};
+                return undef;
+            }
+            
+            # autos
+            my @fromAutos = $from->getAutos($fromConf);
+            my @toAutos = $to->getAutos($toConf);
+
+            unless ($to->removeAutos(@toAutos)) {
+                $from->{error} = $to->{error};
+                return undef;
+            }
+
+            map {$_->configuration($toConf)} @fromAutos;
+
+            unless ($to->addAutos(@fromAutos)) {
+                $from->{error} = $to->{error};
+                return undef;
+            }
+
+            # configurations
+
+            # on sql (and fsql) the configuration configuration list, when
+            # pointing to common configuration, doesn't not work until version
+            # 006 but unfortunately, here we only check for version 004 (where
+            # configuration configuration list was introduced)
+            
+            if ($dist eq "/common/" or versionCompare($from->getDistributionVersion($dist), "004") >= 0) {
+                my @fromConfigurations = $from->getConfigurationConfigurations($fromConf);
+                my @toConfigurations = $to->getConfigurationConfigurations($toConf);
+                unless ($to->removeConfigurationConfigurations($toConf, @toConfigurations)) {
+                    $from->{error} = $to->{error};
+                    return undef;
+                }
+                foreach my $configuration (@fromConfigurations) {
+                    unless ($to->addConfigurationConfiguration($toConf, $configuration)) {
+                        $from->{error} = $to->{error};
+                        return undef;
+                    }
+                }
+            }
+        }
+    }
+
+    print ")\n" if $debug;
+
+    return 1;
 }
 
 ################################################################################

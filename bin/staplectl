@@ -1165,7 +1165,9 @@ Gets <distribution>'s version.
 name: sdv | set distribution version
 parameters: <version> [<distribution>]
 
-Sets <distribution>'s version to <version>.
+Sets <distribution>'s version to <version>. if <version> is omitted, use the
+current staple version: $Staple::VERSION.
+
 ",
                     acc => "
 name: acc | add configuration configuration
@@ -1377,7 +1379,7 @@ sub sdv {
     my $version = shift;
     my $dist = shift;
     $dist = $distribution unless defined $dist;
-    $version = "none" unless defined $version;
+    $version = $Staple::VERSION unless defined $version;
     my $old = $db->setDistributionVersion($dist, $version);
     if (defined $old) {
         if ($old eq $version) {
@@ -3796,15 +3798,31 @@ sub syncctl {
     chomp($line);
     return unless $line;
     $line = "setdb $line";
-    (my $command, $db1, @db1params) = parseline($line);
+    (my $command, @db1params) = parseline($line);
+    $db1 = createDB(@db1params);
+    unless (ref $db1) {
+        perror "$db1\n";
+        return;
+    } elsif ($db1->{error}) {
+        perror "$db1->{error}\n";
+        return;
+    }
+    
     print "sync to <db> [<params...>]: ";
     $line = <>;
     return unless $line;
     chomp($line);
     $line = "setdb $line";
-    ($command, $db2, @db2params) = parseline($line);
-
-    perror "sync failed: ".syncError()."\n" unless sync($db1, [@db1params], $db2, [@db2params]);
+    ($command, @db2params) = parseline($line);
+    $db2 = createDB(@db2params);
+    unless (ref $db2) {
+        perror "$db2\n";
+        return;
+    } elsif ($db2->{error}) {
+        perror "$db2->{error}\n";
+        return;
+    }
+    perror "sync failed: ".$db1->{error}."\n" unless $db1->syncTo($db2, 1);
 }
 
 sub parseline {

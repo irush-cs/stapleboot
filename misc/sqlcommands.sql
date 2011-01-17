@@ -5,6 +5,9 @@
 -- ALTER SCHEMA staple OWNER TO irush
 -- CREATE ROLE staple_user LOGIN PASSWORD 'staple_user'
 
+-- PRAGMA foreign_keys = ON
+
+
 SET search_path TO staple;
 
 \pset title ''

@@ -1,5 +1,8 @@
 staple 006snap
 
+	* Better support for sqlite on the sql database.
+	* Faster sync function which works with configuration's configurations list (with some bug fixes)
+	* Fixed DB::SQL (sql db) to properly support common configuration in the configuration's configurations list
 	* Use proper classes instead of hashes (some API change)
 	* Added MANUAL
 	* Added ChangeLog
