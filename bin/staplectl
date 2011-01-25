@@ -1192,7 +1192,7 @@ Removes {+|-}<configuration2> from <configuration1>'s list of configurations.
 ",
 );
 
-my @singleCommandCommands = ("ahc", "rhc", "gag", "ghc", "wht", "whc", "whg", "ghi", "ggi", "gci", "bad", "badcommandorfilename", "gt", "gdt", "gct", "gah", "gac", "gas", "gss", "gts", "gm", "ah", "gad", "ghn", "ggn", "gdn", "gcn", "debug", "undebug", "ndb");
+my @singleCommandCommands = ("ahc", "rhc", "gag", "ghc", "wht", "whc", "whg", "ghi", "ggi", "gci", "bad", "badcommandorfilename", "gt", "gdt", "gct", "gah", "gac", "gas", "gss", "gts", "gm", "ah", "gad", "ghn", "ggn", "gdn", "gcn", "debug", "undebug", "ndb", "ghg", "ght", "gdb");
 
 sub help {
     my %topics = (a              => "helpall",
@@ -3538,13 +3538,17 @@ sub rdt {
 
 sub printgctokens {
     if (my $tokens = $db->getTokens($_[0])) {
-        my %tokens = %$tokens;
-        foreach my $type ("static", "dynamic", "regexp") {
-            my @tokens = grep {$_->{type} eq $type} values %tokens;
-            if (@tokens) {
-                print "- $type:\n";
-                print join "\n", map "     $_->{key}=$_->{raw}", sort {$a->{key} cmp $b->{key}} @tokens;
-                print "\n";
+        if ($singleCommand) {
+            print tokensToXML($tokens);
+        } else {
+            my %tokens = %$tokens;
+            foreach my $type ("static", "dynamic", "regexp") {
+                my @tokens = grep {$_->{type} eq $type} values %tokens;
+                if (@tokens) {
+                    print "- $type:\n";
+                    print join "\n", map "     $_->{key}=$_->{raw}", sort {$a->{key} cmp $b->{key}} @tokens;
+                    print "\n";
+                }
             }
         }
     } else {
