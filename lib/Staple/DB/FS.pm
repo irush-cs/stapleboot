@@ -499,7 +499,7 @@ sub getMounts {
     my @configurations = @_;
     my @mounts = ();
     foreach my $configuration (@configurations) {
-        my $path = "$configuration->{path}/mounts";
+        my $path = $configuration->path()."/mounts";
         if (-r "$path") {
             open(FILE, "<$path");
             my @rawMounts = <FILE>;
@@ -520,7 +520,7 @@ sub getTemplates {
     my @configurations = @_;
     my %templates = ();
     foreach my $configuration (@configurations) {
-        my $path = "$configuration->{path}/templates";
+        my $path = $configuration->path()."/templates";
         next unless -d "$path";
         my @raw = map {(my $a = $_) =~ s/$path//; $a} grep {! -d} getDirectoryList("$path");
         foreach my $rawTemplate (@raw) {
@@ -570,7 +570,7 @@ sub addTemplates {
             }
             $template->gid($gid);
         }
-        my $path = $template->configuration()->{path}."/templates/".$template->stage()."/".$template->destination();
+        my $path = $template->configuration()->path()."/templates/".$template->stage()."/".$template->destination();
         if (-e $path) {
             unless (unlink $path) {
                 push @errors, "can't remove previous template \"$path\": $!";
@@ -615,9 +615,9 @@ sub removeTemplates {
     my @templates = @_;
     my @errors = ();
     foreach my $template (@templates) {
-        my $path = $template->configuration()->{path}."/templates/".$template->stage()."/".$template->destination();
+        my $path = $template->configuration()->path()."/templates/".$template->stage()."/".$template->destination();
         unless (-e $path) { 
-            push @errors, "Can't remove template \"".$template->destination()."\", it does not exist in the configuration \"".$template->configuration()->{name}."\"";
+            push @errors, "Can't remove template \"".$template->destination()."\", it does not exist in the configuration \"".$template->configuration()->name()."\"";
             next;
         }
         unless (unlink $path) {
@@ -637,7 +637,7 @@ sub getScripts {
     my @configurations = @_;
     my @results = ();
     foreach my $configuration (@configurations) {
-        my $path = "$configuration->{path}/scripts";
+        my $path = $configuration->path()."/scripts";
         my @scripts = ();
         next unless (-d "$path");
         my @raw = map {(my $a = $_) =~ s/$path\///; $a} grep { ! -d $_ } getDirectoryList("$path");
@@ -673,17 +673,17 @@ sub addScripts {
             next;
         }
 
-        my @oldScripts = grep {$_->stage() eq $script->stage()} $self->getScripts($script->{configuration});
+        my @oldScripts = grep {$_->stage() eq $script->stage()} $self->getScripts($script->configuration());
         $script->order(scalar(@oldScripts) + 1) if not defined $script->order() or $script->order() > scalar(@oldScripts) or $script->order() < 1;
-        unless($self->mkdirs($script->configuration()->{path}."/scripts/".$script->stage()."/")) {
+        unless($self->mkdirs($script->configuration()->path()."/scripts/".$script->stage()."/")) {
             push @errors, $self->{error};
             next;
         }
-        unless ($self->openOrdering($script->order(), $script->configuration()->{path}."/scripts/".$script->stage()."/")) {
+        unless ($self->openOrdering($script->order(), $script->configuration()->path()."/scripts/".$script->stage()."/")) {
             push @errors, $self->{error};
             next;
         }
-        my $file = $script->configuration()->{path}."/scripts/".$script->stage()."/".$script->order().".".($script->critical() ? "c" : "").($script->tokens() ? "t" : "").($script->tokenScript() ? "m" : "").".".$script->name();
+        my $file = $script->configuration()->path()."/scripts/".$script->stage()."/".$script->order().".".($script->critical() ? "c" : "").($script->tokens() ? "t" : "").($script->tokenScript() ? "m" : "").".".$script->name();
         unless (open(FILE, ">$file")) {
             push @errors, "can't open file for writing \"$file\": $!";
             next;
@@ -729,7 +729,7 @@ sub getAutos {
     my @configurations = @_;
     my @results = ();
     foreach my $configuration (@configurations) {
-        my $path = "$configuration->{path}/autos";
+        my $path = $configuration->path()."/autos";
         my @autos = ();
         next unless (-d "$path");
         my @raw = map {(my $a = $_) =~ s/$path\///; $a} grep { ! -d $_ } getDirectoryList("$path");
@@ -765,15 +765,15 @@ sub addAutos {
 
         my @oldAutos = $self->getAutos($auto->configuration());
         $auto->order(scalar(@oldAutos) + 1) if not defined $auto->order() or $auto->order() > scalar(@oldAutos) or $auto->order() < 1;
-        unless($self->mkdirs($auto->configuration()->{path}."/autos/")) {
+        unless($self->mkdirs($auto->configuration()->path()."/autos/")) {
             push @errors, $self->{error};
             next;
         }
-        unless ($self->openOrdering($auto->order(), $auto->configuration()->{path}."/autos/")) {
+        unless ($self->openOrdering($auto->order(), $auto->configuration()->path()."/autos/")) {
             push @errors, $self->{error};
             next;
         }
-        my $file = $auto->configuration()->{path}."/autos/".$auto->order().".".($auto->critical() ? "c" : "").($auto->tokens() ? "t" : "").".".$auto->name();
+        my $file = $auto->configuration()->path()."/autos/".$auto->order().".".($auto->critical() ? "c" : "").($auto->tokens() ? "t" : "").".".$auto->name();
         unless (open(FILE, ">$file")) {
             push @errors, "can't open file for writing \"$file\": $!";
             next;
@@ -841,11 +841,11 @@ sub removeMounts {
     my $self = shift;
     my @allMounts = @_;
     my @errors = ();
-    my @configurations = map {"$_->{configuration}->{name}:$_->{configuration}->{dist}"} @allMounts;
+    my @configurations = map {$_->{configuration}->name().":".$_->{configuration}->dist()} @allMounts;
     my %configurations = ();
     @configurations{@configurations} = @configurations;
     foreach my $conf (keys %configurations) {
-        my @mounts = grep {"$_->{configuration}->{name}:$_->{configuration}->{dist}" eq $conf} @allMounts;
+        my @mounts = grep {$_->{configuration}->name().":".$_->{configuration}->dist() eq $conf} @allMounts;
         my @oldMounts = $self->getMounts($mounts[0]->{configuration});
         my @results = ();
         foreach my $mount (@oldMounts) {
@@ -866,9 +866,9 @@ sub removeConfigurationConfigurations {
     my $self = shift;
     my $conf = shift;
     my @confs = @_;
-    my $version = $self->getDistributionVersion($conf->{dist});
+    my $version = $self->getDistributionVersion($conf->dist());
     if (versionCompare($version, "004") < 0) {
-        $self->{error} = "distribution \"$conf->{dist}\" is version $version (needs at least 004)";
+        $self->{error} = "distribution \"".$conf->dist()."\" is version $version (needs at least 004)";
         return undef;
     }
     $self->removeGroupConfigurations($conf, @confs);
@@ -879,13 +879,13 @@ sub addConfigurationConfiguration {
     my $conf1 = shift;
     my $conf2 = shift;
     my $location = shift;
-    my $version = $self->getDistributionVersion($conf1->{dist});
+    my $version = $self->getDistributionVersion($conf1->dist());
     if (versionCompare($version, "004") < 0) {
-        $self->{error} = "distribution \"$conf1->{dist}\" is version $version (needs at least 004)";
+        $self->{error} = "distribution \"".$conf1->dist()."\" is version $version (needs at least 004)";
         return undef;
     }
-    unless ($self->getFullConfigurations([$conf2], $conf1->{dist})) {
-        $self->{error} = "distribution $conf1->{dist} doesn't have $conf2->{name}";
+    unless ($self->getFullConfigurations([$conf2], $conf1->dist())) {
+        $self->{error} = "distribution ".$conf1->dist()." doesn't have ".$conf2->name();
         return undef;
     }
     $self->addGroupConfiguration($conf1, $conf2, $location);
@@ -894,12 +894,12 @@ sub addConfigurationConfiguration {
 sub getConfigurationConfigurations {
     my $self = shift;
     my $conf = shift;
-    my $version = $self->getDistributionVersion($conf->{dist});
+    my $version = $self->getDistributionVersion($conf->dist());
     if (versionCompare($version, "004") < 0) {
-        $self->{error} = "distribution \"$conf->{dist}\" is version $version (needs at least 004)";
+        $self->{error} = "distribution \"".$conf->dist()."\" is version $version (needs at least 004)";
         return undef;
     }
-    $self->getGroupConfigurations($conf);
+    return $self->getGroupConfigurations($conf);
 }
 
 # applies also to getConfigurationConfigurations
@@ -917,8 +917,8 @@ sub getGroupConfigurations {
             return undef;
         }
         push @configurations, map {my $a = $_; chomp $a; $a} @configurationData;
-        @configurations = map {m/^([+-])(.*)$/; {name => $2, active => $1, group => $group, path => undef, dist => undef}} @configurations;
-        map {if ($_->{active} eq '+') {$_->{active} = 1} else {$_->{active} = 0}} @configurations;
+        @configurations = map {m/^([+-])(.*)$/; Staple::Configuration->new({name => $2, active => $1, group => $group})} @configurations;
+        #map {if ($_->{active} eq '+') {$_->{active} = 1} else {$_->{active} = 0}} @configurations;
     }
     return @configurations;
 }
@@ -932,8 +932,8 @@ sub addGroupConfiguration {
     $location = int $location if $location;
     my @results;
     my @configurations = $self->getGroupConfigurations($group);
+    @configurations = grep {$_->name() ne $configuration->name() or $_->active() ne $configuration->active()} @configurations;
     my $i = 0;
-    @configurations = grep {$_->{name} ne $configuration->{name} or $_->{active} ne $configuration->{active}} @configurations;
     $location = scalar(@configurations) + 1 if not $location or $location > @configurations;
     foreach my $conf (@configurations) {
         $i++;
@@ -951,13 +951,13 @@ sub addGroupConfiguration {
 sub removeGroupConfigurations {
     my $self = shift;
     my $group = shift;
-    my @toRemove = map {($_->{active} ? "+" : "-").$_->{name}} @_;
+    my @toRemove = map {($_->active() ? "+" : "-").$_->name()} @_;
     my %toRemove = ();
     @toRemove{@toRemove} = @toRemove;
     my @configurations = $self->getGroupConfigurations($group);
     my @results = ();
     foreach my $configuration (@configurations) {
-        push @results, $configuration unless $toRemove{($configuration->{active} ? "+" : "-").$configuration->{name}};
+        push @results, $configuration unless $toRemove{($configuration->active() ? "+" : "-").$configuration->name()};
     }
     return $self->setGroupConfigurations($group, @results);
 }
@@ -1184,7 +1184,7 @@ sub setDistributionVersion {
                 # let's hope there's no configuration named tokens...
                 `find \`find $path -name tokens -type d\` -maxdepth 1 \\( -name static -o -name dynamic -o -name regexp \\) -delete`;
                 `find $path -name tokens -type d -delete`;
-                foreach my $conf (sort {length($b) <=> length($a)} map {$_->{path}} @configurations) {
+                foreach my $conf (sort {length($b) <=> length($a)} map {$_->path()} @configurations) {
                     if (-d "$conf/configurations") {
                         rename "$conf/configurations", "$conf/subconfs";
                     }
@@ -1399,7 +1399,7 @@ sub setMounts {
     my $self = shift;
     my $configuration = shift;
     my @mounts = @_;
-    my $mountsFile = "$configuration->{path}/mounts";
+    my $mountsFile = $configuration->path()."/mounts";
     if (@mounts) {
         if (open(FILE, ">$mountsFile")) {
             print FILE join "\n", map {($_->{active} ?  "+" : "-").$_->{destination}} @mounts;
@@ -1457,7 +1457,7 @@ sub setGroupConfigurations {
     my $configurationsFile = "$group->{path}/configurations";
     if (@configurations) {
         if (open(FILE, ">$configurationsFile")) {
-            print FILE join "\n", map {($_->{active} ?  "+" : "-").$_->{name}} @configurations;
+            print FILE join "\n", map {($_->active() ?  "+" : "-").$_->name()} @configurations;
             print FILE "\n";
             close(FILE);
             return 1;

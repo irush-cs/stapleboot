@@ -1192,7 +1192,7 @@ Removes {+|-}<configuration2> from <configuration1>'s list of configurations.
 ",
 );
 
-my @singleCommandCommands = ("ahc", "rhc", "gag", "ghc", "wht", "whc", "whg", "ghi", "ggi", "gci", "bad", "badcommandorfilename", "gt", "gdt", "gct", "gah", "gac", "gas", "gss", "gts", "gm", "ah", "gad", "ghn", "ggn", "gdn", "gcn", "debug", "undebug", "ndb", "ghg", "ght", "gdb");
+my @singleCommandCommands = ("ahc", "rhc", "gag", "ghc", "wht", "whc", "whg", "ghi", "ggi", "gci", "bad", "badcommandorfilename", "gt", "gdt", "gct", "gah", "gac", "gas", "gss", "gts", "gm", "ah", "gad", "ghn", "ggn", "gdn", "gcn", "debug", "undebug", "ndb", "ghg", "ght", "gdb", "ggg", "ggc", "ggt", "gcc");
 
 sub help {
     my %topics = (a              => "helpall",
@@ -1361,7 +1361,7 @@ sub perror {
         }
         $err = RED.$err.RESET.$suffix;
     } 
-    print $err;
+    print STDERR $err;
 }
 
 sub gdv {
@@ -1742,7 +1742,7 @@ sub ggi {
             if (@configurations) {
                 print "Configurations:\n";
                 print "  ";
-                print join "\n  ", map {($_->{active} ?  "+" : "-").$_->{name}} @configurations;
+                print join "\n  ", map {($_->active() ?  "+" : "-").$_->name()} @configurations;
                 print "\n";
             }
         }
@@ -1779,7 +1779,7 @@ sub gci {
                 if (@configurations) {
                     print "\nConfigurations:\n";
                     print "  ";
-                    print join "\n  ", map {($_->{active} ?  "+" : "-").$_->{name}} @configurations;
+                    print join "\n  ", map {($_->active() ?  "+" : "-").$_->name()} @configurations;
                     print "\n";
                 }
             }
@@ -2609,7 +2609,7 @@ sub rgc {
     }
     (my $conf) = $db->getConfigurationsByName($configuration);
     if ($conf) {
-        $conf->{active} = $active;
+        $conf->active($active);
         unless ($db->removeGroupConfigurations($group, $conf)) {
             perror $db->{error}."\n";
             return;
@@ -2643,7 +2643,7 @@ sub rdc {
     }
     (my $conf) = $db->getConfigurationsByName($configuration);
     if ($conf) {
-        $conf->{active} = $active;
+        $conf->active($active);
         unless ($db->removeGroupConfigurations($group, $conf)) {
             perror $db->{error}."\n";
             return;
@@ -2688,7 +2688,7 @@ sub rhc {
     }
     (my $conf) = $db->getConfigurationsByName($configuration);
     if ($conf) {
-        $conf->{active} = $active;
+        $conf->active($active);
         unless ($db->removeGroupConfigurations($group, $conf)) {
             perror $db->{error}."\n";
             return;
@@ -2728,7 +2728,7 @@ sub agc {
     }
     (my $conf) = $db->getConfigurationsByName($configuration);
     if ($conf) {
-        $conf->{active} = $active;
+        $conf->active($active);
         unless ($db->addGroupConfiguration($group, $conf, $location)) {
             perror $db->{error}."\n";
             return;
@@ -2767,7 +2767,7 @@ sub rcc {
     }
     (my $conf2rm) = $db->getConfigurationsByName($configuration);
     if ($conf2rm) {
-        $conf2rm->{active} = $active;
+        $conf2rm->active($active);
         unless ($db->removeConfigurationConfigurations($conf, $conf2rm)) {
             perror $db->{error}."\n";
             return;
@@ -2790,20 +2790,22 @@ sub gcc {
         print "No such configuration \"$configuration_name\"\n";
         return;
     }
+    @configurations_names = $configuration_name if $singleCommand;
     my @confs = $db->getFullConfigurations([$db->getConfigurationsByName(@configurations_names)], $distribution);
+    my $prefix = $singleCommand ? "" : "  ";
     foreach my $conf (@confs) {
-        print "$conf->{name}:\n";
+        print $conf->name().":\n" unless $singleCommand;
         my @configurations = $db->getConfigurationConfigurations($conf);
         if (@configurations and not defined $configurations[0]) {
             perror $db->{error}."\n";
             return;
         } else {
             if (@configurations) {
-                print "  ";
-                print join "\n  ", map {($_->{active} ?  "+" : "-").$_->{name}} @configurations;
+                print "$prefix";
+                print join "\n$prefix", map {($_->active() ?  "+" : "-").$_->name()} @configurations;
                 print "\n";
             }
-            print "\n";
+            print "\n" unless $singleCommand;
         }
     }
 }
@@ -2842,7 +2844,7 @@ sub acc {
     }
     (my $conf2) = $db->getConfigurationsByName($configuration);
     if ($conf2) {
-        $conf2->{active} = $active;
+        $conf2->active($active);
         unless ($db->addConfigurationConfiguration($conf, $conf2, $location)) {
             perror $db->{error}."\n";
             return;
@@ -2877,7 +2879,7 @@ sub adc {
     }
     (my $conf) = $db->getConfigurationsByName($configuration);
     if ($conf) {
-        $conf->{active} = $active;
+        $conf->active($active);
         unless ($db->addGroupConfiguration($group, $conf, $location)) {
             perror $db->{error}."\n";
             return;
@@ -2923,7 +2925,7 @@ sub ahc {
     }
     (my $conf) = $db->getConfigurationsByName($configuration);
     if ($conf) {
-        $conf->{active} = $active;
+        $conf->active($active);
         unless ($db->addGroupConfiguration($group, $conf, $location)) {
             perror $db->{error}."\n";
             return;
@@ -2943,7 +2945,7 @@ sub gdc {
             perror $db->{error}."\n";
             return;
         } else {
-            print join "\n", map {($_->{active} ?  "+" : "-").$_->{name}} @configurations;
+            print join "\n", map {($_->active() ?  "+" : "-").$_->name()} @configurations;
             print "\n";
         }
     } else {
@@ -2964,7 +2966,7 @@ sub ghc {
             perror $db->{error}."\n";
             return;
         } else {
-            print join "\n", map {($_->{active} ?  "+" : "-").$_->{name}} @configurations;
+            print join "\n", map {($_->active() ?  "+" : "-").$_->name()} @configurations;
             print "\n";
         }
     } else {
@@ -3118,20 +3120,22 @@ sub ggc {
         print "No such group \"$group_name\"\n";
         return;
     }
+    @groups_names = $group_name if ($singleCommand);
     my @groups = $db->getGroupsByName(@groups_names);
+    my $prefix = $singleCommand ? "" : "  ";
     foreach my $group (@groups) {
-        print "$group->{name}:\n";
+        print "$group->{name}:\n" unless $singleCommand;
         my @configurations = $db->getGroupsConfigurations($group);
         if (@configurations and not defined $configurations[0]) {
             perror $db->{error}."\n";
             return;
         } else {
             if (@configurations) {
-                print "  ";
-                print join "\n  ", map {($_->{active} ?  "+" : "-").$_->{name}} @configurations;
+                print "$prefix";
+                print join "\n$prefix", map {($_->active() ?  "+" : "-").$_->name()} @configurations;
                 print "\n";
             }
-            print "\n";
+            print "\n" unless $singleCommand;
         }
     }
 }
@@ -3886,7 +3890,7 @@ sub group_configurations_completion {
         return () unless $group;
         my @confs = $db->getGroupsConfigurations($group);
         return () if (@confs and not defined $confs[0]);
-        @currentCompletionList = grep {index($_, $text) == 0} map {($_->{active} ?  "+" : "-").$_->{name}} @confs;
+        @currentCompletionList = grep {index($_, $text) == 0} map {($_->active() ?  "+" : "-").$_->name()} @confs;
     }
     return $currentCompletionList[$count];
 }
@@ -3901,7 +3905,7 @@ sub distribution_configurations_completion {
         return () unless $group;
         my @confs = $db->getGroupsConfigurations($group);
         return () if (@confs and not defined $confs[0]);
-        @currentCompletionList = grep {index($_, $text) == 0} map {($_->{active} ?  "+" : "-").$_->{name}} @confs;
+        @currentCompletionList = grep {index($_, $text) == 0} map {($_->active() ?  "+" : "-").$_->name()} @confs;
     }
     return $currentCompletionList[$count];
 }
@@ -3927,7 +3931,7 @@ sub host_configurations_completion {
         return () unless @groups;
         my @confs = $db->getGroupsConfigurations(@groups);
         return () if (@confs and not defined $confs[0]);
-        @currentCompletionList = grep {index($_, $text) == 0} map {($_->{active} ?  "+" : "-").$_->{name}} @confs;
+        @currentCompletionList = grep {index($_, $text) == 0} map {($_->active() ?  "+" : "-").$_->name()} @confs;
     }
     return $currentCompletionList[$count];
 }
@@ -3944,7 +3948,7 @@ sub configuration_configurations_completion {
         return () unless $conf;
         my @confs = $db->getConfigurationConfigurations($conf);
         return () if (@confs and not defined $confs[0]);
-        @currentCompletionList = grep {index($_, $text) == 0} map {($_->{active} ?  "+" : "-").$_->{name}} @confs;
+        @currentCompletionList = grep {index($_, $text) == 0} map {($_->active() ?  "+" : "-").$_->name()} @confs;
     }
     return $currentCompletionList[$count];
 }

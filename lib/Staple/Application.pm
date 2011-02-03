@@ -658,7 +658,7 @@ sub applyMounts {
             foreach my $key (keys %$mount) {
                 # the configuration name
                 if (ref $mount->{$key}) {
-                    $body .= " $key: $mount->{$key}->{name},";
+                    $body .= " $key: ".$mount->{$key}->name().",";
                 } else {
                     $body .= " $key: $mount->{$key},";
                 }
@@ -675,7 +675,7 @@ sub applyMounts {
             $body .= "\n\n Trying next mount from $mount->{next}\n" if $mount->{next};
             $self->addMail($body);
             if ($mount->{critical}) {
-                $self->error("mounting of $mount->{destination} from $mount->{configuration}->{name} failed");
+                $self->error("mounting of $mount->{destination} from ".$mount->{configuration}->name()." failed");
                 $self->doCriticalAction();
             } elsif ($mount->{next}) {
                 $self->output("trying next mount from configuration: $mount->{next}", 1);

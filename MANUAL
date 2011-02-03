@@ -87,6 +87,9 @@ Group - A group is a collection of configurations and other groups. The groups
         hosts. The host and the distribution are represented as special types
         of groups.
 
+Node - A container. This is a general name for either configuration, group,
+       distribution or host.
+
 Token - A token is a variable. Tokens' values are replaced in templates before
         they are copied, and in scripts before they run. Tokens also control
         the mounts and other aspects of staple. Tokens can be set and changed
@@ -108,6 +111,8 @@ Mount - Mount is a single mount point that staple will mount. Mounts are
         configured using tokens, and are either mounted by staple or inserted
         into the fstab for later mount.
 
+Setting - A single setting. An abstract name that can be either autogroup,
+          template, script or mount.
 
 3. Staple Parts
 ----------------
@@ -898,18 +903,6 @@ group hash - represents a group.
   type - The type, can be one of: group, distribution or host.
   path - used by the database internally (on fs, it's the path...)
 
-configuration hash - represents a configuration. A configuration hash is
-                     considered full, if it has a distribution attached to
-                     it. To get a full configuration from an incomplete
-                     configuration, one needs to call DB::getFullConfigurations
-  name   - The name of the configuration
-  type   - the string "configuration" (to distinguish from groups)
-  active - Whether the configuration is active (1) or not (0)
-  group  - Originating group hash (if any)
-  dist   - The distribution
-  path   - Used by the database internally (on fs, it's the path)
-
-
 token hash - A token
   key    - The token name
   value  - The token's final value (after expansion for regexp and dynamic)
@@ -959,6 +952,12 @@ Staple::Setting
     Staple::Script
     Staple::Autogroup
 
+Staple::Node
+
+  Base class for nodes (configuration, group, host or distribution). 
+
+  The subclasses of Staple::Node are:
+    Staple::Configuration
 
 
 ?. 

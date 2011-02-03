@@ -449,7 +449,7 @@ sub finalStage {
                     print LOG "\nbad mounts:\n";
                     foreach my $mount (@$badMounts) {
                         print LOG "  $mount->{destination}\n";
-                        print LOG "    configuration: $mount->{configuration}->{name}\n";
+                        print LOG "    configuration: ".$mount->{configuration}->name()."\n";
                         print LOG "    command: $mount->{_cmd}\n";
                         print LOG "    status: $mount->{_status}\n";
                     }

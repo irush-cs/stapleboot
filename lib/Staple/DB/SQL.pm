@@ -541,7 +541,7 @@ sub getMounts {
     my $sth = $dbh->prepare_cached("SELECT destination, active FROM $self->{schema}mounts WHERE configuration = ? AND distribution = ? ORDER BY ordering");
 
     foreach my $configuration (@configurations) {
-        unless ($sth->execute($configuration->{name}, $configuration->{dist})) {
+        unless ($sth->execute($configuration->name(), $configuration->dist())) {
             $self->{error} = $sth->errstr;
             chomp ($self->{error});
             return undef;
@@ -565,7 +565,7 @@ sub getTemplates {
     my $sth = $dbh->prepare_cached("SELECT destination, source, data, stage, mode, gid, uid FROM $self->{schema}templates WHERE configuration = ? AND distribution = ?");
 
     foreach my $configuration (@configurations) {
-        unless ($sth->execute($configuration->{name}, $configuration->{dist})) {
+        unless ($sth->execute($configuration->name(), $configuration->dist())) {
             $self->{error} = $sth->errstr;
             chomp ($self->{error});
             return undef;
@@ -590,9 +590,9 @@ sub addTemplates {
     foreach my $template (@templates) {
                                          
         # delete previous
-        if ($self->count("SELECT COUNT(*) FROM $self->{schema}templates WHERE configuration = ? AND distribution = ? AND destination = ? AND stage = ?", $template->configuration()->{name}, $template->configuration()->{dist}, $template->destination(), $template->stage())) {
+        if ($self->count("SELECT COUNT(*) FROM $self->{schema}templates WHERE configuration = ? AND distribution = ? AND destination = ? AND stage = ?", $template->configuration()->name(), $template->configuration()->dist(), $template->destination(), $template->stage())) {
             my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}templates WHERE configuration = ? AND distribution = ? AND destination = ? AND stage = ?");
-            unless ($sth->execute($template->configuration()->{name}, $template->configuration()->{dist}, $template->destination(), $template->stage())) {
+            unless ($sth->execute($template->configuration()->name(), $template->configuration()->dist(), $template->destination(), $template->stage())) {
                 push @errors, $sth->errstr;
                 next;
             }
@@ -610,8 +610,8 @@ sub addTemplates {
         # add template
         my $sth = $dbh->prepare_cached("INSERT INTO $self->{schema}templates(destination, configuration, distribution, source, data, comment, stage, mode, gid, uid) VALUES(?,?,?,?,?,?,?,?,?,?)");
         unless ($sth->execute($template->destination(),
-                              $template->configuration()->{name},
-                              $template->configuration()->{dist},
+                              $template->configuration()->name(),
+                              $template->configuration()->dist(),
                               # use either data or source
                               (($self->{saveData} or not $template->source()) ?
                                ("", $template->data()) :
@@ -640,7 +640,7 @@ sub removeTemplates {
     my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}templates WHERE configuration = ? AND distribution = ? AND destination = ? AND stage = ?");
     foreach my $template (@templates) {
-        unless ($sth->execute($template->configuration()->{name}, $template->configuration()->{dist}, $template->destination(), $template->stage())) {
+        unless ($sth->execute($template->configuration()->name(), $template->configuration()->dist(), $template->destination(), $template->stage())) {
             push @errors, $sth->errstr;
             next;
         }
@@ -660,7 +660,7 @@ sub getScripts {
     my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached("SELECT name, source, data, stage, ordering, critical, tokens, tokenscript FROM $self->{schema}scripts WHERE configuration = ? AND distribution = ?");
     foreach my $configuration (@configurations) {
-        unless ($sth->execute($configuration->{name}, $configuration->{dist})) {
+        unless ($sth->execute($configuration->name(), $configuration->dist())) {
             $self->{error} = $sth->errstr;
             chomp ($self->{error});
             return undef;
@@ -742,12 +742,12 @@ sub removeScripts {
     my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}scripts WHERE configuration = ? AND distribution = ? AND stage = ? AND ordering = ?");
     foreach my $script (sort {$b->order() <=> $a->order()} @scripts) {
-        $sth->execute($script->configuration()->{name}, $script->configuration()->{dist}, $script->stage(), $script->order());
+        $sth->execute($script->configuration()->name(), $script->configuration()->dist(), $script->stage(), $script->order());
         if ($sth->errstr) {
             push @errors, $sth->errstr;
             next;
         }
-        push @errors, $self->{error} unless ($self->closeOrdering($script->order(), "$self->{schema}scripts", "configuration = ? AND distribution = ? AND stage = ?", $script->configuration()->{name}, $script->configuration()->{dist}, $script->stage()));
+        push @errors, $self->{error} unless ($self->closeOrdering($script->order(), "$self->{schema}scripts", "configuration = ? AND distribution = ? AND stage = ?", $script->configuration()->name(), $script->configuration()->dist(), $script->stage()));
     }
     if (@errors) {
         chomp @errors;
@@ -764,7 +764,7 @@ sub getAutos {
     my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached("SELECT name, source, data, ordering, critical, tokens FROM $self->{schema}autos WHERE configuration = ? AND distribution = ?");
     foreach my $configuration (@configurations) {
-        unless ($sth->execute($configuration->{name}, $configuration->{dist})) {
+        unless ($sth->execute($configuration->name(), $configuration->dist())) {
             $self->{error} = $sth->errstr;
             chomp ($self->{error});
             return undef;
@@ -800,14 +800,14 @@ sub addAutos {
         }
 
         $self->{error} = "";
-        my $location = $self->count("SELECT COUNT(*) FROM $self->{schema}autos WHERE configuration = ? AND distribution = ?", $auto->configuration()->{name}, $auto->configuration()->{dist});
+        my $location = $self->count("SELECT COUNT(*) FROM $self->{schema}autos WHERE configuration = ? AND distribution = ?", $auto->configuration()->name(), $auto->configuration()->dist());
         if ($self->{error}) {
             push @errors, $self->{error};
             next;
         }
         $location = 0 unless $location;
         $auto->order($location + 1) if not defined $auto->order() or $auto->order() > $location or $auto->order() < 1;
-        unless ($self->openOrdering($auto->order(), "$self->{schema}autos", "configuration = ? AND distribution = ?", $auto->configuration()->{name}, $auto->configuration()->{dist})) {
+        unless ($self->openOrdering($auto->order(), "$self->{schema}autos", "configuration = ? AND distribution = ?", $auto->configuration()->name(), $auto->configuration()->dist())) {
             push @errors, $self->{error};
             next;
         }
@@ -816,8 +816,8 @@ sub addAutos {
                               (($self->{saveData} or not $auto->source()) ?
                                ("", $auto->data()) :
                                ($auto->source(), "")), 
-                              $auto->configuration()->{name},
-                              $auto->configuration()->{dist},
+                              $auto->configuration()->name(),
+                              $auto->configuration()->dist(),
                               $auto->order(),
                               $auto->critical(),
                               $auto->tokens())) {
@@ -840,12 +840,12 @@ sub removeAutos {
     my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}autos WHERE configuration = ? AND distribution = ? AND ordering = ?");
     foreach my $auto (sort {$b->order() <=> $a->order()} @autos) {
-        $sth->execute($auto->configuration()->{name}, $auto->configuration()->{dist}, $auto->order());
+        $sth->execute($auto->configuration()->name(), $auto->configuration()->dist(), $auto->order());
         if ($sth->errstr) {
             push @errors, $sth->errstr;
             next;
         }
-        push @errors, $self->{error} unless ($self->closeOrdering($auto->order(), "$self->{schema}autos", "configuration = ? AND distribution = ?", $auto->configuration()->{name}, $auto->configuration()->{dist}));
+        push @errors, $self->{error} unless ($self->closeOrdering($auto->order(), "$self->{schema}autos", "configuration = ? AND distribution = ?", $auto->configuration()->name(), $auto->configuration()->dist()));
     }
     if (@errors) {
         chomp @errors;
@@ -861,19 +861,19 @@ sub addMount {
     my $mount = shift;
     my $location = shift;
     my $stmt = "SELECT COUNT(destination) FROM $self->{schema}mounts WHERE configuration = ? AND distribution = ? AND destination = ? AND active = ?";
-    if ($self->count($stmt, $configuration->{name}, $configuration->{dist}, $mount->{destination}, $mount->{active})) {
+    if ($self->count($stmt, $configuration->name(), $configuration->dist(), $mount->{destination}, $mount->{active})) {
         $mount->{configuration} = $configuration;
         return undef unless $self->removeMounts($mount);
     }
     my $dbh = $self->{dbh};
-    my $max = $self->count("SELECT MAX(ordering) FROM $self->{schema}mounts WHERE configuration = ? AND distribution = ?", $configuration->{name}, $configuration->{dist});
+    my $max = $self->count("SELECT MAX(ordering) FROM $self->{schema}mounts WHERE configuration = ? AND distribution = ?", $configuration->name(), $configuration->dist());
     $max = 0 unless $max;
     if ($location and $max and $location <= $max) { 
-        return undef unless ($self->openOrdering($location, "$self->{schema}mounts", "configuration = ? AND distribution = ?", $configuration->{name}, $configuration->{dist}));
+        return undef unless ($self->openOrdering($location, "$self->{schema}mounts", "configuration = ? AND distribution = ?", $configuration->name(), $configuration->dist()));
     } else {
         $location = $max + 1;
     }
-    return undef unless ($self->insert("$self->{schema}mounts", $mount->{destination}, $configuration->{name}, $configuration->{dist}, $mount->{active}, $location));
+    return undef unless ($self->insert("$self->{schema}mounts", $mount->{destination}, $configuration->name(), $configuration->dist(), $mount->{active}, $location));
     return 1;
 }
 
@@ -886,17 +886,17 @@ sub removeMounts {
     my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}mounts WHERE configuration = ? AND distribution = ? AND destination = ? AND active = ?");
     
     foreach my $mount (@mounts) {
-        my $location = $self->count("SELECT ordering FROM $self->{schema}mounts WHERE configuration = ? AND distribution = ? AND destination = ? AND active = ?", $mount->{configuration}->{name}, $mount->{configuration}->{dist}, $mount->{destination}, $mount->{active});
+        my $location = $self->count("SELECT ordering FROM $self->{schema}mounts WHERE configuration = ? AND distribution = ? AND destination = ? AND active = ?", $mount->{configuration}->name(), $mount->{configuration}->dist(), $mount->{destination}, $mount->{active});
         unless ($location) {
-            push @errors, "\"".($mount->{active} ? "+" : "-")."$mount->{destination}\" is not in \"$mount->{configuration}->{name}\"";
+            push @errors, "\"".($mount->{active} ? "+" : "-")."$mount->{destination}\" is not in \"".$mount->{configuration}->name()."\"";
             next;
         }
-        my $rv = $sth->execute($mount->{configuration}->{name}, $mount->{configuration}->{dist}, $mount->{destination}, $mount->{active});
+        my $rv = $sth->execute($mount->{configuration}->name(), $mount->{configuration}->dist(), $mount->{destination}, $mount->{active});
         if ($sth->errstr) {
             push @errors, $sth->errstr;
             next;
         } 
-        push @errors, $self->{error} unless ($self->closeOrdering($location, "$self->{schema}mounts", "configuration = ? AND distribution = ?", $mount->{configuration}->{name}, $mount->{configuration}->{dist}));
+        push @errors, $self->{error} unless ($self->closeOrdering($location, "$self->{schema}mounts", "configuration = ? AND distribution = ?", $mount->{configuration}->name(), $mount->{configuration}->dist()));
     }
     if (@errors) {
         $self->{error} = join "\n", @errors;
@@ -909,28 +909,28 @@ sub removeConfigurationConfigurations {
     my $self = shift;
     my $conf = shift;
     my @configurations = @_;
-    my $version = $self->getDistributionVersion($conf->{dist});
+    my $version = $self->getDistributionVersion($conf->dist());
     if (versionCompare($version, "004") < 0) {
-        $self->{error} = "distribution \"$conf->{dist}\" is version $version (needs at least 004)";
+        $self->{error} = "distribution \"".$conf->dist()."\" is version $version (needs at least 004)";
         return undef;
     }
     my $col;
     my @errors = ();
     return undef unless $col = $self->getGroupColumn($conf); # conf_id
     my $dbh = $self->{dbh};
-    my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}$conf->{type}_configurations WHERE configuration = ? AND active = ? AND $col = ? AND distribution = ?");
+    my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}".$conf->type()."_configurations WHERE configuration = ? AND active = ? AND $col = ? AND distribution = ?");
     foreach my $torm (@configurations) {
-        my $location = $self->count("SELECT ordering FROM $self->{schema}$conf->{type}_configurations WHERE configuration = ? AND active = ? AND $col = ? AND distribution = ?", $torm->{name}, $torm->{active}, $conf->{name}, $conf->{dist});
+        my $location = $self->count("SELECT ordering FROM $self->{schema}".$conf->type()."_configurations WHERE configuration = ? AND active = ? AND $col = ? AND distribution = ?", $torm->name(), $torm->active(), $conf->name(), $conf->dist());
         unless ($location) {
-            push @errors, "\"".($torm->{active} ? "+" : "-")."$torm->{name}\" is not in \"$conf->{name}\"";
+            push @errors, "\"".($torm->active() ? "+" : "-").$torm->name()."\" is not in \"".$conf->name()."\"";
             next;
         }
-        my $rv = $sth->execute($torm->{name}, $torm->{active}, $conf->{name}, $conf->{dist});
+        my $rv = $sth->execute($torm->name(), $torm->active(), $conf->name(), $conf->dist());
         if ($sth->errstr) {
             push @errors, $sth->errstr;
             next;
         } 
-        push @errors, $self->{error} unless ($self->closeOrdering($location, "$self->{schema}$conf->{type}_configurations", "$col = ? AND distribution = ?", $conf->{name}, $conf->{dist}));
+        push @errors, $self->{error} unless ($self->closeOrdering($location, "$self->{schema}".$conf->type()."_configurations", "$col = ? AND distribution = ?", $conf->name(), $conf->dist()));
     }
     if (@errors) {
         $self->{error} = join "\n", @errors;
@@ -943,18 +943,18 @@ sub removeConfigurationConfigurations {
 sub getConfigurationConfigurations {
     my $self = shift;
     my $conf = shift;
-    my $version = $self->getDistributionVersion($conf->{dist});
+    my $version = $self->getDistributionVersion($conf->dist());
     if (versionCompare($version, "004") < 0) {
-        $self->{error} = "distribution \"$conf->{dist}\" is version $version (needs at least 004)";
+        $self->{error} = "distribution \"".$conf->dist()."\" is version $version (needs at least 004)";
         return undef;
     }
     my $col = $self->getGroupColumn($conf); # conf_id
     return undef unless $col;
 
     my $dbh = $self->{dbh};
-    my $stmt = "SELECT configuration, active FROM $self->{schema}$conf->{type}_configurations WHERE $col = ? AND distribution = ? ORDER BY ordering";
+    my $stmt = "SELECT configuration, active FROM $self->{schema}".$conf->type()."_configurations WHERE $col = ? AND distribution = ? ORDER BY ordering";
     my $sth = $dbh->prepare_cached($stmt);
-    unless ($sth->execute($conf->{name}, $conf->{dist})) {
+    unless ($sth->execute($conf->name(), $conf->dist())) {
         $self->{error} = $sth->errstr;
         chomp ($self->{error});
         return undef;
@@ -965,9 +965,8 @@ sub getConfigurationConfigurations {
         chomp ($self->{error});
         return undef;
     }
-    return map { +{name => $_->[0], active => $_->[1], path => undef, dist => undef, group => $conf}} @$resultArray;
+    return map {Staple::Configuration->new({name => $_->[0], active => $_->[1], group => $conf})} @$resultArray;
 }
-
 
 sub addConfigurationConfiguration {
     my $self = shift;
@@ -975,31 +974,31 @@ sub addConfigurationConfiguration {
     my $configuration = shift;
     my $location = shift;
     $location = int $location if $location;
-    my $version = $self->getDistributionVersion($conf->{dist});
+    my $version = $self->getDistributionVersion($conf->dist());
     if (versionCompare($version, "004") < 0) {
-        $self->{error} = "distribution \"$conf->{dist}\" is version $version (needs at least 004)";
+        $self->{error} = "distribution \"".$conf->dist()."\" is version $version (needs at least 004)";
         return undef;
     }
     my $col;
     return undef unless $col = $self->getGroupColumn($conf); # conf_id
-    unless ($self->getFullConfigurations([$configuration], $conf->{dist})) {
-        $self->{error} = "distribution $conf->{dist} doesn't have $configuration->{name}";
+    unless ($self->getFullConfigurations([$configuration], $conf->dist())) {
+        $self->{error} = "distribution ".$conf->dist()." doesn't have ".$configuration->name();
         return undef;
     }
-    my $stmt = "SELECT COUNT(configuration) FROM $self->{schema}$conf->{type}_configurations WHERE configuration = ? AND active = ? AND $col = ? AND distribution = ?";
-    if ($self->count($stmt, $configuration->{name}, $configuration->{active}, $conf->{name}, $conf->{dist})) {
+    my $stmt = "SELECT COUNT(configuration) FROM $self->{schema}".$conf->type()."_configurations WHERE configuration = ? AND active = ? AND $col = ? AND distribution = ?";
+    if ($self->count($stmt, $configuration->name(), $configuration->active(), $conf->name(), $conf->dist())) {
         # first remove if already there
         return undef unless $self->removeConfigurationConfigurations($conf, $configuration);
     }
     my $dbh = $self->{dbh};
-    my $max = $self->count("SELECT MAX(ordering) FROM $self->{schema}$conf->{type}_configurations WHERE $col = ? AND distribution = ?", $conf->{name}, $conf->{dist});
+    my $max = $self->count("SELECT MAX(ordering) FROM $self->{schema}".$conf->type()."_configurations WHERE $col = ? AND distribution = ?", $conf->name(), $conf->dist());
     $max = 0 unless $max;
     if ($location and $max and $location <= $max) { 
-        return undef unless ($self->openOrdering($location, "$self->{schema}$conf->{type}_configurations", "$col = ? AND distribution = ?", $conf->{name}, $conf->{dist}));
+        return undef unless ($self->openOrdering($location, "$self->{schema}".$conf->type()."_configurations", "$col = ? AND distribution = ?", $conf->name(), $conf->dist()));
     } else {
         $location = $max + 1;
     }
-    return undef unless ($self->insert("$self->{schema}$conf->{type}_configurations", $conf->{name}, $configuration->{name}, $location, $configuration->{active}, $conf->{dist}));
+    return undef unless ($self->insert("$self->{schema}".$conf->type()."_configurations", $conf->name(), $configuration->name(), $location, $configuration->active(), $conf->dist()));
     return 1;
 }
 
@@ -1022,8 +1021,7 @@ sub getGroupConfigurations {
         chomp ($self->{error});
         return undef;
     }
-    return map { +{name => $_->[0], active => $_->[1], path => undef, dist => undef, group => $group}} @$resultArray;
-    
+    return map {Staple::Configuration->new({name => $_->[0], active => $_->[1], group => $group})} @$resultArray;
 }
 
 sub addGroupConfiguration {
@@ -1035,7 +1033,7 @@ sub addGroupConfiguration {
     my $col;
     return undef unless $col = $self->getGroupColumn($group);
     my $stmt = "SELECT COUNT(configuration) FROM $self->{schema}$group->{type}_configurations WHERE configuration = ? AND active = ? AND $col = ?";
-    if ($self->count($stmt, $configuration->{name}, $configuration->{active}, $group->{name})) {
+    if ($self->count($stmt, $configuration->name(), $configuration->active(), $group->{name})) {
         return undef unless $self->removeGroupConfigurations($group, $configuration);
     }
     my $dbh = $self->{dbh};
@@ -1046,7 +1044,7 @@ sub addGroupConfiguration {
     } else {
         $location = $max + 1;
     }
-    return undef unless ($self->insert("$self->{schema}$group->{type}_configurations ($col, configuration, ordering, active)", $group->{name}, $configuration->{name}, $location, $configuration->{active}));
+    return undef unless ($self->insert("$self->{schema}$group->{type}_configurations ($col, configuration, ordering, active)", $group->{name}, $configuration->name(), $location, $configuration->active()));
     return 1;
 }
 
@@ -1060,16 +1058,16 @@ sub removeGroupConfigurations {
     my $dbh = $self->{dbh};
     my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}$group->{type}_configurations WHERE configuration = ? AND active = ? AND $col = ?");
     foreach my $conf (@configurations) {
-        my $location = $self->count("SELECT ordering FROM $self->{schema}$group->{type}_configurations WHERE configuration = ? AND active = ? AND $col = ?", $conf->{name}, $conf->{active}, $group->{name});
+        my $location = $self->count("SELECT ordering FROM $self->{schema}$group->{type}_configurations WHERE configuration = ? AND active = ? AND $col = ?", $conf->name(), $conf->active(), $group->{name});
         unless ($location) {
-            push @errors, "\"".($conf->{active} ? "+" : "-")."$conf->{name}\" is not in \"$group->{name}\"";
+            push @errors, "\"".($conf->active() ? "+" : "-").$conf->name()."\" is not in \"$group->{name}\"";
             next;
         }
-        my $rv = $sth->execute($conf->{name}, $conf->{active}, $group->{name});
+        my $rv = $sth->execute($conf->name(), $conf->active(), $group->{name});
         if ($sth->errstr) {
             push @errors, $sth->errstr;
             next;
-        } 
+        }
         push @errors, $self->{error} unless ($self->closeOrdering($location, "$self->{schema}$group->{type}_configurations", "$col = ?", $group->{name}));
     }
     if (@errors) {
@@ -1259,7 +1257,7 @@ sub whoHasToken {
     
     # configurations
     my @configurations = $self->getList("SELECT configuration FROM $self->{schema}configuration_tokens WHERE distribution = ? AND key = ?", $distribution, $key);
-    @configurations = map {{name => $_, path => undef, dist => undef, active => 1, group => undef}} @configurations;
+    @configurations = Staple::Configuration->new(map {{name => $_}} @configurations);
     @configurations = $self->getFullConfigurations(\@configurations, $distribution);
     return undef if (grep {not defined $_} @configurations);
 
@@ -1299,8 +1297,8 @@ sub getFullConfigurations {
     my $confs = shift;
     my $distribution = shift;
     my @confs = $self->SUPER::getFullConfigurations($confs, $distribution);
-    my $common =$self->getCommonPath();
-    map {$_->{dist} = $common if index($_->{name}, "common/") == 0} @confs;
+    my $common = $self->getCommonPath();
+    map {$_->dist($common) if index($_->name(), "common/") == 0} @confs;
     return @confs;
 }
 

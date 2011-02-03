@@ -10,6 +10,7 @@ package Staple::DB;
 use strict;
 use warnings;
 use Staple::Misc;
+use Staple::Configuration;
 our $VERSION = '006snap';
 
 =head1 NAME
@@ -595,11 +596,11 @@ sub getGroupsConfigurations {
 
 =item B<getCompleteConfigurations(I<configurations ref, distribution, [bad list ref]>)>
 
-Receives an ordered list reference of configurations (hashes) and a
-distribution name (string), and returns a complete ordered list of
-configuration (hashes). The configurations are full (i.e. includes I<path> and
-I<dist>), and include all intermediate configurations and recursive
-configurations; inactive configurations are removed.
+Receives an ordered list reference of configurations (Staple::Configuration)
+and a distribution name (string), and returns a complete ordered list of
+configuration. The configurations are full (i.e. includes I<path> and I<dist>),
+and include all intermediate configurations and recursive configurations;
+inactive configurations are removed.
 
 If the (empty) hash ref of bad list is also supplied, it will be filled with
 configurations that doesn't exist under the given distribution. 
@@ -626,17 +627,17 @@ sub getCompleteConfigurations {
         #print "PROCESSING: ".($conf->{active} ? "+" : "-")."$conf->{name} ".(exists $conf->{_done} ? "(after $conf->{_done}) " : "").Dumper($conf->{_source});
 
         # remove a configuration
-        if (not $conf->{active}) {
-            my @toremove = $conf->{name};
+        if (not $conf->active()) {
+            my @toremove = $conf->name();
             while (@toremove) {
                 my $c = shift @toremove;
                 next unless $final{$c};
                 #use Data::Dumper;
                 #print "DELETE: $c\n";
 
-                @final = grep {$_->{name} ne $c} @final;
+                @final = grep {$_->name() ne $c} @final;
                 delete $final{$c};
-                push @toremove, grep m!^$c/!, map {$_->{name}} @final;
+                push @toremove, grep m!^$c/!, map {$_->name()} @final;
 
                 # go over all configuration and check for source (might be more efficient to just super and recursive)
                 foreach my $c2 (@final) {
@@ -649,7 +650,7 @@ sub getCompleteConfigurations {
                     if (@s) {
                         $c2->{_source} = [@s];
                     } else {
-                        push @toremove, $c2->{name};
+                        push @toremove, $c2->name();
                     }
                 }
                   
@@ -666,9 +667,9 @@ sub getCompleteConfigurations {
             }
         }
 
-        # next if already done, just add source 
-        elsif ($final{$conf->{name}}) {
-            push @{$final{$conf->{name}}->{_source}}, @{$conf->{_source}};
+        # next if already done, just add source
+        elsif ($final{$conf->name()}) {
+            push @{$final{$conf->name()}->{_source}}, @{$conf->{_source}};
         }
 
         # add superconfs
@@ -677,8 +678,8 @@ sub getCompleteConfigurations {
 
             # fillIntermediate copies also _source and _done
             # but don't change the _source of $conf
-            my @confs = grep {$_->{name} ne $conf->{name} and $_->{name} ne "common"} fillIntermediate($conf);
-            map {push @{$_->{_source}}, $conf->{name}} @confs;
+            my @confs = grep {$_->name() ne $conf->name() and $_->name() ne "common"} fillIntermediate($conf);
+            map {push @{$_->{_source}}, $conf->name()} @confs;
             unshift @remaining, (@confs, $conf);
         }
 
@@ -686,7 +687,7 @@ sub getCompleteConfigurations {
         elsif ($conf->{_done} eq "super") {
             (my $aconf) = $self->getFullConfigurations([$conf], $distribution);
             unless ($aconf) {
-                push @$badConfigurations, $conf->{name} if ($badConfigurations);
+                push @$badConfigurations, $conf->name() if ($badConfigurations);
                 next;
             }
             $aconf->{_source} = $conf->{_source};
@@ -709,7 +710,7 @@ sub getCompleteConfigurations {
         # add the damn conf already
         elsif ($conf->{_done} eq "recursive") {
             push @final, $conf;
-            $final{$conf->{name}} = $conf;
+            $final{$conf->name()} = $conf;
         } else {
             die "something really bad happened, probably a bug\n";
         }
@@ -730,22 +731,13 @@ indicating active/inactive configurations
 
 sub getConfigurationsByName {
     my $self = shift;
-    my @configurations = ();
-    while (my $configuration = shift) {
-        my $active = 1;
-        if ($configuration =~ m/^([+-])(.*)$/) {
-            $active = $1 eq '+';
-            $configuration = $2;
-        }
-        next if invalidConfiguration($configuration);
-        push @configurations, {name => $configuration, path => undef, dist => undef, active => $active, group => undef, type => "configuration"};
-    }
+    my @configurations = grep {ref $_} Staple::Configuration->new(map {{name => $_}} @_);
     return @configurations;
 }
 
 =item B<addConfigurationConfiguration(I<configuration1, configuration2, [location]>)>
 
-Adds I<configuration2> (name, and active should be set) to I<configuration1>'s
+Adds I<configuration2> (Staple::Configuration) to I<configuration1>'s
 configuration list at I<location> (or at the end if omitted). Returns 1 or
 undef.
 
@@ -759,7 +751,7 @@ sub addConfigurationConfiguration {
 
 =item B<getConfigurationConfigurations(I<configuration>)>
 
-Gets a full configuration hash (with dist), Returns an ordered configuration
+Gets a full Staple::Configuration (with dist), Returns an ordered configuration
 list associated with the given configuration. The returned list is of raw
 configurations (i.e. no path, no distribution, and includes inactive
 configurations). On failure returns undef (and sets the error).
@@ -774,7 +766,7 @@ sub getConfigurationConfigurations {
 
 =item B<removeConfigurationConfigurations(I<conf1, configuration, [configuration [...]]>)>
 
-Removes the configuration list (configuration hashes) from the list of
+Removes the configuration list (Staple::Configuration) from the list of
 configurations of I<conf1>. Returns 1 or undef.
 
 =cut
@@ -787,9 +779,8 @@ sub removeConfigurationConfigurations {
 
 =item B<addGroupConfiguration(I<group, configuration, location>)>
 
-Adds I<configuration> (name, and active should be set) to I<group>'s
-configuration list at I<location> (or at the end if omitted). Returns 1 or
-undef.
+Adds I<configuration> (Staple::Configuration) to I<group>'s configuration list
+at I<location> (or at the end if omitted). Returns 1 or undef.
 
 =cut
 
@@ -801,7 +792,7 @@ sub addGroupConfiguration {
 
 =item B<removeGroupConfigurations(I<group, configuration, [configuration [...]]>)>
 
-Removes the configuration list (configuration hashes) from the list of
+Removes the configuration list (Staple::Configuration) from the list of
 configurations in I<group>. Returns 1 or undef.
 
 =cut
@@ -877,10 +868,10 @@ sub getAllConfigurations {
 
 =item B<getFullConfigurations(I<configuration list ref>, distribution name>)>
 
-Receives a list of configuration (hashes) without the path or dist set and a
-distribution name (string). Returns a list of configurations, with the dist and
-path field set according to the distribution given. Order is preserved, the
-returned configurations are not the same as the input (i.e. new
+Receives a list of configuration (Staple::Configuration) without the path or
+dist set and a distribution name (string). Returns a list of configurations,
+with the dist and path field set according to the distribution given. Order is
+preserved, the returned configurations are not the same as the input (i.e. new
 references). Non existing configurations are removed.
 
 Input can have configuration names, in which case they are set to active
@@ -896,15 +887,18 @@ sub getFullConfigurations {
     my $distribution = $_[1];
     my @configurations = ();
     foreach my $conf (@inputConfigurations) {
-        my %newConf = ();
+        my $newConf;
         if (ref $conf) {
-            %newConf = %$conf;
+            ($newConf) = Staple::Configuration->new($conf);
         } else {
-            %newConf = (name => $conf, active => 1, group => undef, path => undef, dist => undef, type => "configuration");
+            ($newConf) = Staple::Configuration->new({name => $conf});
+            next unless ref $newConf;
         }
-        $newConf{dist} = $distribution;
-        $newConf{path} = $self->getConfigurationPath($newConf{name}, $distribution);
-        push @configurations, \%newConf if defined $newConf{path};
+        $newConf->dist($distribution);
+        my $path = $self->getConfigurationPath($newConf->name(), $distribution);
+        next unless defined $path;
+        $newConf->path($path);
+        push @configurations, $newConf;
     }
     return @configurations;
 }
@@ -1063,14 +1057,14 @@ sub whoHasConfiguration {
                        (map {$self->getDistributionGroup($_)} $self->getAllDistributions()),
                        $self->getGroupsByName($self->getAllGroups())) {
         my @configurations = $self->getGroupConfigurations($group);
-        push @groups, $group if grep {$_->{name} =~ /^${configuration}/} @configurations;
+        push @groups, $group if grep {$_->name() =~ /^${configuration}/} @configurations;
     }
 
     # recursive configurations and common configuration only from 004
     if ($distribution and versionCompare($self->getDistributionVersion($distribution), "004") >= 0) {
         foreach my $conf ($self->getFullConfigurations([$self->getAllConfigurations($distribution)], $distribution)) {
             my @configurations = $self->getConfigurationConfigurations($conf);
-            push @groups, $conf if grep {$_->{name} =~ /^${configuration}/} @configurations;
+            push @groups, $conf if grep {$_->name() =~ /^${configuration}/} @configurations;
         }
     }
 
@@ -1393,9 +1387,9 @@ sub syncTo {
         @to = () unless $to[0];
         return undef if (@from and not defined $from[0]);
 
-        $fromConfs{$distribution} = {map {$_->{name} => $_} $from->getFullConfigurations([grep !/^common\//, @from], $distribution)};
+        $fromConfs{$distribution} = {map {$_->name() => $_} $from->getFullConfigurations([grep !/^common\//, @from], $distribution)};
         if (grep /^common\//, @from) {
-            $fromConfs{"/common/"} = {map {$_->{name} => $_} $from->getFullConfigurations([grep /^common\//, @from], $distribution)};
+            $fromConfs{"/common/"} = {map {$_->name() => $_} $from->getFullConfigurations([grep /^common\//, @from], $distribution)};
             $commondist = $distribution;
         }
 
@@ -1428,7 +1422,7 @@ sub syncTo {
     }
     
     foreach my $distribution (grep {$_ ne "/common/"} keys %fromConfs) {
-        $toConfs{$distribution} = {map {$_->{name} => $_} $to->getFullConfigurations([keys %{$fromConfs{$distribution}}], $distribution)};
+        $toConfs{$distribution} = {map {$_->name() => $_} $to->getFullConfigurations([keys %{$fromConfs{$distribution}}], $distribution)};
     }
     if ($fromConfs{"/common/"}) {
         print "/common/.." if $debug;
@@ -1438,7 +1432,7 @@ sub syncTo {
                 return undef;
             }
         }
-        $toConfs{"/common/"} = {map {$_->{name} => $_} $to->getFullConfigurations([keys %{$fromConfs{"/common/"}}], $commondist)};
+        $toConfs{"/common/"} = {map {$_->name() => $_} $to->getFullConfigurations([keys %{$fromConfs{"/common/"}}], $commondist)};
     }
     print ")\n" if $debug;
 
