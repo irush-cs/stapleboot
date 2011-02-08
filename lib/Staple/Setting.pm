@@ -1,7 +1,7 @@
 package Staple::Setting;
 
 #
-# Copyright (C) 2007-2010 Hebrew University Of Jerusalem, Israel
+# Copyright (C) 2007-2011 Hebrew University Of Jerusalem, Israel
 # See the LICENSE file.
 #
 # Author: Yair Yarom <irush@cs.huji.ac.il>
@@ -192,7 +192,7 @@ sub param {
     my $key = shift;
     my $value = shift;
     my $old = $self->{$key};
-    $self->{$key} = $value if $value;
+    $self->{$key} = $value if defined $value;
     return $old;
 }
 

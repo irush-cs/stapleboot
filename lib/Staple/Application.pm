@@ -157,7 +157,7 @@ to the host, distribution, groups and configurations.
 sub updateSettings {
     my $self = shift;
     $self->setTokens({$self->{db}->getCompleteTokens($self->{db}->getTokens(@{$self->{configurations}}, @{$self->{groups}}), $self->{host}, $self->{distribution})});
-    $self->{mounts} = [getCompleteMounts([$self->{db}->getRawMounts(@{$self->{configurations}})], $self->{tokens})];
+    $self->{mounts} = [getCompleteMounts([$self->{db}->getMounts(@{$self->{configurations}})], $self->{tokens})];
     if (scalar(@{$self->{configurations}}) > 0) {
         $self->{templates} = [$self->{db}->getTemplates(@{$self->{configurations}})];
         $self->{scripts} = [$self->{db}->getScripts(@{$self->{configurations}})];
@@ -517,9 +517,9 @@ sub applyMounts {
         my $mountcmd = "";
         
         # if no source is set, search for labels
-        if (not $mount->{source}) {
+        if (not $mount->source()) {
             if ($self->{findLabelScript}) {
-                (my $findExit, my $findOutput, my $findError) = runCommand("$self->{findLabelScript} $mount->{destination}");
+                (my $findExit, my $findOutput, my $findError) = runCommand("$self->{findLabelScript} ".$mount->destination());
                 chomp $findOutput;
                 chomp $findError;
                 if ($findExit) {
@@ -527,43 +527,43 @@ sub applyMounts {
                     $self->error($status);
                     goto aftermount;
                 }
-                $mount->{source} = $findOutput;
+                $mount->source($findOutput);
             } else {
-                $status = "error mounting $mount->{destination}: missing source";
+                $status = "error mounting ".$mount->destination().": missing source";
                 $self->error($status);
                 goto aftermount;
             }
         }
 
         # need a type
-        if (not $mount->{type}) {
-            $status = "error mounting $mount->{destination}: missing type";
+        if (not $mount->type()) {
+            $status = "error mounting ".$mount->destination().": missing type";
             $self->error($status);
             goto aftermount;
         }
 
         # if manual, do the mount
-        if ($mount->{manual}) {
+        if ($mount->manual()) {
 
             # fsck, only on a proper device
-            if ($mount->{fsck} and -e $mount->{source}) {
-                my $fsckcmd = "$mount->{fsckCommand}";
+            if ($mount->fsck() and -e $mount->source()) {
+                my $fsckcmd = $mount->fsckCommand();
                 $fsckcmd = "$self->{fsckCommand}" unless $fsckcmd;
-                $fsckcmd .= " $mount->{source}";
-                $self->output("fsck $mount->{destination}: $fsckcmd") if $self->{verbose} > 2;
+                $fsckcmd .= " ".$mount->source();
+                $self->output("fsck ".$mount->destination().": $fsckcmd") if $self->{verbose} > 2;
                 unless ($self->{disabled}) {
                     (my $fsckExit, my $fsckOutput, my $fsckError) = runCommand("$fsckcmd 2>&1");
-                    my $fsckExitOK = $mount->{fsckExitOK};
+                    my $fsckExitOK = $mount->fsckExitOK();
                     $fsckExitOK = $self->{fsckExitOK} unless $fsckExitOK;
                     if (0 == grep {$fsckExit == $_} split /,/, $fsckExitOK) {
                         $status = "Error running fsck: $fsckcmd\n";
                         $status .= "fsck output:\n$fsckOutput\n\nfsck error:\n$fsckError\n\nfsck exit code: $fsckExit\n";
-                        $self->error("error running fsck on $mount->{destination}");
+                        $self->error("error running fsck on ".$mount->destination());
                         $self->output("fsck errors: $fsckError") if $self->{verbose} >= 1 and $fsckError;
                         goto aftermount;
                     } elsif ($fsckError) {
                         my $body = "fsck succeeded with errors\n\n";
-                        $body .= "Mount: $mount->{source} -> $mount->{destination}\n";
+                        $body .= "Mount: ".$mount->source()." -> ".$mount->destination()."\n";
                         $body .= "Command: $fsckcmd\n";
                         $body .= "Exit status: $fsckExit\n";
                         $body .= "Output:\n$fsckOutput\n";
@@ -575,14 +575,14 @@ sub applyMounts {
             }
 
             $mountcmd = "$self->{mountCommand}";
-            if ($mount->{type} eq "bind") {
+            if ($mount->type() eq "bind") {
                 $mountcmd .= " --bind";
             } else {
-                $mountcmd .= " -t $mount->{type}";
+                $mountcmd .= " -t ".$mount->type();
             }
-            $mountcmd .= " -o $mount->{options}" if $mount->{options};
-            $mountcmd .= " $mount->{source} ".fixPath("$self->{rootDir}/$mount->{destination}")." 2>&1";
-            $self->output("mount $mount->{destination}: $mountcmd") if $self->{verbose} > 2;
+            $mountcmd .= " -o ".$mount->options() if $mount->options();
+            $mountcmd .= " ".$mount->source()." ".fixPath("$self->{rootDir}/".$mount->destination())." 2>&1";
+            $self->output("mount ".$mount->destination().": $mountcmd") if $self->{verbose} > 2;
             unless ($self->{disabled}) {
                 (my $mountExit, $status, my $mountError) = runCommand("$mountcmd");
                 if ($mountExit and not $status) {
@@ -593,22 +593,22 @@ sub applyMounts {
         }
 
         if ($status) {
-            $self->error("error mounting $mount->{destination}: $status");
+            $self->error("error mounting ".$mount->destination().": $status");
         } else {
             
             # copy files
-            if ($mount->{manual} and not $self->{disabled}) {
-                chmod oct($mount->{permissions}), $mount->{destination} if $mount->{permissions};
-                if ($mount->{copySource}) {
+            if ($mount->manual() and not $self->{disabled}) {
+                chmod oct($mount->permissions()), $mount->destination() if $mount->permissions();
+                if ($mount->copySource()) {
                     my $files = ".";
-                    $files = $mount->{copyFiles} if $mount->{copyFiles};
-                    my $destination = fixPath("$mount->{destination}/");
+                    $files = $mount->copyFiles() if $mount->copyFiles();
+                    my $destination = fixPath($mount->destination()."/");
                     my $excludes = "";
-                    $excludes = join " ", map {"--exclude='$_'"} split /\s+/, $mount->{copyExclude} if $mount->{copyExclude};
-                    $excludes .= " ".join(" " , map {"--exclude='$_'"} split /\s+/, $mount->{copyLinks}) if $mount->{copyLinks};
-                    $self->output("Copying $mount->{copySource} to $destination", 2);
+                    $excludes = join " ", map {"--exclude='$_'"} split /\s+/, $mount->copyExclude() if $mount->copyExclude();
+                    $excludes .= " ".join(" " , map {"--exclude='$_'"} split /\s+/, $mount->copyLinks()) if $mount->copyLinks();
+                    $self->output("Copying ".$mount->copySource()." to $destination", 2);
                     #my $status = `cp -RPp -- $source $destination`;
-                    my $cmd = "tar cpsf - -C $mount->{copySource} $excludes $files | tar xpsf - -C $destination";
+                    my $cmd = "tar cpsf - -C ".$mount->copySource()." $excludes $files | tar xpsf - -C $destination";
                     #my $cmd = "rsync -aW --delete --progress $excludes $mount->{copySource} $destination";
                     $self->output($cmd, 0);
 
@@ -621,33 +621,33 @@ sub applyMounts {
                         goto aftermount;
                     }
                     my $failedLinks = "";
-                    foreach my $link (split /\s+/, $mount->{copyLinks}) {
-                        unless (symlink "$mount->{copySource}/$link", "$destination/$link") {
-                            $self->error("can't symlink \"$mount->{copySource}/$link\" to \"$destination/$link\": $!");
-                            $failedLinks .= "\"$mount->{copySource}/$link\" -> \"$destination/$link\": $!";
+                    foreach my $link (split /\s+/, $mount->copyLinks()) {
+                        unless (symlink $mount->copySource()."/$link", "$destination/$link") {
+                            $self->error("can't symlink \"".$mount->copySource()."/$link\" to \"$destination/$link\": $!");
+                            $failedLinks .= "\"".$mount->copySource()."/$link\" -> \"$destination/$link\": $!";
                         }
                     }
-                    $self->addMail("mount $mount->{destination} link on copy failed:\n$failedLinks\n") if $failedLinks;
+                    $self->addMail("mount ".$mount->destination()." link on copy failed:\n$failedLinks\n") if $failedLinks;
                 }
             }
 
             # add to fstab
-            if ($mount->{type} ne "bind") {
+            if ($mount->type() ne "bind") {
                 my $options = "";
-                $options = "noauto" if $mount->{manual};
-                $options .= ",$mount->{options}" if $mount->{options};
-                $options .= ",mode=$mount->{permissions}" if $mount->{permissions};
+                $options = "noauto" if $mount->manual();
+                $options .= ",".$mount->options() if $mount->options();
+                $options .= ",mode=".$mount->permissions() if $mount->permissions();
                 $options =~ s/^,//;
                 $options = "defaults" unless $options;
-                my $fsck = ($mount->{fsck} and -e $mount->{source}) ? "2" : "0";
-                push @fstab, "$mount->{source}\t$mount->{destination}\t$mount->{type}\t$options\t0 $fsck";
+                my $fsck = ($mount->fsck() and -e $mount->source()) ? "2" : "0";
+                push @fstab, $mount->source()."\t".$mount->destination()."\t".$mount->type()."\t$options\t0 $fsck";
             }
         }
 
       aftermount:
         # basically, report any errors
         if ($status) {
-            my $body = "Mount: $mount->{source} -> $mount->{destination}\n";
+            my $body = "Mount: ".$mount->source()." -> ".$mount->destination()."\n";
             $body .= "Command: $mountcmd\n" if $mountcmd;
             $body .= "Status: $status\n\nMount data:";
             my $bad = clone($mount);
@@ -666,22 +666,22 @@ sub applyMounts {
 
             $body =~ s/,$//;
             
-            if ($mount->{critical}) {
+            if ($mount->critical()) {
                 $body = "Bad critical mount\n".$body;
             } else {
                 $body = "Bad mount\n".$body;
             }
             
-            $body .= "\n\n Trying next mount from $mount->{next}\n" if $mount->{next};
+            $body .= "\n\n Trying next mount from ".$mount->next()."\n" if $mount->next();
             $self->addMail($body);
-            if ($mount->{critical}) {
-                $self->error("mounting of $mount->{destination} from ".$mount->{configuration}->name()." failed");
+            if ($mount->critical()) {
+                $self->error("mounting of ".$mount->destination()." from ".$mount->configuration()->name()." failed");
                 $self->doCriticalAction();
-            } elsif ($mount->{next}) {
-                $self->output("trying next mount from configuration: $mount->{next}", 1);
-                my @nextConfigurations = $self->{db}->getCompleteConfigurations([$self->{db}->getConfigurationsByName($mount->{next})], $self->{distribution});
+            } elsif ($mount->next()) {
+                $self->output("trying next mount from configuration: ".$mount->next(), 1);
+                my @nextConfigurations = $self->{db}->getCompleteConfigurations([$self->{db}->getConfigurationsByName($mount->next())], $self->{distribution});
                 my %nextTokens = $self->{db}->getCompleteTokens($self->{db}->getTokens(@nextConfigurations), $self->{host}, $self->{distribution});
-                my @nextMounts = grep {$_->{destination} eq $mount->{destination}} getCompleteMounts([$self->{db}->getRawMounts(@nextConfigurations)], \%nextTokens);
+                my @nextMounts = grep {$_->destination() eq $mount->destination()} getCompleteMounts([$self->{db}->getMounts(@nextConfigurations)], \%nextTokens);
                 my $next = clone($self);
                 $next->{configurations} = \@nextConfigurations;
                 $next->{tokens} = \%nextTokens;

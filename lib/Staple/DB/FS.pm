@@ -15,6 +15,7 @@ use Staple::Misc;
 use File::Path;
 use Staple::Template;
 use Staple::Script;
+use Staple::Mount;
 
 our @ISA = ("Staple::DB");
 our $VERSION = '006snap';
@@ -322,18 +323,14 @@ sub copyConfiguration {
 sub addTokens {
     my $self = shift;
     my $tokens = shift;
-    my $group = shift;
-    unless (-d $group->{path}) {
-        if ($group->{type} and $group->{type} ne "configuration") {
-            $self->{error} = "Group $group->{name} does not exist";
-        } else {
-            $self->{error} = "Configuration $group->{name} does not exist";
-        }
+    my $node = shift;
+    unless (-d $node->path()) {
+        $self->{error} = $node->type()." ".$node->name()." does not exist";
         return undef;
     }
 
     # new xml style
-    my $file = "$group->{path}/tokens.xml";
+    my $file = $node->path()."/tokens.xml";
     my @read = readTokensXMLFile($file);
     my %newTokens = ();
     %newTokens = @read if (@read > 1);
@@ -344,14 +341,14 @@ sub addTokens {
     }
 
     # old tokens style, only before 004
-    if (versionCompare($self->getVersionOf($group), "004") < 0) {
-        return undef unless ($self->mkdirs("$group->{path}/tokens"));
+    if (versionCompare($self->getVersionOf($node), "004") < 0) {
+        return undef unless ($self->mkdirs($node->path()."/tokens"));
         foreach my $type ("static", "dynamic", "regexp") {
             my @tokens = map {$_->{key}} grep {$_->{type} eq $type} values %$tokens;
             next unless @tokens;
             my %newTokens = ();
             @newTokens{@tokens} = @{$tokens}{@tokens};
-            my $file = "$group->{path}/tokens/$type";
+            my $file = $node->path()."/tokens/$type";
             my %oldTokens = readTokensFile($file, $type);
             @oldTokens{keys %newTokens} = values %newTokens;
             unless (writeTokensFile($file, \%oldTokens)) {
@@ -366,18 +363,14 @@ sub addTokens {
 sub removeTokens {
     my $self = shift;
     my $tokens = shift;
-    my $group = shift;
-    unless (-d $group->{path}) {
-        if ($group->{type} and $group->{type} ne "configuration") {
-            $self->{error} = "Group $group->{name} does not exist";
-        } else {
-            $self->{error} = "Configuration $group->{name} does not exist";
-        }
+    my $node = shift;
+    unless (-d $node->path()) {
+        $self->{error} = $node->type()." ".$node->name()." does not exist";
         return undef;
     }
 
     # new xml style
-    my $file = "$group->{path}/tokens.xml";
+    my $file = $node->path()."/tokens.xml";
     my @read = readTokensXMLFile($file);
     my %oldTokens = ();
     %oldTokens = @read if (@read > 1);
@@ -389,9 +382,9 @@ sub removeTokens {
     }
 
     # old tokens style, only before 004
-    if (versionCompare($self->getVersionOf($group), "004") < 0) {
+    if (versionCompare($self->getVersionOf($node), "004") < 0) {
         foreach my $type ("static", "dynamic", "regexp") {
-            my $file = "$group->{path}/tokens/$type";
+            my $file = $node->path()."/tokens/$type";
             my %oldTokens = readTokensFile($file);
             if (delete @oldTokens{@$tokens}) {
                 unless (writeTokensFile($file, \%oldTokens)) {
@@ -408,24 +401,19 @@ sub removeTokens {
 sub setTokens {
     my $self = shift;
     my $tokens = shift;
-    my $group = shift;
+    my $node = shift;
 
-    unless (-d $group->{path}) {
-        if ($group->{type} and $group->{type} ne "configuration") {
-            $self->{error} = "Group $group->{name} does not exist";
-        } else {
-            $self->{error} = "Configuration $group->{name} does not exist";
-        }
-        return undef;
+    unless (-d $node->path()) {
+        $self->{error} = $node->type()." ".$node->name()." does not exist";
     }
-    unlink "$group->{path}/tokens.xml";
+    unlink $node->path()."/tokens.xml";
 
     # not sure if we still need to care about these
-    if (versionCompare($self->getVersionOf($group), "004") < 0) {
-        unlink map {"$group->{path}/tokens/$_"} qw(static dynamic regexp)
+    if (versionCompare($self->getVersionOf($node), "004") < 0) {
+        unlink map {$node->path()."/tokens/$_"} qw(static dynamic regexp)
     }
 
-    return $self->addTokens($tokens, $group);
+    return $self->addTokens($tokens, $node);
 }
 
 sub getTokens {
@@ -435,22 +423,15 @@ sub getTokens {
 
 sub getTokensXML {
     my $self = shift;
-    my @gorc = @_;
+    my @nodes = @_;
     my %tokens = ();
-    my @tokenFiles = map {$_->{path} ? "$_->{path}/tokens.xml" : undef} @gorc;
-    foreach my $gorc (@_) {
+    my @tokenFiles = map {$_->path() ? $_->path()."/tokens.xml" : undef} @nodes;
+    foreach my $node (@_) {
         my $tokenFile = shift @tokenFiles;
         next if not defined $tokenFile or not -r $tokenFile;
         my %currentTokens = readTokensXMLFile($tokenFile);
-        my $prefix;
-        if ($gorc->{type}) {
-            # only group had type
-            $prefix = $gorc->{type};
-        } else {
-            # configuration had no type
-            $prefix = "configuration";
-        }
-        map {$_->{source} = "$prefix:$gorc->{name}";} values %currentTokens;
+        my $prefix = $node->type();
+        map {$_->{source} = "$prefix:".$node->name();} values %currentTokens;
         @tokens{keys %currentTokens} = values %currentTokens;
     }
     return \%tokens;
@@ -458,7 +439,7 @@ sub getTokensXML {
 
 sub getTokensOLD {
     my $self = shift;
-    my @tokenFiles = grep {$_} map {$_->{path} ? "$_->{path}/tokens" : undef} @_;
+    my @tokenFiles = grep {$_} map {$_->path() ? $_->path()."/tokens" : undef} @_;
     my %tokens = ();
     foreach my $token (@tokenFiles) {
         if (-r "$token/static") {
@@ -484,7 +465,7 @@ sub getTokensOLD {
 sub getGroups {
     my $self = shift;
     my $group = shift;
-    my $groupsFile = "$group->{path}/groups";
+    my $groupsFile = $group->path()."/groups";
     if (open(FILE, "<$groupsFile")) {
         my @groups = <FILE>;
         close(FILE);
@@ -505,12 +486,8 @@ sub getMounts {
             my @rawMounts = <FILE>;
             close(FILE);
             chomp @rawMounts;
-            push @mounts, map {/^([+-])(.*)$/; {destination => "$2", active => "$1", configuration => $configuration}} @rawMounts;
+            push @mounts, map {Staple::Mount->new({destination => "$_", configuration => $configuration})} @rawMounts;
         }
-    }
-    foreach my $mount (@mounts) {
-        $mount->{active} = 1 if $mount->{active} eq '+';
-        $mount->{active} = 0 if $mount->{active} eq '-';
     }
     return @mounts;   
 }
@@ -823,7 +800,7 @@ sub addMount {
     my @results;
     my @mounts = $self->getMounts($configuration);
     my $i = 0;
-    @mounts = grep {$_->{destination} ne $mount->{destination} or $_->{active} ne $mount->{active}} @mounts;
+    @mounts = grep {$_->description() ne $mount->description()} @mounts;
     $location = scalar(@mounts) + 1 if not $location or $location > @mounts;
     foreach my $mnt (@mounts) {
         $i++;
@@ -841,17 +818,17 @@ sub removeMounts {
     my $self = shift;
     my @allMounts = @_;
     my @errors = ();
-    my @configurations = map {$_->{configuration}->name().":".$_->{configuration}->dist()} @allMounts;
+    my @configurations = map {$_->configuration()->name().":".$_->configuration()->dist()} @allMounts;
     my %configurations = ();
     @configurations{@configurations} = @configurations;
     foreach my $conf (keys %configurations) {
-        my @mounts = grep {$_->{configuration}->name().":".$_->{configuration}->dist() eq $conf} @allMounts;
-        my @oldMounts = $self->getMounts($mounts[0]->{configuration});
+        my @mounts = grep {$_->configuration()->name().":".$_->configuration()->dist() eq $conf} @allMounts;
+        my @oldMounts = $self->getMounts($mounts[0]->configuration());
         my @results = ();
         foreach my $mount (@oldMounts) {
-            push @results, $mount unless grep {$mount->{destination} eq $_->{destination} and $mount->{active} eq $_->{active}} @mounts;
+            push @results, $mount unless grep {$mount->description() eq $_->description()} @mounts;
         }
-        unless ($self->setMounts($mounts[0]->{configuration}, @results)) {
+        unless ($self->setMounts($mounts[0]->configuration(), @results)) {
             push @errors, $self->{error};
         }
     }
@@ -907,13 +884,13 @@ sub getGroupConfigurations {
     my $self = shift;
     my $group = shift;
     my @configurations = ();
-    if (-r "$group->{path}/configurations") {
+    if (-r $group->path()."/configurations") {
         my @configurationData = ();
-        if (open(FILE, "<$group->{path}/configurations")) {
+        if (open(FILE, "<".$group->path()."/configurations")) {
             @configurationData = <FILE>;
             close(FILE);
         } else {
-            $self->{error} = "failed to open $group->{path}/configurations: $!";
+            $self->{error} = "failed to open ".$group->path()."/configurations: $!";
             return undef;
         }
         push @configurations, map {my $a = $_; chomp $a; $a} @configurationData;
@@ -950,16 +927,16 @@ sub addGroupConfiguration {
 # applies also to removeConfigurationConfigurations
 sub removeGroupConfigurations {
     my $self = shift;
-    my $group = shift;
+    my $node = shift;
     my @toRemove = map {($_->active() ? "+" : "-").$_->name()} @_;
     my %toRemove = ();
     @toRemove{@toRemove} = @toRemove;
-    my @configurations = $self->getGroupConfigurations($group);
+    my @configurations = $self->getGroupConfigurations($node);
     my @results = ();
     foreach my $configuration (@configurations) {
         push @results, $configuration unless $toRemove{($configuration->active() ? "+" : "-").$configuration->name()};
     }
-    return $self->setGroupConfigurations($group, @results);
+    return $self->setGroupConfigurations($node, @results);
 }
 
 sub addGroupGroup {
@@ -1001,7 +978,7 @@ sub removeGroupGroups {
     }
     foreach my $toremove (keys %toRemove) {
         unless (grep {$_ eq $toremove} @groups) {
-            $self->{error} = "group \"$toremove\" not in group \"$group->{name}\"";
+            $self->{error} = "group \"$toremove\" not in group \"".$group->name()."\"";
             return undef;
         }
     }
@@ -1271,11 +1248,11 @@ sub getStapleDir {
 
 sub getNote {
     my $self = shift;
-    my $group = shift;
+    my $node = shift;
     my $note = "";
     $self->{error} = "";
-    if (ref $group and $group->{path} and -e "$group->{path}/note") {
-        if (open(NOTE, "<$group->{path}/note")) {
+    if (ref $node and $node->path() and -e $node->path()."/note") {
+        if (open(NOTE, "<".$node->path()."/note")) {
             $note = join "", <NOTE>;
             close(NOTE);
         } else {
@@ -1288,11 +1265,11 @@ sub getNote {
 
 sub setNote {
     my $self = shift;
-    my $group = shift;
+    my $node = shift;
     my $note = shift;
     if (defined $note and $note ne "") {
-        if (defined $group->{path} and -d "$group->{path}") {
-            if (open(NOTE, ">$group->{path}/note")) {
+        if (defined $node->path() and -d $node->path()) {
+            if (open(NOTE, ">".$node->path()."/note")) {
                 print NOTE $note;
                 close(NOTE);
             } else {
@@ -1300,12 +1277,12 @@ sub setNote {
                 return undef;
             }
         } else {
-            $self->{error} = "Don't know $group->{type} path";
+            $self->{error} = "Don't know ".$node->type()." path";
             return undef;
         }
     } else {
-        if (-e "$group->{path}/note") {
-            unless (unlink "$group->{path}/note") {
+        if (-e $node->path()."/note") {
+            unless (unlink $node->path()."/note") {
                 $self->{error} = "Can't delete note: $!\n";
                 return undef;
             }
@@ -1392,7 +1369,7 @@ sub mkdirs {
     return 1;
 }
 
-# input: configuration hash, list of mounts
+# input: configuration, list of mounts
 # output: 1 or undef
 # writes the mounts file
 sub setMounts {
@@ -1402,7 +1379,7 @@ sub setMounts {
     my $mountsFile = $configuration->path()."/mounts";
     if (@mounts) {
         if (open(FILE, ">$mountsFile")) {
-            print FILE join "\n", map {($_->{active} ?  "+" : "-").$_->{destination}} @mounts;
+            print FILE join "\n", map {$_->description()} @mounts;
             print FILE "\n";
             close(FILE);
             return 1;
@@ -1427,7 +1404,7 @@ sub setGroupGroups {
     my $self = shift;
     my $group = shift;
     my @groups = @_;
-    my $groupsFile = "$group->{path}/groups";
+    my $groupsFile = $group->path()."/groups";
     if (@groups) {
         if (open(FILE, ">$groupsFile")) {
             print FILE join("\n", @groups)."\n";
@@ -1447,14 +1424,14 @@ sub setGroupGroups {
     return 1;
 }
 
-# input: group hash (may be a configuration), list of configuration hashes (name + active)
+# input: Staple::Node, list of configuration (name + active)
 # output: 1 or undef
 # writes the groups file
 sub setGroupConfigurations {
     my $self = shift;
-    my $group = shift;
+    my $node = shift;
     my @configurations = @_;
-    my $configurationsFile = "$group->{path}/configurations";
+    my $configurationsFile = $node->path()."/configurations";
     if (@configurations) {
         if (open(FILE, ">$configurationsFile")) {
             print FILE join "\n", map {($_->active() ?  "+" : "-").$_->name()} @configurations;

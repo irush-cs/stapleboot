@@ -45,7 +45,7 @@ Staple::Misc module
 
 =item cleanInactive(<list of hash refs>)
 
-=item fillIntermediate(<list of hash refs>)
+=item fillIntermediate(<list of nodes>)
 
 =item applyTokens(data string, hash ref of tokens)
 
@@ -325,12 +325,13 @@ sub cleanInactive {
     return @data;
 }
 
-=item B<fillIntermediate(I<E<lt>list of hash refsE<gt>>)>
+=item B<fillIntermediate(I<E<lt>list of nodesE<gt>>)>
 
-Receives an ordered list of hashes with a "name" key. Where "name" is a
-path-like string. It returns an ordered list with intermediate hashes (before
-the final one). The new values are deep duplicates of the originals with "name"
-value changed appropriately. No duplicate entries are returned.
+Receives an ordered list of nodes, where the "name" attribute is a path-like
+string. It returns an ordered list with intermediate nodes (before the final
+one). The new values are deep duplicates of the originals with "name" value
+changed appropriately. No duplicate entries are returned. If name can't be
+changed, the failed intermediate node is dropped.
 
 =cut
 
@@ -339,12 +340,11 @@ sub fillIntermediate {
     my @data = ();
     my %data = ();
     foreach my $data (@compactData) {
-        my @splited = splitData $data->{name};
+        my @splited = splitData $data->name();
         for my $split (@splited) {
             unless ($data{$split}) {
                 my $newData = clone($data);
-                $newData->{name} = $split;
-                push @data, $newData;
+                push @data, $newData if $newData->name($split);
                 $data{$split} = 1;
             }
         }

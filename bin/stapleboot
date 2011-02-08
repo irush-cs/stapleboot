@@ -305,7 +305,7 @@ sub autoStage {
         }
         my @realGroups = $boot->{db}->getGroupsByName(@autoGroups);
         if (scalar @realGroups != scalar @autoGroups) {
-            my @missings = grep {my $a = $_; not grep {$a eq $_->{name}} @realGroups} @autoGroups;
+            my @missings = grep {my $a = $_; not grep {$a eq $_->name()} @realGroups} @autoGroups;
             my $error = "Unknown groups from autogroup script:\n  ".join("\n  ", @missings)."\n";
             $boot->error("$error");
             $boot->addMail("$error");

@@ -1416,17 +1416,17 @@ sub wht {
         return;
     }
     foreach my $type ("host", "distribution", "group") {
-        my @subset = grep {$_->{type} eq $type} @$groups;
+        my @subset = grep {$_->type() eq $type} @$groups;
         if (@subset) {
             print "${type}s:\n";
-            print join("", map {"  $_->{name}\n"} @subset);
+            print join("", map {"  ".$_->name()."\n"} @subset);
             print "\n";
         }
     }
 
     if (@$configurations) {
         print "configurations ($dist):\n";
-        print join("", map{"  $_->{name}\n"} @$configurations);
+        print join("", map{"  ".$_->name()."\n"} @$configurations);
         print "\n";
     }
 }
@@ -1730,7 +1730,7 @@ sub ggi {
         } else {
             if (@groupsref) {
                 print "Groups:\n";
-                print join "\n", map {"$_->{name}"} @groupsref;
+                print join "\n", map {$_->name()} @groupsref;
                 print "\n\n";
             }
         }
@@ -2509,7 +2509,7 @@ sub rm {
         print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n";
         return;
     }
-    unless ($db->removeMounts({destination => $mount, active => $active, configuration => $conf})) {
+    unless ($db->removeMounts(Staple::Mount->new({destination => $mount, active => $active, configuration => $conf}))) {
         perror $db->{error}."\n";
         return;
     }
@@ -2547,7 +2547,7 @@ sub am {
         print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n";
         return;
     }
-    unless ($db->addMount($conf, {destination => $mount, active => $active}, $location)) {
+    unless ($db->addMount($conf, Staple::Mount->new({destination => $mount, active => $active}), $location)) {
         perror $db->{error}."\n";
         return;
     }
@@ -2568,7 +2568,7 @@ sub gm {
                 perror $db->{error}."\n";
                 return;
             } else {
-                print join "\n", map {($_->{active} ?  "  +" : "  -").$_->{destination}} @mounts;
+                print join "\n", map {"  ".$_->description()} @mounts;
                 print "\n" if (@mounts);
             }
         } else {
@@ -3124,7 +3124,7 @@ sub ggc {
     my @groups = $db->getGroupsByName(@groups_names);
     my $prefix = $singleCommand ? "" : "  ";
     foreach my $group (@groups) {
-        print "$group->{name}:\n" unless $singleCommand;
+        print $group->name().":\n" unless $singleCommand;
         my @configurations = $db->getGroupsConfigurations($group);
         if (@configurations and not defined $configurations[0]) {
             perror $db->{error}."\n";
@@ -3262,7 +3262,7 @@ sub rhg {
         return;
     }
     if (my $hostGroup = $db->getHostGroup($host)) {
-        unless (grep {$_->{name} eq "$group"} $db->getGroupGroups($hostGroup)) {
+        unless (grep {$_->name() eq "$group"} $db->getGroupGroups($hostGroup)) {
             print "\"$host\" doesn't have the group \"$group\"\n";
             return;
         }
@@ -3290,7 +3290,7 @@ sub gdg {
             perror $db->{error}."\n";
             return;
         } else {
-            print join "\n", map {$_->{name}} @groups;
+            print join "\n", map {$_->name()} @groups;
             print "\n";
         }
     } else {
@@ -3312,7 +3312,7 @@ sub ggg {
             perror $db->{error}."\n";
             return;
         } else {
-            print join "\n", map {$_->{name}} @groups;
+            print join "\n", map {$_->name()} @groups;
             print "\n";
         }
     } else {
@@ -3333,7 +3333,7 @@ sub ghg {
             perror $db->{error}."\n";
             return;
         } else {
-            print join "\n", map {$_->{name}} @groups;
+            print join "\n", map {$_->name()} @groups;
             print "\n";
         }
     } else {
@@ -3384,12 +3384,12 @@ sub createToken {
 }
 
 sub addToken {
-    my $group = shift;
+    my $node = shift;
     my $token = createToken();
     unless ($token) {
         print "no token added\n";
     } else {
-        unless ($db->addTokens($token, $group)) {
+        unless ($db->addTokens($token, $node)) {
             perror $db->{error}."\n";
         }
     }
@@ -3993,7 +3993,7 @@ sub host_groups_completion {
         return () unless @gs;
         my @groups = $db->getGroupGroups(@gs);
         return () if (@groups and not defined $groups[0]);
-        @currentCompletionList = grep {index($_, $text) == 0} map {$_->{name}} @groups;
+        @currentCompletionList = grep {index($_, $text) == 0} map {$_->name()} @groups;
     }
     return $currentCompletionList[$count];
 }
@@ -4103,7 +4103,7 @@ sub group_groups_completion {
         return () unless $group;
         my @groups = $db->getGroupGroups($group);
         return () if (@groups and not defined $groups[0]);
-        @currentCompletionList = grep {index($_, $text) == 0} map {$_->{name}} @groups;
+        @currentCompletionList = grep {index($_, $text) == 0} map {$_->name()} @groups;
     }
     return $currentCompletionList[$count];
 }
@@ -4118,7 +4118,7 @@ sub distribution_groups_completion {
         return () unless $group;
         my @groups = $db->getGroupGroups($group);
         return () if (@groups and not defined $groups[0]);
-        @currentCompletionList = grep {index($_, $text) == 0} map {$_->{name}} @groups;        
+        @currentCompletionList = grep {index($_, $text) == 0} map {$_->name()} @groups;        
     }
     return $currentCompletionList[$count];
 }
@@ -4249,10 +4249,10 @@ sub mount_completion {
         return () unless $conf;
         ($conf) = $db->getFullConfigurations([$conf], $distribution);
         return () unless $conf;
-        my @mounts = $db->getRawMounts($conf);
+        my @mounts = $db->getMounts($conf);
         return () if @mounts and not defined $mounts[0];
 
-        @currentCompletionList = map {($_->{active} ?  "+" : "-").$_->{destination}} @mounts;
+        @currentCompletionList = map {$_->description()} @mounts;
         @currentCompletionList = grep {index($_, $text) == 0} @currentCompletionList;
     }
     return $currentCompletionList[$count];

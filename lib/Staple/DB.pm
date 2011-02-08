@@ -11,6 +11,10 @@ use strict;
 use warnings;
 use Staple::Misc;
 use Staple::Configuration;
+use Staple::Group;
+use Staple::Host;
+use Staple::Distribution;
+
 our $VERSION = '006snap';
 
 =head1 NAME
@@ -158,7 +162,7 @@ sub addConfiguration {
     return undef;
 }
 
-=item B<addTokens(I<tokens hash ref, group|configuration>)>
+=item B<addTokens(I<tokens hash ref, node>)>
 
 Adds the tokens (tokens hash ref) to the group or configuration in the
 database, returns 1 on success, or undef on failure. $error is set to the
@@ -172,7 +176,7 @@ sub addTokens {
     return undef;
 }
 
-=item B<removeTokens(I<tokens name list ref, group|configuration>)>
+=item B<removeTokens(I<tokens name list ref, node>)>
 
 Removes the tokens (list ref of strings) from the group or configuration in the
 database, returns 1 on success, or undef on failure. $error is set to the
@@ -186,12 +190,12 @@ sub removeTokens {
     return undef;
 }
 
-=item B<setTokens(I<tokens name list ref, group|configuration>)>
+=item B<setTokens(I<tokens name list ref, node>)>
 
 Sets the tokens (tokens hash ref) of the group or configuration in the
 database, returns 1 on success, or undef on failure. error is set to the error.
 
-The default implementation calls removeTokens(getTokens(group)), and then
+The default implementation calls removeTokens(getTokens(group)), followed by
 addTokens. Databases which support a faster method of replacing all tokens
 should reimplement this.
 
@@ -212,7 +216,7 @@ sub setTokens {
 
 =item B<addMount(I<configuration, mount, [location]>)>
 
-Adds the mount (hash ref) to the configuration at location, returns 1 on
+Adds the mount (Staple::Mount) to the configuration at location, returns 1 on
 success, or undef on failure. $error is set to the error.
 
 =cut
@@ -225,7 +229,7 @@ sub addMount {
 
 =item B<removeMounts(I<mount [mount [...]]>)>
 
-Deletes the list of mounts (list of hashes), returns 1 on success, or undef on
+Deletes the list of mounts (Staple::Mount), returns 1 on success, or undef on
 failure (and sets the error).
 
 =cut
@@ -290,12 +294,12 @@ sub copyConfiguration {
     return undef;
 }
 
-=item B<getTokens(I<group|configuration, [...]>)>
+=item B<getTokens(I<node, [...]>)>
 
 Returns a tokens hash reference (where the key is the token key, and the value
-is the token hash). The tokens are taken from the groups and configurations
-(which can be intermixed in the input list), by the same order, so if token
-appears twice it will be overridden.
+is the token hash). The tokens are taken from the nodes (types can be
+intermixed in the input list), by the same order, so if token appears twice it
+will be overridden.
 
 The tokens are returned raw from the database/filesystem, they are not
 C<initialized>. i.e. they aren't checked for mistakes, no auto and default
@@ -326,18 +330,6 @@ sub getMounts {
     my $self = shift;
     $self->{error} = "getMounts not implemented in this database yet";
     return undef;
-}
-
-
-=item B<getRawMounts(I<configuration [configuration [...]]>)>
-
-Identical to getMounts.
-
-=cut
-
-sub getRawMounts {
-    my $self = shift;
-    return $self->getMounts(@_);
 }
 
 =item B<getTemplates(I<configuration, [configuration [...]]>)>
@@ -490,9 +482,9 @@ sub removeTemplates {
 
 =item B<getGroups(I<group>)>
 
-Gets an orderd group list associated with the given group (hash). returns a
-list of group names (strings), which can be built using getGroupsByName. On
-failure returns undef (and sets the error).
+Gets an orderd group list associated with the given group
+(Staple::Group). returns a list of group names (strings), which can be built
+using getGroupsByName. On failure returns undef (and sets the error).
 
 =cut
 
@@ -504,9 +496,9 @@ sub getGroups {
 
 =item B<getGroupGroups(I<group>)>
 
-Returns an ordered list of raw group (hashes, no intermediate, no recursive)
-associated with the given group (hash). In case of error, undef will be
-returned and the error will be set.
+Returns an ordered list of raw group (no intermediate, no recursive) associated
+with the given group (Staple::Group). In case of error, undef will be returned
+and the error will be set.
 
 =cut
 
@@ -521,10 +513,10 @@ sub getGroupGroups {
 
 =item B<getCompleteGroups(I<group [group [...]]>)>
 
-Given a list of groups (hashes) returns a complete list of groups
-(hashes). Groups that have extra group, are computed and placed before the
-given group. Groups will be splitted into intermediate groups, and duplicate
-groups will be removed.
+Given a list of groups (Staple::Group) returns a complete list of groups
+(Staple::Group). Groups that have extra group, are computed and placed before
+the given group. Groups will be splitted into intermediate groups, and
+duplicate groups will be removed.
 
 WARNING: try to avoid circular groups dependencies 
 
@@ -537,18 +529,18 @@ sub getCompleteGroups {
     my %groups = ();
 
     @rawGroups = fillIntermediate(@rawGroups);
-    map {$_->{path} = $self->getGroupPath($_->{name}) if $_->{type} eq "group"} @rawGroups;
+    map {$_->path($self->getGroupPath($_->name())) if $_->type() eq "group"} @rawGroups;
 
     foreach my $rawGroup (@rawGroups) {
-        unless ($groups{$rawGroup->{name}}) {
+        unless ($groups{$rawGroup->name()}) {
             my @newGroups = $self->getCompleteGroups($self->getGroupGroups($rawGroup));
             foreach my $newGroup (@newGroups) {
-                unless ($groups{$newGroup->{name}}) {
-                    $groups{$newGroup->{name}} = 1;
+                unless ($groups{$newGroup->name()}) {
+                    $groups{$newGroup->name()} = 1;
                     push @groups, $newGroup;
                 }
             }
-            $groups{$rawGroup->{name}} = 1;
+            $groups{$rawGroup->name()} = 1;
             push @groups, $rawGroup;
         }
     }
@@ -559,8 +551,8 @@ sub getCompleteGroups {
 
 =item B<getGroupConfigurations(I<group>)>
 
-Gets a group hash, Returns an ordered configuration list associated with the
-given group. The returned list is of raw configurations (i.e. no path, no
+Gets a group, Returns an ordered configuration list associated with the given
+group. The returned list is of raw configurations (i.e. no path, no
 distribution, and includes inactive configurations). On failure returns undef
 (and sets the error).
 
@@ -575,10 +567,10 @@ sub getGroupConfigurations {
 =item B<getGroupsConfigurations(I<group [group [...]]>)>
 
 Returns an ordered list of configurations (both active and inactive) from the
-groups list (list of hashs). The configurations aren't full, i.e. I<path> and
-I<dist> are undef. To get complete configurations, as they would appear in the
-boot process, pass them through I<getCompleteConfigurations>.  In case of
-error, undef will be returned and the error will be set.
+groups list. The configurations aren't full, i.e. I<path> and I<dist> are
+undef. To get complete configurations, as they would appear in the boot
+process, pass them through I<getCompleteConfigurations>.  In case of error,
+undef will be returned and the error will be set.
 
 =cut
 
@@ -807,7 +799,7 @@ sub removeGroupConfigurations {
 
 The first group is the receiver. The second group (name - string), is the group
 to add to the first group. The third, optional, parameter is the location in
-the gorup list, if omitted adds to the end of the list.
+the group list, if omitted adds to the end of the list.
 
 Returns 1 on succes or undef on failure (error is set).
 
@@ -822,7 +814,7 @@ sub addGroupGroup {
 =item B<removeGroupGroups(I<group, group name, [group name ...]>)
 
 Removes the groups list (strings) from the list of groups in I<group>
-(hash). returns 1 or undef.
+(Staple::Group). returns 1 or undef.
 
 =cut
 
@@ -962,7 +954,7 @@ sub getMinimumDistributionVersion {
     return $min;
 }
 
-=item B<getVersionOf(I<group|configuration|distribution|host hash>)
+=item B<getVersionOf(I<Staple::Node>)
 
 For distribution returns its version. For configuration returns it's
 distribution version. For the rest (group, host) returns the minimum
@@ -972,18 +964,18 @@ distribution version.
 
 sub getVersionOf {
     my $self = shift;
-    my $group = shift;
-    return $self->getDistributionVersion($group->{name}) if $group->{type} eq "distribution";
-    return $self->getDistributionVersion($group->{dist}) if $group->{type} eq "configuration";
+    my $node = shift;
+    return $self->getDistributionVersion($node->name()) if $node->type() eq "distribution";
+    return $self->getDistributionVersion($node->dist()) if $node->type() eq "configuration";
     return $self->getMinimumDistributionVersion();
 }
 
 =item B<whoHasGroup(I<group name>)>
 
-Receives a single group name (string), and returns a group (hash) list, of the
-groups that are attached to the given group. The output can be a group, host,
-or distribution groups.
-On error undef is returned, and the error is set.
+Receives a single group name (string), and returns a group (Staple::Group)
+list, of the groups that are attached to the given group. The output can be a
+group, host, or distribution groups.  On error undef is returned, and the error
+is set.
 
 =cut
 
@@ -1026,18 +1018,18 @@ sub whoHasToken {
     return undef if (grep {not defined $_} @groups);
 
     
-    my @configurations = grep {$_->{type} eq "configuration"} @groups;
-    @groups = grep {$_->{type} ne "configuration"} @groups;
+    my @configurations = grep {$_->type() eq "configuration"} @groups;
+    @groups = grep {$_->type() ne "configuration"} @groups;
 
     return ([@groups], [@configurations])
 }
 
 =item B<whoHasConfiguration(I<configuration name, [distribution]>)>
 
-Receives a single configuration name (string), and returns a group (hash) list,
-of the groups that are attached to the given configuration. The output can be a
-group, host, distribution groups or configurations. The output also includes
-group which contains a removed configurations.
+Receives a single configuration name (string), and returns a node list, of the
+nodes that are attached to the given configuration. The output can be a group,
+host, distribution groups or configurations. The output also includes nodes
+which contains a removed configurations.
 
 If the second argument is a valide distribution name, then configurations for
 that distribution are also checked.
@@ -1128,8 +1120,8 @@ sub getDistributionPath {
 
 =item B<getDistributionGroup(I<distribution string>)>
 
-Returns the distribution group hash ref. If the distribution does not exists,
-undef is returned and the error is set
+Returns the distribution group (Staple::Distribution). If the distribution does
+not exists, undef is returned and the error is set
 
 =cut
 
@@ -1137,7 +1129,7 @@ sub getDistributionGroup {
     my $self = shift;
     my $distribution = shift;
     my $path = $self->getDistributionPath($distribution);
-    return {name => $distribution, path => $path, type => "distribution"} if $path;
+    return Staple::Distribution->new({name => $distribution, path => $path}) if $path;
     $self->{error} = "Distribution \"$distribution\" does not exist";
     return undef;
 }
@@ -1154,7 +1146,7 @@ sub getGroupsByName {
     my @groups = ();
     while (my $group = shift) {
         my $path = $self->getGroupPath($group);
-        push @groups, {name => $group, path => $path, type => "group"} if $path;
+        push @groups, Staple::Group->new({name => $group, path => $path}) if $path;
     }
     return @groups;
 }
@@ -1170,17 +1162,17 @@ sub getHostGroup {
     my $self = shift;
     my $host = shift;
     my $hostPath = $self->getHostPath($host);
-    return {name => $host, path => $hostPath, type => "host"} if $hostPath;
+    return Staple::Host->new({name => $host, path => $hostPath}) if $hostPath;
     $self->{error} = "Host \"$host\" does not exist";
     return undef;
 }
 
 
 
-=item B<setNote(group|configuration ref, note)>
+=item B<setNote(node, note)>
 
-Sets the note for the given group/configurations. Returns 1 on success and
-undef on failure (and sets the error). To delete a note set it to undef. 
+Sets the note for the given node. Returns 1 on success and undef on failure
+(and sets the error). To delete a note set it to undef.
 
 =cut
 
@@ -1206,10 +1198,10 @@ sub getHostPath {
     return undef;
 }
 
-=item B<getNote(I<group|configuration hash>)>
+=item B<getNote(I<node>)>
 
-Returns the group's note. returns undef on error and sets the error. If no
-note, returns empty string and error is empty.
+Returns the node's note. returns undef on error and sets the error. If no note,
+returns empty string and error is empty.
 
 =cut
 

@@ -27,45 +27,21 @@ If Staple is not on the standard perl library, then the PERL5LIB should contain
 
 =head1 DATA TYPES
 
-B<group hash>
+B<Staple::Group>
 
-=over
+B<Staple::Host>
 
-=over
+B<Staple::Distribution>
 
-=item I<name>    - The name of the group
+B<Staple::Configuration>
 
-=item I<type>    - The type of the group (group, distribution, or host)
+B<Staple::Mount>
 
-=item I<path>    - The path of the group in the filesystem
+B<Staple::Template>
 
-=for comment =item I<active> - Whether this group is active (1) or not (0)
+B<Staple::Script>
 
-=back
-
-=back
-
-B<configuration hash>
-
-=over
-
-=over
-
-=item I<name>   - The name of the configuration
-
-=item I<type>   - "configuration" (to distinguish from groups)
-
-=item I<path>   - The full path of the configuration (filesystem)
-
-=item I<dist>   - The distribution
-
-=item I<active> - Whether the configuration is active (1) or not (0)
-
-=item I<group>  - Originating group hash (if any)
-
-=back
-
-=back
+B<Staple::Autogroup>
 
 B<token hash>
 
@@ -86,54 +62,6 @@ B<token hash>
 =back
 
 =back
-
-B<mount hash>
-
-=over
-
-=over
-
-=item I<source>         - The device
-
-=item I<destination>    - The mounting point
-
-=item I<type>           - Mount type (eg. tmpfs, bind, etc.)
-
-=item I<options>        - Mount options 
-
-=item I<active>         - Whether the mount is active (1) or not (0)
-
-=item I<permissions>    - Mount permissions (octal)
-
-=item I<next>           - Next mount if this one fails (a configuration name), only works on manual mode
-
-=item I<critical>       - Whether to declare a critical state if fails (implies manual).
-
-=item I<configuration>  - Configuration for this mount
-
-=item I<copySource>     - The location of the source files to copy from (no copy if empty)
-
-=item I<copyFiles>      - The files to copy from the source (defaults to .)
-
-=item I<copyExclude>    - The fiels to exclude from the source (default to "")
-
-=item I<manual>         - Whether to manually mount (1) or just write an fstab entry (0)
-
-=item I<fsck>           - Whether to run fsck (1) or not (0).
-
-=item I<fsckCommand>    - Special fsck command for this mount (defaults to empty, only for manual mount)
-
-=item I<fsckExitOK>     - Special fsck exit status for this mount
-
-=back
-
-=back
-
-B<Staple::Template>
-
-B<Staple::Script>
-
-B<Staple::Autogroup>
 
 =head1 EXPORT
 
@@ -298,18 +226,18 @@ sub cleanMounts {
     my @raw = @_;
     my %mounts = ();
     foreach my $mount (@raw) {
-        if ($mount->{active}) {
-            $mounts{$mount->{destination}} = $mount;
+        if ($mount->active()) {
+            $mounts{$mount->destination()} = $mount;
         } else {
-            delete $mounts{$mount->{destination}}
+            delete $mounts{$mount->destination()}
         }
     }
     my @output = ();
     my %uniq = ();
     foreach my $mount (@raw) {
-        if ($mounts{$mount->{destination}} and ! $uniq{$mount->{destination}}) {
+        if ($mounts{$mount->destination()} and ! $uniq{$mount->destination()}) {
             push @output, $mount;
-            $uniq{$mount->{destination}} = 1;
+            $uniq{$mount->destination()} = 1;
         }
     }
     return @output;
@@ -333,7 +261,7 @@ sub buildMounts {
         }
         $mount{manual} = 1 if $mount{critical};
         $mount{manual} = 1 if $mount{next};
-        push @mounts, \%mount;
+        push @mounts, Staple::Mount->new(\%mount);
     }
     return @mounts;
 }

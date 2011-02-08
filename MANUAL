@@ -892,16 +892,11 @@ Staple/Template.pm - Represents a template.
 ------------------------------
 
 All the functions in the staple modules are documented in the modules
-themselves (perldoc). Most elements in staple are represented by perl hashes,
-some are represented by classes. 
+themselves (perldoc). Most elements in staple are represented by classes, some
+are represented perl hashes.
 
 7.3.1. Hashes
 --------------
-
-group hash - represents a group. 
-  name - The name of the group
-  type - The type, can be one of: group, distribution or host.
-  path - used by the database internally (on fs, it's the path...)
 
 token hash - A token
   key    - The token name
@@ -911,10 +906,6 @@ token hash - A token
   source - The origin of the token as free text. Isn't used by staple itself,
            just for the logging and debugging.
 
-mount hash - A mount. The keys for this hash are equivalent to the
-             __MOUNT_<dest>_*__ tokens, with the mapping done by the
-             %Staple::mountTokenToOption map.
-
 7.3.2. Classes
 ---------------
 
@@ -922,7 +913,7 @@ Staple classes are divided into two main groups: data structures, and
 program/logic classes. The data structure classes are usually simple hashes
 with accessors and some utility methods. They do not represent a "real-time"
 database state of the object they represent (i.e. changes won't propagate to
-the backend).
+the backend). Most of them heve internal/perldoc documentation.
 
 Staple::DB 
 
@@ -951,6 +942,7 @@ Staple::Setting
     Staple::Template
     Staple::Script
     Staple::Autogroup
+    Staple::Mount
 
 Staple::Node
 
@@ -958,7 +950,9 @@ Staple::Node
 
   The subclasses of Staple::Node are:
     Staple::Configuration
-
+    Staple::Group
+    Staple::Host (ISA Staple::Group)
+    Staple::Distribution (ISA Staple::Group)
 
 ?. 
 -----

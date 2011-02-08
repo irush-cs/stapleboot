@@ -279,7 +279,7 @@ if (grep {$_ eq "auto"} @stages) {
     }
     my @realGroups = $stapler->{db}->getGroupsByName(@autoGroups);
     if (scalar @realGroups != scalar @autoGroups) {
-        my @missings = grep {my $a = $_; not grep {$a eq $_->{name}} @realGroups} @autoGroups;
+        my @missings = grep {my $a = $_; not grep {$a eq $_->name()} @realGroups} @autoGroups;
         my $error = "Unknown groups from autogroup script:\n  ".join("\n  ", @missings)."\n";
         $stapler->error("$error");
     }

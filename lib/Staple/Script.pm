@@ -200,7 +200,7 @@ sub description {
         $result .= "  tokenScript => $self->{tokenScript}\n";
         $result .= "  note => ".($self->{note} ? $self->{note} : "(undef)")."\n";
     } else {
-        $result .= "$_->{order}. $_->{name}\t(".($_->{critical} ? "critical " : "").($_->{tokens} ? "tokened " : "").($_->{tokenScript} ? "tokenScript " : "").($_->{source} ? "file" : "data").")\n";
+        $result .= "$self->{order}. $self->{name}\t(".($self->{critical} ? "critical " : "").($self->{tokens} ? "tokened " : "").($self->{tokenScript} ? "tokenScript " : "").($self->{source} ? "file" : "data").")\n";
     }
     return $result;
 }

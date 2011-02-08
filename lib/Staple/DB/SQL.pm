@@ -374,27 +374,27 @@ sub removeDistribution {
 sub addTokens {
     my $self = shift;
     my $tokens = shift;
-    my $group = shift;
-    if ($group->{type} and $group->{type} ne "configuration") {
+    my $node = shift;
+    if ($node->type() ne "configuration") {
         #group
         my $table;
-        if ($group->{type} eq "host") {
+        if ($node->type() eq "host") {
             $table = "$self->{schema}host_tokens(key, value, type, host)";
-        } elsif ($group->{type} eq "distribution") {
+        } elsif ($node->type() eq "distribution") {
             $table = "$self->{schema}distribution_tokens(key, value, type, distribution)";
-        } elsif ($group->{type} eq "group") {
+        } elsif ($node->type() eq "group") {
             $table = "$self->{schema}group_tokens(key, value, type, group_name)";
         }
-        #print "\n***$group->{name}***\n";
+        #print "\n***$node->{name}***\n";
         #print "***".join(", ", keys %$tokens)."***\n";
         foreach my $token (values %$tokens) {
-            return undef unless ($self->insert($table, $token->{key}, $token->{raw}, $token->{type}, $group->{name}));
+            return undef unless ($self->insert($table, $token->{key}, $token->{raw}, $token->{type}, $node->name()));
         }
     } else {
         #configuration
         foreach my $token (values %$tokens) {
             return undef unless ($self->insert("$self->{schema}configuration_tokens(key, value, type, configuration, distribution)",
-                                               $token->{key}, $token->{raw}, $token->{type}, $group->{name}, $group->{dist}));
+                                               $token->{key}, $token->{raw}, $token->{type}, $node->name(), $node->dist()));
         }
     }
     return 1;
@@ -403,21 +403,21 @@ sub addTokens {
 sub removeTokens {
     my $self = shift;
     my $tokens = shift;
-    my $group = shift;
+    my $node = shift;
     my $dbh = $self->{dbh};
-    if ($group->{type} and $group->{type} ne "configuration") {
+    if ($node->type() ne "configuration") {
         #group
-        my $stmt = "DELETE FROM $self->{schema}$group->{type}_tokens WHERE key = ? AND ";
-        if ($group->{type} eq "host") {
+        my $stmt = "DELETE FROM $self->{schema}".$node->type()."_tokens WHERE key = ? AND ";
+        if ($node->type() eq "host") {
             $stmt .= "host = ?";
-        } elsif ($group->{type} eq "distribution") {
+        } elsif ($node->type() eq "distribution") {
             $stmt .= "distribution = ?";
-        } elsif ($group->{type} eq "group") {
+        } elsif ($node->type() eq "group") {
             $stmt .= "group_name = ?";
         }
         my $sth = $dbh->prepare_cached($stmt);
         foreach my $token (@$tokens) {
-            unless ($sth->execute($token, $group->{name})) {
+            unless ($sth->execute($token, $node->name())) {
                 $self->{error} = $sth->errstr;
                 return 0;
             }
@@ -427,7 +427,7 @@ sub removeTokens {
         my $stmt = "DELETE FROM $self->{schema}configuration_tokens WHERE key = ? AND configuration = ? AND distribution = ?";
         my $sth = $dbh->prepare_cached($stmt);
         foreach my $token (@$tokens) {
-            unless ($sth->execute($token, $group->{name}, $group->{dist})) {
+            unless ($sth->execute($token, $node->name(), $node->dist())) {
                 $self->{error} = $sth->errstr;
                 return 0;
             }
@@ -439,21 +439,21 @@ sub removeTokens {
 sub setTokens {
     my $self = shift;
     my $tokens = shift;
-    my $group = shift;
+    my $node = shift;
     my $dbh = $self->{dbh};
 
-    if ($group->{type} and $group->{type} ne "configuration") {
+    if ($node->type() ne "configuration") {
         # group
-        my $stmt = "DELETE FROM $self->{schema}$group->{type}_tokens WHERE ";
-        if ($group->{type} eq "host") {
+        my $stmt = "DELETE FROM $self->{schema}".$node->type()."_tokens WHERE ";
+        if ($node->type() eq "host") {
             $stmt .= "host = ?";
-        } elsif ($group->{type} eq "distribution") {
+        } elsif ($node->type() eq "distribution") {
             $stmt .= "distribution = ?";
-        } elsif ($group->{type} eq "group") {
+        } elsif ($node->type() eq "group") {
             $stmt .= "group_name = ?";
         }
         my $sth = $dbh->prepare_cached($stmt);
-        unless ($sth->execute($group->{name})) {
+        unless ($sth->execute($node->name())) {
             $self->{error} = $sth->errstr;
             return undef;
         }
@@ -461,39 +461,35 @@ sub setTokens {
         #configuration
         my $stmt = "DELETE FROM $self->{schema}configuration_tokens WHERE configuration = ? AND distribution = ?";
         my $sth = $dbh->prepare_cached($stmt);
-        unless ($sth->execute($group->{name}, $group->{dist})) {
+        unless ($sth->execute($node->name(), $node->dist())) {
             $self->{error} = $sth->errstr;
             return undef;
         }
     }
 
-    return $self->addTokens($tokens, $group);
+    return $self->addTokens($tokens, $node);
 }
 
 sub getTokens {
     my $self = shift;
-    my @groupsAndConfigurations = @_;
+    my @nodes = @_;
     my $dbh = $self->{dbh};
     my $sth;
     my %tokens = ();    
-    foreach my $gorc (@groupsAndConfigurations) {
-        my $prefix;
-        if (defined $gorc->{type} and $gorc->{type} ne "configuration") {
-            # in the past, only groups had types
-            $prefix = $gorc->{type};
-            if ($gorc->{type} eq "group") {
+    foreach my $node (@nodes) {
+        my $prefix = $node->type();
+        if ($node->type() ne "configuration") {
+            if ($node->type() eq "group") {
                 $sth = $dbh->prepare_cached("SELECT key, value, type FROM $self->{schema}group_tokens WHERE group_name = ?");
-            } elsif ($gorc->{type} eq "distribution") {
+            } elsif ($node->type() eq "distribution") {
                 $sth = $dbh->prepare_cached("SELECT key, value, type FROM $self->{schema}distribution_tokens WHERE distribution = ?");
-            } elsif ($gorc->{type} eq "host") {
+            } elsif ($node->type() eq "host") {
                 $sth = $dbh->prepare_cached("SELECT key, value, type FROM $self->{schema}host_tokens WHERE host = ?");
             }
-            $sth->execute($gorc->{name})
+            $sth->execute($node->name())
         } else {
-            # configurations do not have types
-            $prefix = "configuration";
             $sth = $dbh->prepare_cached("SELECT key, value, type FROM $self->{schema}configuration_tokens WHERE configuration = ? AND distribution = ?");
-            $sth->execute($gorc->{name}, $gorc->{dist});
+            $sth->execute($node->name(), $node->dist());
         }
 
         if ($sth->err) {
@@ -502,7 +498,7 @@ sub getTokens {
         }
         
         if (my $rawTokens = $sth->fetchall_hashref("key")) {
-            @tokens{keys %$rawTokens} = map {{key => $_->{key}, value => $_->{value}, raw => $_->{value}, type => $_->{type}, source => "$prefix:$gorc->{name}"}} values %$rawTokens;
+            @tokens{keys %$rawTokens} = map {{key => $_->{key}, value => $_->{value}, raw => $_->{value}, type => $_->{type}, source => "$prefix:".$node->name()}} values %$rawTokens;
         } elsif ($sth->err) {
             $self->{error} = $sth->errstr;
             return undef;
@@ -517,19 +513,19 @@ sub getGroups {
     my $self = shift;
     my $group = shift;
 
-    my $stmt = "SELECT group_name FROM $self->{schema}$group->{type}_groups WHERE ";
-    if ($group->{type} eq "host") {
+    my $stmt = "SELECT group_name FROM $self->{schema}".$group->type()."_groups WHERE ";
+    if ($group->type() eq "host") {
         $stmt .= "host = ?";
-    } elsif ($group->{type} eq "group") {
+    } elsif ($group->type() eq "group") {
         $stmt .= "groupid = ?";
-    } elsif ($group->{type} eq "distribution") {
+    } elsif ($group->type() eq "distribution") {
         $stmt .= "distribution = ?";
     } else {
         $self->{error} = "Bad group";
         return undef;
     }
     $stmt .= " ORDER BY ordering";
-    return $self->getList($stmt, $group->{name});
+    return $self->getList($stmt, $group->name());
 }
 
 sub getMounts {
@@ -552,7 +548,7 @@ sub getMounts {
             chomp ($self->{error});
             return undef;
         }
-        push @mounts, map { +{destination => $_->[0], active => $_->[1], configuration => $configuration}} @$resultArray;
+        push @mounts, map {Staple::Mount->new({destination => $_->[0], active => $_->[1], configuration => $configuration})} @$resultArray;
     }
     return @mounts;   
 }
@@ -861,8 +857,8 @@ sub addMount {
     my $mount = shift;
     my $location = shift;
     my $stmt = "SELECT COUNT(destination) FROM $self->{schema}mounts WHERE configuration = ? AND distribution = ? AND destination = ? AND active = ?";
-    if ($self->count($stmt, $configuration->name(), $configuration->dist(), $mount->{destination}, $mount->{active})) {
-        $mount->{configuration} = $configuration;
+    if ($self->count($stmt, $configuration->name(), $configuration->dist(), $mount->destination(), $mount->active())) {
+        $mount->configuration($configuration);
         return undef unless $self->removeMounts($mount);
     }
     my $dbh = $self->{dbh};
@@ -873,7 +869,7 @@ sub addMount {
     } else {
         $location = $max + 1;
     }
-    return undef unless ($self->insert("$self->{schema}mounts", $mount->{destination}, $configuration->name(), $configuration->dist(), $mount->{active}, $location));
+    return undef unless ($self->insert("$self->{schema}mounts", $mount->destination(), $configuration->name(), $configuration->dist(), $mount->active(), $location));
     return 1;
 }
 
@@ -886,17 +882,17 @@ sub removeMounts {
     my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}mounts WHERE configuration = ? AND distribution = ? AND destination = ? AND active = ?");
     
     foreach my $mount (@mounts) {
-        my $location = $self->count("SELECT ordering FROM $self->{schema}mounts WHERE configuration = ? AND distribution = ? AND destination = ? AND active = ?", $mount->{configuration}->name(), $mount->{configuration}->dist(), $mount->{destination}, $mount->{active});
+        my $location = $self->count("SELECT ordering FROM $self->{schema}mounts WHERE configuration = ? AND distribution = ? AND destination = ? AND active = ?", $mount->configuration()->name(), $mount->configuration()->dist(), $mount->destination(), $mount->active());
         unless ($location) {
-            push @errors, "\"".($mount->{active} ? "+" : "-")."$mount->{destination}\" is not in \"".$mount->{configuration}->name()."\"";
+            push @errors, "\"".$mount->description()."\" is not in \"".$mount->configuration()->name()."\"";
             next;
         }
-        my $rv = $sth->execute($mount->{configuration}->name(), $mount->{configuration}->dist(), $mount->{destination}, $mount->{active});
+        my $rv = $sth->execute($mount->configuration()->name(), $mount->configuration()->dist(), $mount->destination(), $mount->active());
         if ($sth->errstr) {
             push @errors, $sth->errstr;
             next;
         } 
-        push @errors, $self->{error} unless ($self->closeOrdering($location, "$self->{schema}mounts", "configuration = ? AND distribution = ?", $mount->{configuration}->name(), $mount->{configuration}->dist()));
+        push @errors, $self->{error} unless ($self->closeOrdering($location, "$self->{schema}mounts", "configuration = ? AND distribution = ?", $mount->configuration()->name(), $mount->configuration()->dist()));
     }
     if (@errors) {
         $self->{error} = join "\n", @errors;
@@ -1009,8 +1005,8 @@ sub getGroupConfigurations {
     return undef unless $col;
 
     my $dbh = $self->{dbh};
-    my $sth = $dbh->prepare_cached("SELECT configuration, active FROM $self->{schema}$group->{type}_configurations WHERE $col = ? ORDER BY ordering");
-    unless ($sth->execute($group->{name})) {
+    my $sth = $dbh->prepare_cached("SELECT configuration, active FROM $self->{schema}".$group->type()."_configurations WHERE $col = ? ORDER BY ordering");
+    unless ($sth->execute($group->name())) {
         $self->{error} = $sth->errstr;
         chomp ($self->{error});
         return undef;
@@ -1032,19 +1028,19 @@ sub addGroupConfiguration {
     $location = int $location if $location;
     my $col;
     return undef unless $col = $self->getGroupColumn($group);
-    my $stmt = "SELECT COUNT(configuration) FROM $self->{schema}$group->{type}_configurations WHERE configuration = ? AND active = ? AND $col = ?";
-    if ($self->count($stmt, $configuration->name(), $configuration->active(), $group->{name})) {
+    my $stmt = "SELECT COUNT(configuration) FROM $self->{schema}".$group->type()."_configurations WHERE configuration = ? AND active = ? AND $col = ?";
+    if ($self->count($stmt, $configuration->name(), $configuration->active(), $group->name())) {
         return undef unless $self->removeGroupConfigurations($group, $configuration);
     }
     my $dbh = $self->{dbh};
-    my $max = $self->count("SELECT MAX(ordering) FROM $self->{schema}$group->{type}_configurations WHERE $col = ?", $group->{name});
+    my $max = $self->count("SELECT MAX(ordering) FROM $self->{schema}".$group->type()."_configurations WHERE $col = ?", $group->name());
     $max = 0 unless $max;
     if ($location and $max and $location <= $max) { 
-        return undef unless ($self->openOrdering($location, "$self->{schema}$group->{type}_configurations", "$col = ?", $group->{name}));
+        return undef unless ($self->openOrdering($location, "$self->{schema}".$group->type()."_configurations", "$col = ?", $group->name()));
     } else {
         $location = $max + 1;
     }
-    return undef unless ($self->insert("$self->{schema}$group->{type}_configurations ($col, configuration, ordering, active)", $group->{name}, $configuration->name(), $location, $configuration->active()));
+    return undef unless ($self->insert("$self->{schema}".$group->type()."_configurations ($col, configuration, ordering, active)", $group->name(), $configuration->name(), $location, $configuration->active()));
     return 1;
 }
 
@@ -1056,19 +1052,19 @@ sub removeGroupConfigurations {
     my @errors = ();
     return undef unless $col = $self->getGroupColumn($group);
     my $dbh = $self->{dbh};
-    my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}$group->{type}_configurations WHERE configuration = ? AND active = ? AND $col = ?");
+    my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}".$group->type()."_configurations WHERE configuration = ? AND active = ? AND $col = ?");
     foreach my $conf (@configurations) {
-        my $location = $self->count("SELECT ordering FROM $self->{schema}$group->{type}_configurations WHERE configuration = ? AND active = ? AND $col = ?", $conf->name(), $conf->active(), $group->{name});
+        my $location = $self->count("SELECT ordering FROM $self->{schema}".$group->type()."_configurations WHERE configuration = ? AND active = ? AND $col = ?", $conf->name(), $conf->active(), $group->name());
         unless ($location) {
-            push @errors, "\"".($conf->active() ? "+" : "-").$conf->name()."\" is not in \"$group->{name}\"";
+            push @errors, "\"".($conf->active() ? "+" : "-").$conf->name()."\" is not in \"".$group->name()."\"";
             next;
         }
-        my $rv = $sth->execute($conf->name(), $conf->active(), $group->{name});
+        my $rv = $sth->execute($conf->name(), $conf->active(), $group->name());
         if ($sth->errstr) {
             push @errors, $sth->errstr;
             next;
         }
-        push @errors, $self->{error} unless ($self->closeOrdering($location, "$self->{schema}$group->{type}_configurations", "$col = ?", $group->{name}));
+        push @errors, $self->{error} unless ($self->closeOrdering($location, "$self->{schema}".$group->type()."_configurations", "$col = ?", $group->name()));
     }
     if (@errors) {
         $self->{error} = join "\n", @errors;
@@ -1085,19 +1081,19 @@ sub addGroupGroup {
     $location = int $location if $location;
     my $col;
     return undef unless $col = $self->getGroupColumn($group);
-    my $stmt = "SELECT COUNT(group_name) FROM $self->{schema}$group->{type}_groups WHERE group_name = ? AND $col = ?";
-    if ($self->count($stmt, $name, $group->{name})) {
+    my $stmt = "SELECT COUNT(group_name) FROM $self->{schema}".$group->type()."_groups WHERE group_name = ? AND $col = ?";
+    if ($self->count($stmt, $name, $group->name())) {
         return undef unless $self->removeGroupGroups($group, $name);
     }
     my $dbh = $self->{dbh};
-    my $max = $self->count("SELECT MAX(ordering) FROM $self->{schema}$group->{type}_groups WHERE $col = ?", $group->{name});
+    my $max = $self->count("SELECT MAX(ordering) FROM $self->{schema}".$group->type()."_groups WHERE $col = ?", $group->name());
     $max = 0 unless $max;
     if ($location and $max and $location <= $max) { 
-        return undef unless ($self->openOrdering($location, "$self->{schema}$group->{type}_groups", "$col = ?", $group->{name}));
+        return undef unless ($self->openOrdering($location, "$self->{schema}".$group->type()."_groups", "$col = ?", $group->name()));
     } else {
         $location = $max + 1;
     }
-    return undef unless ($self->insert("$self->{schema}$group->{type}_groups", $group->{name}, $name, $location));
+    return undef unless ($self->insert("$self->{schema}".$group->type()."_groups", $group->name(), $name, $location));
     return 1;
 }
 
@@ -1109,19 +1105,19 @@ sub removeGroupGroups {
     my @errors = ();
     return undef unless $col = $self->getGroupColumn($group);
     my $dbh = $self->{dbh};
-    my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}$group->{type}_groups WHERE group_name = ? AND $col = ?");
+    my $sth = $dbh->prepare_cached("DELETE FROM $self->{schema}".$group->type()."_groups WHERE group_name = ? AND $col = ?");
     foreach my $name (@names) {
-        my $location = $self->count("SELECT ordering FROM $self->{schema}$group->{type}_groups WHERE group_name = ? AND $col = ?", $name, $group->{name});
+        my $location = $self->count("SELECT ordering FROM $self->{schema}".$group->type()."_groups WHERE group_name = ? AND $col = ?", $name, $group->name());
         unless ($location) {
-            push @errors, "\"$name\" is not in \"$group->{name}\"";
+            push @errors, "\"$name\" is not in \"".$group->name()."\"";
             next;
         }
-        my $rv = $sth->execute($name, $group->{name});
+        my $rv = $sth->execute($name, $group->name());
         if ($sth->errstr) {
             push @errors, $sth->errstr;
             next;
         } 
-        push @errors, $self->{error} unless ($self->closeOrdering($location, "$self->{schema}$group->{type}_groups", "$col = ?", $group->{name}));
+        push @errors, $self->{error} unless ($self->closeOrdering($location, "$self->{schema}".$group->type()."_groups", "$col = ?", $group->name()));
     }
     if (@errors) {
         $self->{error} = join "\n", @errors;
@@ -1430,19 +1426,19 @@ sub getHostPath {
 
 sub setNote {
     my $self = shift;
-    my $group = shift;
+    my $node = shift;
     my $note = shift;
-    my $col = $group->{type} eq "host" ? "host" : "name";
+    my $col = $node->type() eq "host" ? "host" : "name";
     my $dbh = $self->{dbh};
-    if ($group->{type} eq "configuration") {
+    if ($node->type() eq "configuration") {
         my $sth = $dbh->prepare_cached("UPDATE $self->{schema}configurations SET comment = ? WHERE name = ? AND distribution = ?");
-        unless ($sth->execute($note, $group->{name}, $group->{dist})) {
+        unless ($sth->execute($note, $node->name(), $node->dist())) {
             $self->{error} = $sth->errstr;
             return undef;
         }
     } else {
-        my $sth = $dbh->prepare_cached("UPDATE $self->{schema}$group->{type}s SET comment = ? WHERE $col = ?");
-        unless ($sth->execute($note, $group->{name})) {
+        my $sth = $dbh->prepare_cached("UPDATE $self->{schema}".$node->type()."s SET comment = ? WHERE $col = ?");
+        unless ($sth->execute($note, $node->name())) {
             $self->{error} = $sth->errstr;
             return undef;
         }
@@ -1452,16 +1448,16 @@ sub setNote {
 
 sub getNote {
     my $self = shift;
-    my $group = shift;
+    my $node = shift;
     my $note = "";
     $self->{error} = "";
-    if (ref $group and $group->{path}) {
-        if ($group->{type} eq "configuration") {
-            $note = $self->count("SELECT comment FROM $self->{schema}configurations WHERE name = ? AND distribution = ?", $group->{name}, $group->{dist});
+    if (ref $node and $node->path()) {
+        if ($node->type() eq "configuration") {
+            $note = $self->count("SELECT comment FROM $self->{schema}configurations WHERE name = ? AND distribution = ?", $node->name(), $node->dist());
             return undef if $self->{error};
         } else {
-            my $col = $group->{type} eq "host" ? "host" : "name";
-            $note = $self->count("SELECT comment FROM $self->{schema}$group->{type}s WHERE $col = ?", $group->{name});
+            my $col = $node->type() eq "host" ? "host" : "name";
+            $note = $self->count("SELECT comment FROM $self->{schema}".$node->type()."s WHERE $col = ?", $node->name());
             return undef if $self->{error};
         }
         $note = "" unless defined $note;
@@ -1600,18 +1596,18 @@ sub closeOrdering {
     return 1;
 }
 
-# input: qualified group
-# output: host, distribution, groupid or conf_id, depending on the group type
+# input: node
+# output: host, distribution, groupid or conf_id, depending on the node type
 sub getGroupColumn {
     my $self = shift;
-    my $group = shift;
-    if ($group->{type} eq "host") {
+    my $node = shift;
+    if ($node->type() eq "host") {
         return "host";
-    } elsif ($group->{type} eq "group") {
+    } elsif ($node->type() eq "group") {
         return "groupid";
-    } elsif ($group->{type} eq "distribution") {
+    } elsif ($node->type() eq "distribution") {
         return "distribution";
-    } elsif ($group->{type} eq "configuration") {
+    } elsif ($node->type() eq "configuration") {
         return "conf_id";
     }
     $self->{error} = "Bad group";
