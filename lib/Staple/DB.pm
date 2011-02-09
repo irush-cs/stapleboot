@@ -1162,7 +1162,7 @@ sub getHostGroup {
     my $self = shift;
     my $host = shift;
     my $hostPath = $self->getHostPath($host);
-    return Staple::Host->new({name => $host, path => $hostPath}) if $hostPath;
+    return (Staple::Host->new({name => $host, path => $hostPath}))[0] if $hostPath;
     $self->{error} = "Host \"$host\" does not exist";
     return undef;
 }
