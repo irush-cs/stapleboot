@@ -612,7 +612,7 @@ sub getCompleteConfigurations {
     my %final = ();
     # _source, the originating confs (list ref)
     # _done, the stage: undef, super, recursive
-    map {$_->{_source} = [$_->{name}]} @remaining;
+    map {$_->{_source} = [$_->name()]} @remaining;
     while (@remaining) {
         my $conf = shift @remaining;
         #use Data::Dumper;

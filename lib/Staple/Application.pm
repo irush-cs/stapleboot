@@ -276,8 +276,8 @@ sub applyScripts {
     foreach my $script (@scripts) {
         my $data = $script->data();
         if ($script->error()) {
-            $self->error("Failed getting ".$script->configuration()->{name}."/".$script->name()." (".$script->error().")");
-            my $body = "Failed getting ".$script->configuration()->{name}."/".$script->stage()."/".$script->name().":\n".$script->error()."\n\n";
+            $self->error("Failed getting ".$script->configuration()->name()."/".$script->name()." (".$script->error().")");
+            my $body = "Failed getting ".$script->configuration()->name()."/".$script->stage()."/".$script->name().":\n".$script->error()."\n\n";
             if ($script->critical()) {
                 $self->addMail("Critical script failed!\n\n$body");
                 $self->doCriticalAction();
@@ -290,13 +290,13 @@ sub applyScripts {
         if ($script->source()) {
             push @{$self->{applied}->{scripts}}, $script->source();
         } else {
-            push @{$self->{applied}->{scripts}}, "$self->{distribution}:".$script->configuration()->{name}."/".$script->stage()."/".$script->name();
+            push @{$self->{applied}->{scripts}}, "$self->{distribution}:".$script->configuration()->name()."/".$script->stage()."/".$script->name();
         }
         
         if ($script->tokens()) {
             $tokens->{__AUTO_CONFIGURATION__} = {key => "__AUTO_CONFIGURATION__",
-                                                 value => $script->configuration()->{name},
-                                                 raw => $script->configuration()->{name},
+                                                 value => $script->configuration()->name(),
+                                                 raw => $script->configuration()->name(),
                                                  type => "static",
                                                  source => "auto"};
             $tokens->{__AUTO_SCRIPT__} = {key => "__AUTO_SCRIPT__",
@@ -328,8 +328,8 @@ sub applyScripts {
         chomp $scriptError if $scriptError;
         $self->output($script->name()." error:\n$scriptError") if $scriptError and $self->{verbose} == 1;
         if ($scriptExit) {
-            $self->error($script->configuration()->{name}."/".$script->name()." failed ($scriptExit)");
-            my $body = $script->configuration()->{name}."/".$script->stage()."/".$script->name()." failed with exit code: $scriptExit\n\n";
+            $self->error($script->configuration()->name()."/".$script->name()." failed ($scriptExit)");
+            my $body = $script->configuration()->name()."/".$script->stage()."/".$script->name()." failed with exit code: $scriptExit\n\n";
             $body .= "output:\n-------\n$scriptOutput\n\n" if $scriptOutput;
             $body .= "error:\n------\n$scriptError\n\n" if $scriptError;
             if ($script->critical()) {
@@ -339,7 +339,7 @@ sub applyScripts {
                 $self->addMail("$body");
             }
         } elsif ($scriptError) {
-            my $err = $script->configuration()->{name}."/".$script->stage()."/".$script->name()." gave some errors:\n\n";
+            my $err = $script->configuration()->name()."/".$script->stage()."/".$script->name()." gave some errors:\n\n";
             $err .= "output:\n-------\n$scriptOutput\n\n" if $scriptOutput;
             $err .= "error:\n------\n$scriptError\n\n" if $scriptError;
             $self->addMail($err);
@@ -363,7 +363,7 @@ sub applyScripts {
             foreach my $token (values %rawTokens) {
                 $token->{key} =~ s/^#/_/;
             }
-            map {$_->{source} = "script:".$script->configuration()->{name}."/".$script->stage()."/".$script->name()} values %newTokens;
+            map {$_->{source} = "script:".$script->configuration()->name()."/".$script->stage()."/".$script->name()} values %newTokens;
             @$tokens{keys %newTokens} = values %newTokens;
             # setTokens for updateData
             $self->setTokens({$self->{db}->getCompleteTokens($tokens, $self->{host}, $self->{distribution})});
@@ -389,8 +389,8 @@ sub applyAutos {
     foreach my $auto (@{$self->{autos}}) {
         my $data = $auto->data();
         if ($auto->error()) {
-            $self->error("Failed getting ".$auto->configuration()->{name}."/".$auto->name()." (".$auto->error().")");
-            my $body = "Failed getting ".$auto->configuration()->{name}."/".$auto->name().":\n".$auto->error()."\n\n";
+            $self->error("Failed getting ".$auto->configuration()->name()."/".$auto->name()." (".$auto->error().")");
+            my $body = "Failed getting ".$auto->configuration()->name()."/".$auto->name().":\n".$auto->error()."\n\n";
             if ($auto->critical()) {
                 $self->addMail("Critical auto failed!\n\n$body");
                 $self->doCriticalAction();
@@ -404,7 +404,7 @@ sub applyAutos {
         if ($auto->source()) {
             $autoname = $auto->source();
         } else {
-            $autoname = "$self->{distribution}:".$auto->configuration()->{name}."/".$auto->{name};
+            $autoname = "$self->{distribution}:".$auto->configuration()->name()."/".$auto->name();
         }
         
         if ($auto->tokens()) {
@@ -422,9 +422,9 @@ sub applyAutos {
         my ($autoExit, $autoOutput, $autoError) = runCommand($runnable);
         $self->{applied}->{autos}->{$autoname} = [split /\n/, $autoOutput];
         push @groups, @{$self->{applied}->{autos}->{$autoname}};
-        $self->error($auto->configuration()->{name}."/".$auto->name()." failed ($autoExit)") if $autoExit;
-        $self->error($auto->configuration()->{name}."/".$auto->name()."\n$autoError") if $autoError;
-        $self->addMail($auto->configuration()->{name}."/".$auto->name()." failed:\nerror: $autoError\n exit code: $autoExit;") if $autoError or $autoExit;
+        $self->error($auto->configuration()->name()."/".$auto->name()." failed ($autoExit)") if $autoExit;
+        $self->error($auto->configuration()->name()."/".$auto->name()."\n$autoError") if $autoError;
+        $self->addMail($auto->configuration()->name()."/".$auto->name()." failed:\nerror: $autoError\n exit code: $autoExit;") if $autoError or $autoExit;
     }
     unlink @toDelete unless $self->{debug};
     @groups = grep {$_} @groups;
@@ -444,7 +444,7 @@ sub applyTemplates {
     my $stage = shift;
     foreach my $template (@{$self->{templates}}) {
         next if $template->stage() ne $stage;
-        my $configurationPath = $template->configuration()->{path}."/templates/$stage";
+        my $configurationPath = $template->configuration()->path()."/templates/$stage";
         
         my $data = $template->data();
         if ($template->error()) {
@@ -454,8 +454,8 @@ sub applyTemplates {
         }
 
         $self->{tokens}->{__AUTO_CONFIGURATION__} = {key => "__AUTO_CONFIGURATION__",
-                                                     value => $template->configuration()->{name},
-                                                     raw => $template->configuration()->{name},
+                                                     value => $template->configuration()->name(),
+                                                     raw => $template->configuration()->name(),
                                                      type => "auto"};
         $data = applyTokens($data, $self->{tokens});
         delete $self->{tokens}->{__AUTO_CONFIGURATION__};
@@ -491,7 +491,7 @@ sub applyTemplates {
             }
         } else {
             $self->error("applyTemplates error (".$template->destination()."): $!");
-            $self->addMail("Error coping template ".$template->destination()." from ".$template->configuration()->{name}.": $!");
+            $self->addMail("Error coping template ".$template->destination()." from ".$template->configuration()->name().": $!");
         }
     }
 }

@@ -50,6 +50,7 @@ sub new {
     $self->{stapleDir} = $path;
     bless ($self, $class);
     $self->setTmpDir("$path/tmp");
+    #opendir($self->{openeddir}, $self->{stapleDir});
     return $self;
 }
 

@@ -242,13 +242,13 @@ if (@badConfigurations) {
 }
 
 if (scalar @{$stapler->{groups}} > 0) {
-    $stapler->output("groups:\n".join("\n", map {"  $_->{name}"} @{$stapler->{groups}}));
+    $stapler->output("groups:\n".join("\n", map {"  ".$_->name()} @{$stapler->{groups}}));
 } else {
     $stapler->output("no groups");
 }
 
 if (scalar @{$stapler->{configurations}} > 0) {
-    $stapler->output("configurations:\n".join("\n", map {"  $_->{name}"} @{$stapler->{configurations}}));
+    $stapler->output("configurations:\n".join("\n", map {"  ".$_->name()} @{$stapler->{configurations}}));
 } else {
     $stapler->output("no configurations");
 }

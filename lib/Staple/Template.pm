@@ -173,7 +173,7 @@ sub description {
         $result .= "  data => ".($self->{data} ? "(trimmed)" : "(undef)")."\n";
         $result .= "  destination => $self->{destination}\n";
         $result .= "  stage => $self->{stage}\n";
-        $result .= "  configuration => ".($self->{configuration} ? $self->{configuration}->{name} : "(undef)")."\n";
+        $result .= "  configuration => ".($self->{configuration} ? $self->{configuration}->name() : "(undef)")."\n";
         $result .= "  mode => ".sprintf("%04o", $self->{mode})."\n";
         $result .= "  gid => $self->{gid}\n";
         $result .= "  uid => $self->{uid}\n";

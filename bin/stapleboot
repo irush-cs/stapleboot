@@ -137,12 +137,8 @@ sub debug {
                     printPager(tokensToXML($boot->{tokens}));
                 } elsif ($line eq "mounts") {
                     my @temp = @{$boot->{mounts}};
-                    my $temp = "";
-                    foreach my $mount (@temp) {
-                        $temp .= "   $mount->{destination}";
-                        $temp .= ":\n". join "\n", map {"      $_ => ".(ref $mount->{$_} ? $mount->{$_}->{name} : $mount->{$_})} keys %$mount;
-                        $temp .= "\n";
-                    }
+                    my $temp = join("\n", map {$_->description(1)} @temp);
+                    $temp .= "\n";
                     printPager($temp);
                 } elsif ($line eq "templates") {
                     my @temp = @{$boot->{templates}};
@@ -152,12 +148,12 @@ sub debug {
                 } elsif ($line eq "configurations") {
                     my @temp = @{$boot->{configurations}};
                     my $temp = "";
-                    $temp .= join "\n", map {"   $_->{name}"} @temp;
+                    $temp .= join "\n", map {"   ".$_->name()} @temp;
                     printPager($temp);
                 } elsif ($line eq "groups") {
                     my @temp = @{$boot->{groups}};
                     my $temp = "";
-                    $temp .= join "\n", map {"   $_->{name}"} @temp;
+                    $temp .= join "\n", map {"   ".$_->name()} @temp;
                     $temp .= "\n";
                     printPager($temp);
                 } elsif ($line eq "scripts") {
@@ -430,9 +426,9 @@ sub finalStage {
                 print LOG "distribution: $boot->{distribution} (".$boot->{db}->getDistributionVersion($boot->{distribution}).")\n";
                 print LOG "kernel: ".`uname -smr`;
                 print LOG "\ngroups:\n";
-                print LOG join "", map {"  $_->{name}\n"} @{$boot->{groups}};
+                print LOG join "", map {"  ".$_->name()."\n"} @{$boot->{groups}};
                 print LOG "\nconfigurations:\n";
-                print LOG join "", map {"  $_->{name}\n"} @{$boot->{configurations}};
+                print LOG join "", map {"  ".$_->name()."\n"} @{$boot->{configurations}};
                 print LOG "\nautos:\n";
                 foreach my $auto (keys %{$boot->{applied}->{autos}}) {
                     print LOG "  $auto\n";
@@ -449,7 +445,7 @@ sub finalStage {
                     print LOG "\nbad mounts:\n";
                     foreach my $mount (@$badMounts) {
                         print LOG "  $mount->{destination}\n";
-                        print LOG "    configuration: ".$mount->{configuration}->name()."\n";
+                        print LOG "    configuration: ".$mount->configuration()->name()."\n";
                         print LOG "    command: $mount->{_cmd}\n";
                         print LOG "    status: $mount->{_status}\n";
                     }

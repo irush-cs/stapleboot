@@ -193,7 +193,7 @@ sub description {
         $result .= "  data => ".($self->{data} ? "(trimmed)" : "(undef)")."\n";
         $result .= "  name => $self->{name}\n";
         $result .= "  stage => $self->{stage}\n";
-        $result .= "  configuration => ".($self->{configuration} ? $self->{configuration}->{name} : "(undef)")."\n";
+        $result .= "  configuration => ".($self->{configuration} ? $self->{configuration}->name() : "(undef)")."\n";
         $result .= "  order => $self->{order}\n";
         $result .= "  critical => $self->{critical}\n";
         $result .= "  tokens => $self->{tokens}\n";

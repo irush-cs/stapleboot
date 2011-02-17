@@ -695,14 +695,14 @@ sub addScripts {
         }
 
         $self->{error} = "";
-        my $location = $self->count("SELECT COUNT(*) FROM $self->{schema}scripts WHERE configuration = ? AND distribution = ? AND stage = ?", $script->configuration()->{name}, $script->configuration()->{dist}, $script->stage());
+        my $location = $self->count("SELECT COUNT(*) FROM $self->{schema}scripts WHERE configuration = ? AND distribution = ? AND stage = ?", $script->configuration()->name(), $script->configuration()->dist(), $script->stage());
         if ($self->{error}) {
             push @errors, "addScripts: ".$self->{error};
             next;
         }
         $location = 0 unless $location;
         $script->order($location + 1) if not defined $script->order() or $script->order() > $location or $script->order() < 1;
-        unless ($self->openOrdering($script->order(), "$self->{schema}scripts", "configuration = ? AND distribution = ? AND stage = ?", $script->configuration()->{name}, $script->configuration()->{dist}, $script->stage())) {
+        unless ($self->openOrdering($script->order(), "$self->{schema}scripts", "configuration = ? AND distribution = ? AND stage = ?", $script->configuration()->name(), $script->configuration()->dist(), $script->stage())) {
             push @errors, "addScripts: ".$self->{error};
             next;
         }
@@ -711,8 +711,8 @@ sub addScripts {
                               (($self->{saveData} or not $script->source()) ?
                                ("", $script->data()) :
                                ($script->source(), "")), 
-                              $script->configuration()->{name},
-                              $script->configuration()->{dist},
+                              $script->configuration()->name(),
+                              $script->configuration()->dist(),
                               $script->stage(),
                               $script->order(),
                               $script->critical(),

@@ -1192,7 +1192,7 @@ Removes {+|-}<configuration2> from <configuration1>'s list of configurations.
 ",
 );
 
-my @singleCommandCommands = ("ahc", "rhc", "gag", "ghc", "wht", "whc", "whg", "ghi", "ggi", "gci", "bad", "badcommandorfilename", "gt", "gdt", "gct", "gah", "gac", "gas", "gss", "gts", "gm", "ah", "gad", "ghn", "ggn", "gdn", "gcn", "debug", "undebug", "ndb", "ghg", "ght", "gdb", "ggg", "ggc", "ggt", "gcc");
+my @singleCommandCommands = ("ahc", "rhc", "gag", "ghc", "wht", "whc", "whg", "ghi", "ggi", "gci", "bad", "badcommandorfilename", "gt", "gdt", "gct", "gah", "gac", "gas", "gss", "gts", "gm", "ah", "gad", "ghn", "ggn", "gdn", "gcn", "debug", "undebug", "ndb", "ghg", "ght", "gdb", "ggg", "ggc", "ggt", "gcc", "ga", "gs");
 
 sub help {
     my %topics = (a              => "helpall",
@@ -1452,11 +1452,11 @@ sub whc {
         return;
     }
     foreach my $type ("host", "distribution", "group", "configuration") {
-        my @subset = grep {$_->{type} eq $type} @groups;
+        my @subset = grep {$_->type() eq $type} @groups;
         if (@subset) {
             print "${type}s:\n";
-            print join("", map {"  $_->{name}\n"} sort {$a->{name} cmp $b->{name}}  @subset);
-            print "\n";
+            print join("\n", map {"  ".$_->name()} sort {$a->name() cmp $b->name()}  @subset);
+            print "\n\n";
         }
     }
 }
@@ -1482,11 +1482,11 @@ sub whg {
         return;
     }
     foreach my $type ("host", "distribution", "group") {
-        my @subset = grep {$_->{type} eq $type} @groups;
+        my @subset = grep {$_->type() eq $type} @groups;
         if (@subset) {
             print "${type}s:\n";
-            print join("", map {"  $_->{name}\n"} sort {$a->{name} cmp $b->{name}} @subset);
-            print "\n";
+            print join("\n", map {"  ".$_->name()} sort {$a->name() cmp $b->name()} @subset);
+            print "\n\n";
         }
     }
 }
@@ -1714,8 +1714,8 @@ sub ggi {
     my @groups_names = splitData($group_name);
     my @groups = $db->getGroupsByName(@groups_names);
     foreach my $group (@groups) {
-        print "$group->{name}:\n";
-        print "-" x length($group->{name});
+        print $group->name().":\n";
+        print "-" x length($group->name());
         print "\n";
         #print "Path: $group->{path}\n";
         if (keys %{$db->getTokens($group)}) {

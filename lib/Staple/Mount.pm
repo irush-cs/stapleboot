@@ -346,6 +346,8 @@ Returns a string describing this mount. I<level> will specify the format:
 
 =item 0 - Default, short, one line: [+|-]destination
 
+=item 1 - Long
+
 =back
 
 =cut
@@ -355,17 +357,23 @@ sub description {
     my $level = shift;
     my $result = "";
     if ($level) {
-        #$result .= "$self->{name}:\n";
-        #$result .= "  source => $self->{source}\n";
-        #$result .= "  data => ".($self->{data} ? "(trimmed)" : "(undef)")."\n";
-        #$result .= "  name => $self->{name}\n";
-        #$result .= "  stage => $self->{stage}\n";
-        #$result .= "  configuration => ".($self->{configuration} ? $self->{configuration}->{name} : "(undef)")."\n";
-        #$result .= "  order => $self->{order}\n";
-        #$result .= "  critical => $self->{critical}\n";
-        #$result .= "  tokens => $self->{tokens}\n";
-        #$result .= "  tokenScript => $self->{tokenScript}\n";
-        #$result .= "  note => ".($self->{note} ? $self->{note} : "(undef)")."\n";
+        $result .= "$self->{destination}:\n";
+        $result .= "  active => $self->{active}\n";
+        $result .= "  configuration => ".($self->{configuration} ? $self->{configuration}->name() : "(undef)")."\n";
+        $result .= "  copyExclude => $self->{copyExclude}\n";
+        $result .= "  copyFiles => $self->{copyFiles}\n";
+        $result .= "  copySource => $self->{copySource}\n";
+        $result .= "  critical => $self->{critical}\n";
+        $result .= "  destination => $self->{destination}\n";
+        $result .= "  fsck => $self->{fsck}\n";
+        $result .= "  fsckCommand => $self->{fsckCommand}\n";
+        $result .= "  fsckExitOK => $self->{fsckExitOK}\n";
+        $result .= "  manual => $self->{manual}\n";
+        $result .= "  next => $self->{next}\n";
+        $result .= "  options => $self->{options}\n";
+        $result .= "  permissions => $self->{permissions}\n";
+        $result .= "  source => $self->{source}\n";
+        $result .= "  type => $self->{type}\n";
     } else {
         $result .= ($self->{active} ?  "+" : "-").$self->{destination};
     }
