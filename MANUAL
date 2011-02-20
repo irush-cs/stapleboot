@@ -46,6 +46,7 @@ Table of Contents
   7.1. Databases
   7.1.1. Staple::DB::FS
   7.1.2. Staple::DB::SQL
+  7.1.3. Staple::DB::FSQL
   7.2. Modules
   7.3. Internal Data Structures
   7.3.1. Hashes
@@ -120,12 +121,14 @@ Setting - A single setting. An abstract name that can be either autogroup,
 3.1. Database 
 --------------
 
-Staple currently supports two types of databases: filesystem (aka fs) and sql
-database. These are the back-ends where staple saves its configurations. fs is
-the default and easier to maintain. Whatever database is used, it should be
-available at boot, if it's fs, it should be mounted before stapleboot runs. The
-fs database can be located on the distribution itself, however for several
-distributions it is best to keep it outside and mount it at boot.
+Staple currently supports three types of databases: filesystem (aka fs), sql
+and fsql. These are the back-ends where staple saves its configurations. fs is
+the default and easier to maintain and poke around; sql uses an sql database;
+and fsql is a combination where some data is saved in a database and some on a
+filesystem. Whatever database is used, it should be available at boot, e.g. if
+it's fs, it should be mounted before stapleboot runs. The fs database can be
+located on the distribution itself, however for several distributions it is
+best to keep it outside and mount it at boot.
 
 3.2. Libraries
 ---------------
@@ -544,10 +547,10 @@ to the staple's tmp directory (which can be read by later scripts). This is the
 only exception, tokens are currently not substituted in the templates'
 destinations.
 
-Note for using the fs database, the database keeps the templates as files with
-their proper mode, uid and gid. As such if e.g. the staple database is nfs
-mounted with root squash, templates which are root read-only, will fail to be
-copied.
+Note for using the fs and fsql database, the database keeps the templates as
+files with their proper mode, uid and gid. As such if e.g. the staple database
+is nfs mounted with root squash, templates which are root read-only, will fail
+to be copied.
 
 
 5.4. Scripts
@@ -855,6 +858,24 @@ for distributions, table for groups, table for scripts, table for a group's
 configuration list, etc.). For the create tables commands, see
 lib/Staple/DB/SQL/Init.pm or misc/sqlcommands.sql.
 
+7.1.3. Staple::DB::FSQL
+------------------------
+
+Staple::DB::FSQL saves the metadata in an sql database, and the files
+(templates, scripts and autos) in a filesystem. This simplifies the searches
+and the database handling.
+
+The sql database is the same as Staple::DB::SQL with the exception that the
+files are saved with relative links (to the staple directory). The default sql
+database is sqlite in the staple directory (both features allows a simple copy
+would work).
+
+The directory structure of the filesystem is basically the configuration trees
+(starting with common or the distribution). Inside each directory there are the
+subdirectories and the templates, scripts and auto scripts prefixed with
+numbers. As the additional information (permissions, stage, critical, tokens,
+etc.) is done in the sql database, no other information is needed and the
+numbering is just used for uniqueness.
 
 
 7.2. Modules
@@ -869,8 +890,8 @@ Staple.pm - Originally the base module. Now includes mostly the documentation
 
 Staple/DB.pm - The abstract database class. Controls all aspects of database.
 
-Staple/DB/* - The different concrete database classes. Currently FS.pm and
-              SQL.pm.
+Staple/DB/* - The different concrete database classes. Currently FS.pm, SQL.pm
+              and FSQL.pm.
 
 Staple/DBFactory.pm - Factory functions for creating database instances.
 
@@ -918,9 +939,9 @@ the backend). Most of them heve internal/perldoc documentation.
 Staple::DB 
 
   This class hierarchy is used for managing the backend database. There are
-  currently two databases Staple::DB::FS and Staple::DB::SQL (There's also the
-  pseudo Staple::DB::Error database which is what returned in case a real
-  database can't be created).
+  currently three databases Staple::DB::FS, Staple::DB::SQL and
+  Staple::DB::FSQL (There's also the pseudo Staple::DB::Error database which is
+  what returned in case a real database can't be created).
 
 Staple::Application 
 

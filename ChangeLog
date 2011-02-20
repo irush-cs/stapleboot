@@ -1,5 +1,6 @@
 staple 006snap
 
+	* new DB::FSQL database backend 
 	* Better support for sqlite on the sql database.
 	* Faster sync function which works with configuration's configurations list (with some bug fixes)
 	* Fixed DB::SQL (sql db) to properly support common configuration in the configuration's configurations list
