@@ -391,7 +391,7 @@ sub removeAutos {
             push @errors, "Auto \"".$auto->name().\" does not exist in the configuration \"".$auto->configuration()->name()."\"";
             next;
         }
-        unless ($self->SUPER::removeAuto($auto)) {
+        unless ($self->SUPER::removeAutos($auto)) {
             push @errors, $self->{error};
             next;
         }
