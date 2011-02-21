@@ -16,6 +16,7 @@ use File::Path;
 use Staple::Template;
 use Staple::Script;
 use Staple::Mount;
+use Staple::DBFactory;
 
 our @ISA = ("Staple::DB");
 our $VERSION = '006snap';

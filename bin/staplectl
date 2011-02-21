@@ -3671,6 +3671,10 @@ sub sd {
 }
 
 sub ndb {
+    unless (@_) {
+        perror "Must specify a database to create\n";
+        return;
+    }
     sdb2(createDBinit(@_));
 }
 
