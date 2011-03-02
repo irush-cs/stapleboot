@@ -1129,7 +1129,7 @@ sub getDistributionGroup {
     my $self = shift;
     my $distribution = shift;
     my $path = $self->getDistributionPath($distribution);
-    return Staple::Distribution->new({name => $distribution, path => $path}) if $path;
+    return (Staple::Distribution->new({name => $distribution, path => $path}))[0] if $path;
     $self->{error} = "Distribution \"$distribution\" does not exist";
     return undef;
 }
