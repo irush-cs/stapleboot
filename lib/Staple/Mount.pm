@@ -84,6 +84,8 @@ to attrs. Attributes can be:
 
 =item I<copyFiles>      - The files to copy from the source (defaults to .)
 
+=item I<copyLinks>      - Files to symlink instead of copy
+
 =item I<copyExclude>    - The fiels to exclude from the source (default to "")
 
 =item I<manual>         - Whether to manually mount (1) or just write an fstab entry (0)
@@ -121,6 +123,7 @@ sub init {
     $self->{configuration} = $attr{configuration};
     $self->{copySource} = $attr{copySource};
     $self->{copyFiles} = $attr{copyFiles};
+    $self->{copyLinks} = $attr{copyLinks};
     $self->{copyExclude} = $attr{copyExclude};
     $self->{manual} = $attr{manual};
     $self->{fsck} = $attr{fsck};
@@ -249,6 +252,18 @@ I<copyFiles> is undef don't change it, just return the current one.
 sub copyFiles {
     my $self = shift;
     return $self->param("copyFiles", shift);
+}
+
+=item B<copyLinks(I<copyLinks>)>
+
+Sets this mount's copyLinks (string), and returns the previous copyLinks. If
+I<copyLinks> is undef don't change it, just return the current one.
+
+=cut
+
+sub copyLinks {
+    my $self = shift;
+    return $self->param("copyLinks", shift);
 }
 
 =item B<copyExclude(I<copyExclude>)>
