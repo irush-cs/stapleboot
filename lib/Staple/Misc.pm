@@ -424,16 +424,20 @@ sub writeTokensFile {
     return undef;
 }
 
-=item B<readTokensXMLFile(I<full path>)>
+=item B<readTokensXMLFile(I<full path, [keep source]>)>
 
 Returns a tokens hash, with value = raw if either is missing (though there
 shouldn't be "value" in a file), and type = static if missing (though it
 should be in an xml file format). Returns undef on error.
 
+if I<keep source> is true, and the tokens in the file have "source", the source
+will be kept. otherwise, the source is I<file:path>. The default is false.
+
 =cut
 
 sub readTokensXMLFile {
     my $file = shift;
+    my $keepsource = shift;
     return undef unless $file and -e $file;
     #my $tokens = XMLin($file, "keyattr" => {"token" => "+key"}, "forcearray" => ["token"]);
     my $tokens = _parseXML($file);
@@ -444,7 +448,7 @@ sub readTokensXMLFile {
         $tokens->{$key}->{raw} = $tokens->{$key}->{value} unless exists $tokens->{$key}->{raw};
         $tokens->{$key}->{value} = $tokens->{$key}->{raw} unless exists $tokens->{$key}->{value};
         $tokens->{$key}->{type} = "static" unless exists $tokens->{$key}->{type};
-        $tokens->{$key}->{source} = "file:$file";
+        $tokens->{$key}->{source} = "file:$file" unless exists $tokens->{$key}->{source} and $keepsource;
     }
     return %$tokens;
 }

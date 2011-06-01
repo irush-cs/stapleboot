@@ -532,6 +532,9 @@ __AUTO_STAGE__: For scripts and templates, this token is holds the staple's
                 is one of: auto, mount, sysinit or final. This token cannot
                 appear in dynamic or regexp tokens.
 
+__AUTO_STAPLE_LIB__: The staple library location. Useful for perl scripts that
+                     wants to use staple functions such as the
+                     Staple::Misc::readTokensXMLFile.
 
 5.3. Templates
 ---------------
@@ -567,7 +570,7 @@ method for scripts to get tokens is through the /__AUTO_TMP__/tokens.xml
 file. This file is a dump of all the current tokens for read only purposes
 (stapleboot doesn't reread this file). Perl scripts can use
 Staple::Misc::readTokensXMLFile("/__AUTO_TMP__/tokens.xml") to get the tokens
-hash.
+hash. The staple installation is at __AUTO_STAPLE_LIB__.
 
 A script can be defined as a token script (not to confuse with tokens
 substitution). These scripts' output should be a valid token file, which

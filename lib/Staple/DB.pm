@@ -1242,6 +1242,9 @@ sub getCompleteTokens {
     $tokens{__AUTO_DISTRIBUTION__} = {key => "__AUTO_DISTRIBUTION__", value => $distribution, raw => $distribution, type => "static", source => "auto"} if $distribution;
     $tokens{__AUTO_HOSTNAME__} = {key => "__AUTO_HOSTNAME__", value => $host, raw => $host, type => "static", source => "auto"} if $host;
     $tokens{__AUTO_TMP__} = {key => "__AUTO_TMP__", value => $self->getTmpDir(), raw => $self->getTmpDir(), type => "static", source => "auto"};
+    $tokens{__AUTO_STAPLE_LIB__} = {key => "__AUTO_STAPLE_LIB__", value => $INC{"Staple.pm"}, type => "static", source => "auto"};
+    $tokens{__AUTO_STAPLE_LIB__}{value} =~ s,/Staple.pm$,,;
+    $tokens{__AUTO_STAPLE_LIB__}{raw} = $tokens{__AUTO_STAPLE_LIB__}{value};
     #$tokens{__AUTO_IP__} = $ip;
     %tokens = setDefaultTokens(\%tokens, \%Staple::defaultTokens);
     %tokens = verifyTokens(\%tokens, \%Staple::allowedTokensValues);
