@@ -75,6 +75,7 @@ my %commands = (
                 ua => \&ua,
                 cc => \&cc,
                 cs => \&cs,
+                ct => \&ct,
 
                 act => \&act,
                 adt => \&adt,
@@ -181,6 +182,7 @@ my %commandMap = (
                   ua                               => "ua",
                   cc                               => "cc",
                   cs                               => "cs",
+                  ct                               => "ct",
 
                   act                              => "act",
                   adt                              => "adt",
@@ -319,6 +321,7 @@ my %commandMap = (
                   getdistributioninfo              => "gdi",
                   copyconfiguration                => "cc",
                   copyscript                       => "cs",
+                  copytemplate                     => "ct",
                   hangman                          => "hangman",
                   debug                            => "debug",
                   undebug                          => "undebug",
@@ -423,6 +426,7 @@ my %commandCompletionMap =
    sync      => [],
    cc        => [\&configuration_completion, \&distribution_completion, \&distribution_completion],
    cs        => [\&distribution_completion, \&dist_configuration_completion, \&script_stage_completion, \&script_completion, \&distribution_completion, \&dist_configuration_completion, \&script_stage_completion, \&script_completion],
+   ct        => [\&distribution_completion, \&dist_configuration_completion, \&template_stage_completion, \&template_completion, \&distribution_completion, \&dist_configuration_completion, \&template_stage_completion, \&template_completion],
    hangman   => [],
    debug     => [\&host_completion],
    undebug   => [\&host_completion],
@@ -632,6 +636,16 @@ and <distribution2> can be the same to move a script between different
 configurations in the same distribution. If any of the optional destination
 parameters are missing, they're assumed to be the same is the source. If
 location2 is omitted, the script will be copied at the end.
+",
+                    ct => "
+name: ct | copy template
+parameters: <distribution1> <configuration1> <stage1> <template1> <distribution2> [<configuration2> [<stage2> [<template2>]]]
+  stage: auto | mount | sysinit | final
+
+Copies a single template from <distribution1> to <distribution2>. <distribution1>
+and <distribution2> can be the same to move a template between different
+configurations in the same distribution. If any of the optional destination
+parameters are missing, they're assumed to be the same is the source. 
 ",
                     act => "
 name: act | add configuration token
@@ -1137,6 +1151,7 @@ Configuration commands:
    ua  | update auto <conf> <auto> 
    cc  | copy configuration <conf> <from> <to> 
    cs  | copy script <dist1> <conf1> <stage1> {<script>|<loc>} <dist2> [<conf2> [<stage2> [<script2> [<loc2>]]]]
+   ct  | copy template <dist1> <conf1> <stage1> {<template>|<loc>} <dist2> [<conf2> [<stage2> [<template2> [<loc2>]]]]
    whc | who has configuration <conf>
    acc | add configuration configuration <conf> {+|-}<conf> [<location>]
    gcc | get configuration configurations <conf>
@@ -1645,6 +1660,94 @@ sub cs {
     $script{tokens} = $script1->tokens();
     $script{tokenScript} = $script1->tokenScript();
     perror $db->{error}."\n" unless ($db->addScripts(Staple::Script->new(\%script)));
+}
+
+sub ct {
+    (my $dist1, my $conf1, my $stage1, my $template1_dest, my $dist2, my $conf2, my $stage2, my $template2_dest) = @_;
+    
+    # script1
+    unless ($dist1) {
+        perror "Missing source distribution\n";
+        return;
+    }
+    (my @templates1) = localgettemplates($conf1, $dist1);
+    unless ($stage1) {
+        perror "missing stage\n";
+        return;
+    }
+    unless ($template1_dest) {
+        perror "missing template\n";
+        return;
+    }
+    unless (@templates1) {
+        perror "\"$conf1\" under \"$dist1\" has no templates\n";
+        return;
+    }
+    if (not defined $templates1[0]) {
+        return;
+    }
+    (my $template1) = grep {$_->stage() eq $stage1 and $_->destination() eq $template1_dest} @templates1;
+    unless ($template1) {
+        perror "No such template \"$template1_dest\" in \"$conf1\" (under distribution \"$dist1\")\n";
+        return;
+    }
+
+    # template2
+    unless ($dist2) {
+        perror "Missing destination distribution\n";
+        return;
+    }
+    my $temp = $db->hasDistribution($dist2);
+    if (not defined $temp) {
+        perror "Can't get distribution list: ".$db->{error}."\n";
+        return;
+    } elsif ($temp == 0) {
+        perror "No such distribution \"$dist2\"\n";
+        return undef;
+    }
+    $conf2 = $conf1 unless $conf2;
+    $stage2 = $stage1 unless $stage2;
+    $template2_dest = $template1_dest unless $template2_dest;
+
+    if ($dist1 eq $dist2 and
+        $conf1 eq $conf2) {
+        print "To update a template use the \"update template\" command instead\n";
+        return;
+    }
+    if ($conf1 eq $conf2 and $conf1 =~ m,^common/,) {
+        print "Use \"update template\" for updating common template on the same configuration\n";
+        return;
+    }
+
+    # from here, start changing stuff...
+    (my $conf2full) = $db->getFullConfigurations([$conf2], $dist2);
+    unless ($conf2full) {
+        if ($db->addConfiguration($dist2, $conf2)) {
+            print "Added configurations \"$conf2\" to \"$dist2\"\n";
+            ($conf2full) = $db->getFullConfigurations([$conf2], $dist2);
+        } else {
+            perror $db->{error}."\n";
+            return;
+        }
+    } else {
+        (my @templates2) = localgettemplates($conf2, $dist2);
+        if (@templates2 and $templates2[0]) {
+            (my $template2) = grep {$_->stage() eq $stage2 and $_->destination() eq $template2_dest} @templates2;
+            if ($template2) {
+                print "Removing previous template $template2_dest in $conf2 of $dist2\n";
+                unless ($db->removeTemplates($template2)) {
+                    perror $db->{error}."\n";
+                    return;
+                }
+            }
+        }
+    }
+
+    (my $template2) = Staple::Template->new($template1);
+    $template2->destination($template2_dest);
+    $template2->configuration($conf2full);
+    $template2->stage($stage2);
+    perror $db->{error}."\n" unless ($db->addTemplates($template2));    
 }
 
 sub gdi {
@@ -2261,10 +2364,12 @@ sub gs {
     }
 }
 
-# input: configuration name
+# input: configuration name, optional distribution name
 # output: list of templates
 sub localgettemplates {
     my $configuration = shift;
+    my $dist = shift;
+    $dist = $distribution unless $dist;
     unless ($configuration) {
         print "Missing configuration\n" unless $echooff;
         return undef;
@@ -2274,9 +2379,9 @@ sub localgettemplates {
         print "unknown configuration \"$configuration\"\n"  unless $echooff;
         return undef;
     }
-    ($conf) = $db->getFullConfigurations([$conf], $distribution);
+    ($conf) = $db->getFullConfigurations([$conf], $dist);
     unless ($conf) {
-        print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n" unless $echooff;
+        print "No such configuration \"$configuration\" under the \"$dist\" distribution\n" unless $echooff;
         return undef;
     }
     my @templates = $db->getTemplates($conf);
