@@ -29,7 +29,6 @@ BEGIN {
 
 use Staple;
 use Staple::Misc;
-use Staple::DBSync;
 use Staple::DBFactory;
 use Staple::Hangman;
 use Staple::Template;
@@ -2098,7 +2097,7 @@ sub gas {
             return;
         }
         if ($data !~ m/\n$/) {
-            $data .= "\n(auto doesn't end with \\n)\n";
+            $data .= "\n(auto doesn't end with new line)\n";
         }
         print $data;
     } else {
@@ -2453,6 +2452,9 @@ sub gss {
             print $script->error()."\n";
             return;
         }
+        if ($data !~ m/\n$/) {
+            $data .= "\n(script doesn't end with new line)\n";
+        }
         print $data;
     } else {
         print "No such script \"$script_name\" in \"$configuration\"\n";
@@ -2669,9 +2671,9 @@ sub gts {
             return;
         }
         if ($data !~ m/\n$/) {
-            $data .= "\n(template doesn't end with \\n)\n";
+            $data .= "\n(template doesn't end with new line)\n";
         }
-        print $data;        
+        print $data;
     } else {
         print "No such template \"$template_name\" in \"$configuration\"\n";
         return;

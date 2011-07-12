@@ -15,12 +15,14 @@ use Staple::Misc;
 use Staple::Hangman;
 use Staple::Application::Boot;
 use Term::ReadKey;
+use Term::ReadLine;
 #use Sys::Syslog;
 #use Sys::Syslog qw(:macros);
 
 my $sysinitoutput = "";
 my $pager = undef;
-
+my $input = undef;
+  
 my $currentStage = "init";
 
 my %stages = (
@@ -38,6 +40,76 @@ my %stages = (
               final            => {name => "Final"            , function => \&finalStage,          , next => "done"            , prev => "finalScript"     },
               done             => {name => "Done"             , function => \&doneStage,           , next => undef             , prev => "final"           },
              );
+
+my @currentCompletionList = ();
+my $prevparam = "";
+
+sub command_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        @currentCompletionList = grep {index($_, $text) == 0} ("help", "h", "?", "stages", "tokens", "mounts", "groups", "templates", "configurations", "scripts", "autos", "run", "skip", "prev", "goto", "token:", "bash", "debug-off", "quit");
+    }
+    if (@currentCompletionList == 1 && $currentCompletionList[0] eq "token:") {
+        $input->Attribs->{completion_append_character} = "";
+    } else {
+        $input->Attribs->{completion_append_character} = " ";
+    }
+    return $currentCompletionList[$count];
+}
+
+sub stage1_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        @currentCompletionList = grep {index(lc($_), lc($text)) == 0} map {$_->{name}} values %stages;
+    }
+    return $currentCompletionList[$count];
+}
+
+sub stage2_completion {
+    my ($text, $count) = @_;
+    if ($count == 0) {
+        my @list = ();
+        push @list, "Templates" if (grep {lc($prevparam) eq $_} qw(auto mount sysinit final));
+        push @list, "Scripts" if (grep {lc($prevparam) eq $_} qw(mount sysinit final));
+        @currentCompletionList = grep {index(lc($_), lc($text)) == 0} @list;
+    }
+    return $currentCompletionList[$count];
+}
+
+sub attempted_completion {
+    my ($text, $line, $start, $end) = @_;
+    #$currentCommand = substr($line, 0, $start);
+    if (substr($line, 0, $start) =~ /^\s*$/) {
+        return $input->completion_matches($text, \&command_completion);
+    } else {
+        (my $command) = $line =~ m/^\s*(\S+)/;
+        if (lc($command) eq "goto") {
+            my $parameter = substr($line, 0, $start) =~ s/((^|\s)\S)/$1/g;
+            if ($parameter == 1) {
+                return $input->completion_matches($text, \&stage1_completion);
+            } elsif ($parameter == 2) {
+                $line =~ s/^\s*//;
+                my @params = split /\s+/, $line;
+                $prevparam = $params[$line =~ m/\s$/ ? -1 : -2];
+                return $input->completion_matches($text, \&stage2_completion);
+            }
+        }
+        return ();
+    }
+    return ();
+}
+
+sub readDebugLine {
+    my $prompt = shift;
+    my $readline = shift;
+    unless (defined $input) {
+        $input = new Term::ReadLine 'stapleboot';
+        my $attribs = $input->Attribs;
+        $attribs->{completion_entry_function} = sub {return ()};
+        $attribs->{attempted_completion_function} = \&attempted_completion;
+    }
+    return $readline ? $input->readline($prompt) : <>;
+}
 
 # input: boot, debug action
 # output: no debug: 0
@@ -60,10 +132,10 @@ sub debug {
         }
         return $? >> 8;
     } elsif ($action eq "prompt") {
-        print "staple [$stage]> ";
         my $tokenValue = "";
         my $tokenKey = "";
-        while (my $line = <>) {
+        while (1) {
+            my $line = readDebugLine("staple [$stage]> ", !length($tokenKey));
             if ($tokenKey) {
                 if ($line =~ m/;\n$/) {
                     $line =~ s/;\n$//;
@@ -203,7 +275,7 @@ EOF
                     
                 }
             }
-            print "staple [$stage]> ";
+            #print "staple [$stage]> ";
         }
     }
     return 0;
