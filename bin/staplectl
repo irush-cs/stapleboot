@@ -76,6 +76,7 @@ my %commands = (
                 cc => \&cc,
                 cs => \&cs,
                 ct => \&ct,
+                ca => \&ca,
 
                 act => \&act,
                 adt => \&adt,
@@ -183,6 +184,7 @@ my %commandMap = (
                   cc                               => "cc",
                   cs                               => "cs",
                   ct                               => "ct",
+                  ca                               => "ca",
 
                   act                              => "act",
                   adt                              => "adt",
@@ -321,6 +323,7 @@ my %commandMap = (
                   getdistributioninfo              => "gdi",
                   copyconfiguration                => "cc",
                   copyscript                       => "cs",
+                  copyauto                         => "ca",
                   copytemplate                     => "ct",
                   hangman                          => "hangman",
                   debug                            => "debug",
@@ -426,6 +429,7 @@ my %commandCompletionMap =
    sync      => [],
    cc        => [\&configuration_completion, \&distribution_completion, \&distribution_completion],
    cs        => [\&distribution_completion, \&dist_configuration_completion, \&script_stage_completion, \&script_completion, \&distribution_completion, \&dist_configuration_completion, \&script_stage_completion, \&script_completion],
+   ca        => [\&distribution_completion, \&dist_configuration_completion, \&auto_completion, \&distribution_completion, \&dist_configuration_completion, \&auto_completion],
    ct        => [\&distribution_completion, \&dist_configuration_completion, \&template_stage_completion, \&template_completion, \&distribution_completion, \&dist_configuration_completion, \&template_stage_completion, \&template_completion],
    hangman   => [],
    debug     => [\&host_completion],
@@ -636,6 +640,17 @@ and <distribution2> can be the same to move a script between different
 configurations in the same distribution. If any of the optional destination
 parameters are missing, they're assumed to be the same is the source. If
 location2 is omitted, the script will be copied at the end.
+",
+                    ca => "
+name: ca | copy auto
+parameters: <distribution1> <configuration1> {<auto1>|<location1>} <distribution2> [<configuration2> [<auto2> [<location2>]]]
+
+Copies a single autogroup <auto1> from <distribution1> to <distribution2>.
+<distribution1> and <distribution2> can be the same to move an autogroup
+between different configurations in the same distribution. If any of the
+optional destination parameters are missing, they're assumed to be the same as
+in the source. If location2 is omitted, the autogroup will be copied at the
+end.
 ",
                     ct => "
 name: ct | copy template
@@ -1151,6 +1166,7 @@ Configuration commands:
    ua  | update auto <conf> <auto> 
    cc  | copy configuration <conf> <from> <to> 
    cs  | copy script <dist1> <conf1> <stage1> {<script>|<loc>} <dist2> [<conf2> [<stage2> [<script2> [<loc2>]]]]
+   ca  | copy auto <dist1> <conf1> {<auto>|<loc>} <dist2> [<conf2> [<auto2> [<loc2>]]]
    ct  | copy template <dist1> <conf1> <stage1> {<template>|<loc>} <dist2> [<conf2> [<stage2> [<template2> [<loc2>]]]]
    whc | who has configuration <conf>
    acc | add configuration configuration <conf> {+|-}<conf> [<location>]
@@ -1662,6 +1678,95 @@ sub cs {
     perror $db->{error}."\n" unless ($db->addScripts(Staple::Script->new(\%script)));
 }
 
+
+sub ca {
+    (my $dist1, my $conf1, my $auto1_name, my $dist2, my $conf2, my $auto2_name, my $location2) = @_;
+    
+    # auto1
+    unless ($dist1) {
+        perror "Missing source distribution\n";
+        return;
+    }
+    (my @autos1) = localgetautos($conf1, $dist1);
+    unless ($auto1_name) {
+        perror "missing auto name\n";
+        return;
+    }
+    unless (@autos1) {
+        perror "\"$conf1\" under \"$dist1\" has no autos\n";
+        return;
+    }
+    if (not defined $autos1[0]) {
+        return;
+    }
+    (my $auto1) = grep {$_->name() eq $auto1_name or $_->order() eq $auto1_name} @autos1;
+    unless ($auto1) {
+        perror "No such auto \"$auto1_name\" in \"$conf1\" (under distribution \"$dist1\")\n";
+        return;
+    }
+
+    # auto2
+    unless ($dist2) {
+        perror "Missing destination distribution\n";
+        return;
+    }
+    my $temp = $db->hasDistribution($dist2);
+    if (not defined $temp) {
+        perror "Can't get distribution list: ".$db->{error}."\n";
+        return;
+    } elsif ($temp == 0) {
+        perror "No such distribution \"$dist2\"\n";
+        return undef;
+    }
+    $conf2 = $conf1 unless $conf2;
+    $auto2_name = $auto1_name unless $auto2_name;
+
+    if ($auto2_name =~ m/^\d+$/) {
+        perror "Must have a valid name for destination auto\n";
+        return;
+    }
+
+    if ($dist1 eq $dist2 and
+        $conf1 eq $conf2) {
+        print "To update a auto use the \"update auto\" command instead\n";
+        return;
+    }
+    if ($conf1 eq $conf2 and $conf1 =~ m,^common/,) {
+        print "Use \"update auto\" for updating common auto on the same configuration\n";
+        return;
+    }
+
+    # from here, start changing stuff...
+    (my $conf2full) = $db->getFullConfigurations([$conf2], $dist2);
+    unless ($conf2full) {
+        if ($db->addConfiguration($dist2, $conf2)) {
+            print "Added configurations \"$conf2\" to \"$dist2\"\n";
+            ($conf2full) = $db->getFullConfigurations([$conf2], $dist2);
+        } else {
+            perror $db->{error}."\n";
+            return;
+        }
+    } else {
+        (my @autos2) = localgetautos($conf2, $dist2);
+        if (@autos2 and $autos2[0]) {
+            (my $auto2) = grep {$_->name() eq $auto2_name or $_->order() eq $auto2_name} @autos2;
+            if ($auto2) {
+                print "Removing previous auto $auto2_name in $conf2 of $dist2\n";
+                unless ($db->removeAutos($auto2)) {
+                    perror $db->{error}."\n";
+                    return;
+                }
+            }
+        }
+    }
+
+    (my $auto2) = Staple::Autogroup->new($auto1);
+    $auto2->name($auto2_name);
+    $auto2->configuration($conf2full);
+    $auto2->order(defined $location2 ? $location2 : -1);
+    perror $db->{error}."\n" unless ($db->addAutos($auto2));
+}
+
 sub ct {
     (my $dist1, my $conf1, my $stage1, my $template1_dest, my $dist2, my $conf2, my $stage2, my $template2_dest) = @_;
     
@@ -1933,10 +2038,12 @@ sub edit {
     return 1;
 }
 
-# input: configuration name
+# input: configuration name, optional distribution
 # output: list of autos
 sub localgetautos {
     my $configuration = shift;
+    my $dist = shift;
+    $dist = $distribution unless $dist;
     unless ($configuration) {
         print "Missing configuration\n" unless $echooff;
         return undef;
@@ -1946,9 +2053,9 @@ sub localgetautos {
         print "unknown configuration \"$configuration\"\n" unless $echooff;
         return undef;
     }
-    ($conf) = $db->getFullConfigurations([$conf], $distribution);
+    ($conf) = $db->getFullConfigurations([$conf], $dist);
     unless ($conf) {
-        print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n" unless $echooff;
+        print "No such configuration \"$configuration\" under the \"$dist\" distribution\n" unless $echooff;
         return undef;
     }
     my @autos = $db->getAutos($conf);

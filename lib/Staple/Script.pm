@@ -119,13 +119,18 @@ sub name {
 
 Sets this script's order (number) in the configuration, and returns the
 previous order. If I<order> is undef don't change it, just return the current
-one.
+one. If I<order> is -1, set it to undef.
 
 =cut
 
 sub order {
     my $self = shift;
-    return $self->param("order", shift);
+    my $order = shift;
+    my $old = $self->{order};
+    if (defined $order) {
+        $self->{order} = $order < 0 ? undef : $order;
+    }
+    return $old;
 }
 
 =item B<critical(I<critial>)>
