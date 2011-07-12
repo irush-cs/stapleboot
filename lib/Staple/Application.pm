@@ -456,9 +456,16 @@ sub applyTemplates {
         $self->{tokens}->{__AUTO_CONFIGURATION__} = {key => "__AUTO_CONFIGURATION__",
                                                      value => $template->configuration()->name(),
                                                      raw => $template->configuration()->name(),
-                                                     type => "auto"};
+                                                     type => "static",
+                                                     source => "auto"};
+        $self->{tokens}->{__AUTO_STAGE__} = {key => "__AUTO_STAGE__",
+                                             value => $template->stage(),
+                                             raw => $template->stage(),
+                                             type => "static",
+                                             source => "auto"};
         $data = applyTokens($data, $self->{tokens});
         delete $self->{tokens}->{__AUTO_CONFIGURATION__};
+        delete $self->{tokens}->{__AUTO_STAGE__};
         my $destination = "$self->{rootDir}".$template->destination();
         if ($template->destination() =~ m@^/__AUTO_TMP__/@) {
             $destination = $template->destination();
