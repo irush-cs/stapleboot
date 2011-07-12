@@ -518,33 +518,13 @@ Given a list of groups (Staple::Group) returns a complete list of groups
 the given group. Groups will be splitted into intermediate groups, and
 duplicate groups will be removed.
 
-WARNING: try to avoid circular groups dependencies 
-
 =cut
 
 sub getCompleteGroups {
     my $self = shift;
     my @rawGroups = @_;
     my @groups = ();
-    my %groups = ();
-
-    @rawGroups = fillIntermediate(@rawGroups);
-    map {$_->path($self->getGroupPath($_->name())) if $_->type() eq "group"} @rawGroups;
-
-    foreach my $rawGroup (@rawGroups) {
-        unless ($groups{$rawGroup->name()}) {
-            my @newGroups = $self->getCompleteGroups($self->getGroupGroups($rawGroup));
-            foreach my $newGroup (@newGroups) {
-                unless ($groups{$newGroup->name()}) {
-                    $groups{$newGroup->name()} = 1;
-                    push @groups, $newGroup;
-                }
-            }
-            $groups{$rawGroup->name()} = 1;
-            push @groups, $rawGroup;
-        }
-    }
-
+    $self->getCompleteGroups1(\@groups, [], \@rawGroups);
     return @groups;
 }
 
@@ -1718,6 +1698,32 @@ sub syncTo {
 ################################################################################
 #   Internals
 ################################################################################
+
+# input: [$self], array hash of current results, array hash of not allowed, array hash or groups to check
+sub getCompleteGroups1 {
+    my $self = shift;
+    my $result = shift;
+    my $nogood = shift;
+    my $tocheck = shift;
+    my @groups = ();
+    my %groups = ();
+    @groups{map {$_->name()} @$result} = @$result;
+    @groups{map {$_->name()} @$nogood} = @$nogood;
+    
+    my @rawGroups = fillIntermediate(@$tocheck);
+    map {$_->path($self->getGroupPath($_->name())) if $_->type() eq "group"} @rawGroups;
+    
+    foreach my $rawGroup (@rawGroups) {
+        push @$nogood, $rawGroup;
+        unless ($groups{$rawGroup->name()}) {
+            $self->getCompleteGroups1($result, $nogood, [$self->getGroupGroups($rawGroup)]);
+            push @$result, $rawGroup;
+            @groups{map {$_->name()} @$result} = @$result;
+        }
+    }
+
+    return;
+}
 
 ################################################################################
 #   Tokens Internals
