@@ -603,6 +603,8 @@ sub removeTemplates {
             push @errors, "Can't remove template $path: $!";
             next;
         }
+        # remove empty dirs
+        rmdir for map {$template->configuration()->path()."/templates/".$template->stage()."/".$_} reverse ("", splitData($template->destination()));
     }
     if (@errors) {
         $self->{error} = join "\n", @errors;

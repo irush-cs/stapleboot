@@ -136,6 +136,17 @@ sub name {
     return $self->param("name", $name);
 }
 
+=item B<isCommon()>
+
+Returns true if this configuration is common (name starts with common/)
+
+=cut
+
+sub isCommon {
+    my $self = shift;
+    return index($self->{name}, "common/") == 0
+}
+
 =item B<dist(I<dist>)>
 
 Sets this configuration's distribution (string), and returns the previous
