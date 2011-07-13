@@ -22,23 +22,24 @@ use Term::ReadLine;
 my $sysinitoutput = "";
 my $pager = undef;
 my $input = undef;
-  
+my $rununtil = undef;
+
 my $currentStage = "init";
 
 my %stages = (
-              init             => {name => "Init"             , function => \&initStage            , next => "autoScripts"     , prev => "init"            },
-              autoScripts      => {name => "Auto Scripts"     , function => \&autoScriptsStage     , next => "auto"            , prev => "init"            },
-              auto             => {name => "Auto"             , function => \&autoStage            , next => "mountTemplates"  , prev => "autoScripts"     },
-              mountTemplates   => {name => "Mount Templates"  , function => \&mountTemplatesStage  , next => "mountScripts"    , prev => "auto"            },
-              mountScripts     => {name => "Mount Scripts"    , function => \&mountScriptsStage    , next => "mount"           , prev => "mountTemplates"  },
-              mount            => {name => "Mounts"           , function => \&mountStage           , next => "sysinitTemplates", prev => "mountScripts"    },
-              sysinitTemplates => {name => "Sysinit Templates", function => \&sysinitTemplatesStage, next => "sysinitScripts"  , prev => "mount"           },
-              sysinitScripts   => {name => "Sysinit Scripts"  , function => \&sysinitScriptsStage, , next => "sysinit"         , prev => "sysinitTemplates"},
-              sysinit          => {name => "Sysinit"          , function => \&sysinitStage,        , next => "finalTemplates"  , prev => "sysinitScripts"  },
-              finalTemplates   => {name => "Final Templates"  , function => \&finalTemplatesStage, , next => "finalScript"     , prev => "sysinit"         },
-              finalScript      => {name => "Final Scripts"    , function => \&finalScriptsStage,   , next => "final"           , prev => "finalTemplates"  },
-              final            => {name => "Final"            , function => \&finalStage,          , next => "done"            , prev => "finalScript"     },
-              done             => {name => "Done"             , function => \&doneStage,           , next => undef             , prev => "final"           },
+              init             => {name => "Init"             , function => \&initStage            , next => "autoScripts"     , prev => "init"            , order =>  0},
+              autoScripts      => {name => "Auto Scripts"     , function => \&autoScriptsStage     , next => "auto"            , prev => "init"            , order =>  1},
+              auto             => {name => "Auto"             , function => \&autoStage            , next => "mountTemplates"  , prev => "autoScripts"     , order =>  2},
+              mountTemplates   => {name => "Mount Templates"  , function => \&mountTemplatesStage  , next => "mountScripts"    , prev => "auto"            , order =>  3},
+              mountScripts     => {name => "Mount Scripts"    , function => \&mountScriptsStage    , next => "mount"           , prev => "mountTemplates"  , order =>  4},
+              mount            => {name => "Mounts"           , function => \&mountStage           , next => "sysinitTemplates", prev => "mountScripts"    , order =>  5},
+              sysinitTemplates => {name => "Sysinit Templates", function => \&sysinitTemplatesStage, next => "sysinitScripts"  , prev => "mount"           , order =>  6},
+              sysinitScripts   => {name => "Sysinit Scripts"  , function => \&sysinitScriptsStage, , next => "sysinit"         , prev => "sysinitTemplates", order =>  7},
+              sysinit          => {name => "Sysinit"          , function => \&sysinitStage,        , next => "finalTemplates"  , prev => "sysinitScripts"  , order =>  8},
+              finalTemplates   => {name => "Final Templates"  , function => \&finalTemplatesStage, , next => "finalScript"     , prev => "sysinit"         , order =>  9},
+              finalScript      => {name => "Final Scripts"    , function => \&finalScriptsStage,   , next => "final"           , prev => "finalTemplates"  , order => 10},
+              final            => {name => "Final"            , function => \&finalStage,          , next => "done"            , prev => "finalScript"     , order => 11},
+              done             => {name => "Done"             , function => \&doneStage,           , next => undef             , prev => "final"           , order => 12},
              );
 
 my @currentCompletionList = ();
@@ -47,7 +48,7 @@ my $prevparam = "";
 sub command_completion {
     my ($text, $count) = @_;
     if ($count == 0) {
-        @currentCompletionList = grep {index($_, $text) == 0} ("help", "h", "?", "stages", "tokens", "mounts", "groups", "templates", "configurations", "scripts", "autos", "run", "skip", "prev", "goto", "token:", "bash", "debug-off", "quit");
+        @currentCompletionList = grep {index($_, $text) == 0} ("help", "h", "?", "stages", "tokens", "mounts", "groups", "templates", "configurations", "scripts", "autos", "run", "skip", "prev", "goto", "token:", "bash", "debug-off", "run-until", "quit");
     }
     if (@currentCompletionList == 1 && $currentCompletionList[0] eq "token:") {
         $input->Attribs->{completion_append_character} = "";
@@ -83,7 +84,7 @@ sub attempted_completion {
         return $input->completion_matches($text, \&command_completion);
     } else {
         (my $command) = $line =~ m/^\s*(\S+)/;
-        if (lc($command) eq "goto") {
+        if (lc($command) eq "goto" or lc($command) eq "run-until") {
             my $parameter = substr($line, 0, $start) =~ s/((^|\s)\S)/$1/g;
             if ($parameter == 1) {
                 return $input->completion_matches($text, \&stage1_completion);
@@ -120,6 +121,13 @@ sub debug {
     my $boot = shift;
     my $stage = $stages{$currentStage}->{name};
     my $action = shift;
+    if (defined $rununtil) {
+        if ($rununtil eq $currentStage) {
+            $rununtil = undef;
+        } else {
+            return 0;
+        }
+    }
     if ($action eq "bash") {
         $boot->output($stage, 0);
         @SIG{("INT", "QUIT", "TSTP")} = ('DEFAULT','DEFAULT','DEFAULT');
@@ -248,6 +256,19 @@ sub debug {
                         # need to add for the updateData (even though reference change)
                         $boot->addTokens({__STAPLE_DEBUG__ => $dtoken});
                     }
+                } elsif ($line =~ m/^run-until (.+)$/) {
+                    my $newStage = $1;
+                    (my $temp) = grep {lc($stages{$_}->{name}) eq lc($newStage)} keys %stages;
+                    if ($temp) {
+                        if ($stages{$temp}{order} <= $stages{$currentStage}{order}) {
+                            print "Can't run backwards\n";
+                        } else {
+                            $rununtil = $temp;
+                            return 0;
+                        }
+                    } else {
+                        print "unknown stage: \"$newStage\"\n";
+                    }
                 } elsif ($line ne "") {
                     if ($line !~ m/^help$|^\?$/) {
                         print "Unknown command: $line\n";
@@ -264,6 +285,7 @@ Known commands:
    scripts                - Print all scripts
    autos                  - Print all autos
    run                    - Run current stage
+   run-until <stage>      - Run until <stage> (excluding)
    skip                   - Skip current stage (exits on last stage)
    prev                   - Goto previous stage
    goto <stage>           - Goto specific stage

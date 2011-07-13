@@ -298,8 +298,6 @@ L<Staple::Misc> - Staple miscellaneous utilities.
 
 L<Staple::DB> - Staple database connection interface
 
-L<Staple::DBSync> - Syncs between to databases
-
 =head1 AUTHOR
 
 Yair Yarom, E<lt>irush@cs.huji.ac.ilE<gt>

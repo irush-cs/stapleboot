@@ -898,8 +898,6 @@ Staple/DB/* - The different concrete database classes. Currently FS.pm, SQL.pm
 
 Staple/DBFactory.pm - Factory functions for creating database instances.
 
-Staple/DBSync.pm - Sync function to sync between two databases. 
-
 Staple/Application.pm - Application classes. Used for applying scripts,
                         templates etc. 
 
@@ -910,7 +908,10 @@ Staple/Misc.pm - Miscellaneous functions that didn't fit elsewhere.
 
 Staple/Hangman.pm - Used to hang people.
 
-Staple/Template.pm - Represents a template.
+Staple/Template.pm
+Staple/Mount.pm
+Staple/Script.pm
+Staple/Autogroup.pm  - Represents the different settings classes.
 
 7.3. Internal Data Structures
 ------------------------------
