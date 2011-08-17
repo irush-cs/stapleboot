@@ -1,13 +1,17 @@
-staple 006snap
+Staple 006
 
-	* new DB::FSQL database backend 
+	* Better circular group dependencies check
+	* stapleboot: run-until
+	* stapleboot: basic readline support on debug prompt mode
+	* Added __AUTO_STAPLE_LIB__ auto token for finding staple lib files
+	* new DB::FSQL database backend
 	* Better support for sqlite on the sql database.
 	* Faster sync function which works with configuration's configurations list (with some bug fixes)
 	* Fixed DB::SQL (sql db) to properly support common configuration in the configuration's configurations list
 	* Use proper classes instead of hashes (some API change)
 	* Added MANUAL
 	* Added ChangeLog
-	* staplectl: copy script function
+	* staplectl: copy script/template/auto functions
 	* don't delete autos on debug
 	* pager support in stapleboot
 	* additional info in staple log

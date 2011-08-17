@@ -1,7 +1,7 @@
 package Staple::DB::FSQL;
 
 #
-# Copyright (C) 2007-2010 Hebrew University Of Jerusalem, Israel
+# Copyright (C) 2007-2011 Hebrew University Of Jerusalem, Israel
 # See the LICENSE file.
 #
 # Author: Yair Yarom <irush@cs.huji.ac.il>
@@ -19,7 +19,7 @@ use Staple::Script;
 use Staple::Template;
 
 our @ISA = ("Staple::DB::SQL");
-our $VERSION = '006snap';
+our $VERSION = '006';
 
 =head1 NAME
 
@@ -521,7 +521,7 @@ Yair Yarom, E<lt>irush@cs.huji.ac.ilE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2007-2010 Hebrew University Of Jerusalem, Israel
+Copyright (C) 2007-2011 Hebrew University Of Jerusalem, Israel
 See the LICENSE file.
 
 =cut

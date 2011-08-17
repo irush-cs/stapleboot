@@ -24,7 +24,7 @@ Staple::Node abstract class.
 use strict;
 use warnings;
 
-our $VERSION = '006snap';
+our $VERSION = '006';
 
 =item B<type()>
 

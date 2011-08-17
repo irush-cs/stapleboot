@@ -1,7 +1,7 @@
 package Staple::DB::SQL::Init;
 
 #
-# Copyright (C) 2007-2010 Hebrew University Of Jerusalem, Israel
+# Copyright (C) 2007-2011 Hebrew University Of Jerusalem, Israel
 # See the LICENSE file.
 #
 # Author: Yair Yarom <irush@cs.huji.ac.il>
@@ -14,7 +14,7 @@ use warnings;
 require Exporter;
 
 our @ISA = qw(Exporter);
-our $VERSION = '006snap';
+our $VERSION = '006';
 
 our @createTables = (
 "CREATE TABLE _SCHEMA_hosts (
@@ -259,7 +259,7 @@ Yair Yarom, E<lt>irush@cs.huji.ac.ilE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2007-2010 Hebrew University Of Jerusalem, Israel
+Copyright (C) 2007-2011 Hebrew University Of Jerusalem, Israel
 See the LICENSE file.
 
 =cut

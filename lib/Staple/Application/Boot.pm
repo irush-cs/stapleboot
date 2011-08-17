@@ -1,7 +1,7 @@
 package Staple::Application::Boot;
 
 #
-# Copyright (C) 2007-2010 Hebrew University Of Jerusalem, Israel
+# Copyright (C) 2007-2011 Hebrew University Of Jerusalem, Israel
 # See the LICENSE file.
 #
 # Author: Yair Yarom <irush@cs.huji.ac.il>
@@ -18,7 +18,7 @@ use Staple::Application;
 use Term::ANSIColor qw(:constants color);
 use Net::DNS;
 our @ISA = ("Staple::Application");
-our $VERSION = '006snap';
+our $VERSION = '006';
 
 use constant LINUX_REBOOT_MAGIC1 => 0xFEE1DEAD;
 use constant LINUX_REBOOT_MAGIC2 => 0x20112000;
@@ -226,7 +226,7 @@ Yair Yarom, E<lt>irush@cs.huji.ac.ilE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2007-2010 Hebrew University Of Jerusalem, Israel
+Copyright (C) 2007-2011 Hebrew University Of Jerusalem, Israel
 See the LICENSE file.
 
 =cut

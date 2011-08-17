@@ -1,7 +1,7 @@
 package Staple;
 
 #
-# Copyright (C) 2007-2010 Hebrew University Of Jerusalem, Israel
+# Copyright (C) 2007-2011 Hebrew University Of Jerusalem, Israel
 # See the LICENSE file.
 #
 # Author: Yair Yarom <irush@cs.huji.ac.il>
@@ -83,7 +83,7 @@ our @EXPORT = qw(
                     setDefaultTokens
                     getCompleteMounts
                );
-our $VERSION = '006snap';
+our $VERSION = '006';
 
 # don't use this, it's just for initializing %defaultTokens
 # SMTP_SERVER isn't localhost, as this host most likely doesn't have a mail server running...
@@ -304,7 +304,7 @@ Yair Yarom, E<lt>irush@cs.huji.ac.ilE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2007-2010 Hebrew University Of Jerusalem, Israel
+Copyright (C) 2007-2011 Hebrew University Of Jerusalem, Israel
 See the LICENSE file.
 
 =cut
