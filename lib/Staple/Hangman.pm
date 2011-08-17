@@ -18,7 +18,7 @@ our @EXPORT_OK = qw();
 our @EXPORT = qw(
                     hangman
                );
-our $VERSION = '006';
+our $VERSION = '007snap';
 
 
 =head1 NAME

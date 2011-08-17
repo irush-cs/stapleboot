@@ -19,7 +19,7 @@ use Staple::Script;
 use Staple::Autogroup;
 
 our @ISA = ("Staple::DB");
-our $VERSION = '006';
+our $VERSION = '007snap';
 
 =head1 NAME
 

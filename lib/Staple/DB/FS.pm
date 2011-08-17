@@ -19,7 +19,7 @@ use Staple::Mount;
 use Staple::DBFactory;
 
 our @ISA = ("Staple::DB");
-our $VERSION = '006';
+our $VERSION = '007snap';
 
 =head1 NAME
 

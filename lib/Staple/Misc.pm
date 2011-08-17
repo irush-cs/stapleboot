@@ -103,7 +103,7 @@ our @EXPORT = qw(
                     invalidConfiguration
                     invalidTokenKey
                );
-our $VERSION = '006';
+our $VERSION = '007snap';
 
 
 ################################################################################

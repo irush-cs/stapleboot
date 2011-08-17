@@ -15,7 +15,7 @@ use Staple;
 use Staple::Misc;
 use Staple::DBFactory;
 use Net::DNS;
-our $VERSION = '006';
+our $VERSION = '007snap';
 
 =head1 NAME
 

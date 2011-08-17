@@ -24,7 +24,7 @@ Staple::Setting abstract class.
 use strict;
 use warnings;
 
-our $VERSION = '006';
+our $VERSION = '007snap';
 
 =item B<configuration(I<configuration>)>
 
