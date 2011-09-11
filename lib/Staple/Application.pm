@@ -15,6 +15,8 @@ use Staple;
 use Staple::Misc;
 use Staple::DBFactory;
 use Net::DNS;
+use File::Temp;
+
 our $VERSION = '007snap';
 
 =head1 NAME
@@ -314,11 +316,10 @@ sub applyScripts {
             delete $tokens->{__AUTO_CONFIGURATION__};
             delete $tokens->{__AUTO_STAGE__};
         }
-        my $runnable = `mktemp $self->{tmpDir}/script.XXXXXXXX 2>/dev/null`;
-        chomp($runnable);
-        open(FILE, ">$runnable");
-        print FILE $data;
-        close(FILE);
+
+        (my $fh, my $runnable) = mkstemp("$self->{tmpDir}/script.".$script->name().".XXXXXXXX");
+        print $fh $data;
+        close($fh);
         push @toDelete, $runnable;
         chmod 0755, $runnable;
 
@@ -411,11 +412,9 @@ sub applyAutos {
             $data = applyTokens($data, $self->{tokens});
         }
 
-        my $runnable = `mktemp $self->{tmpDir}/auto.XXXXXXXX 2>/dev/null`;
-        chomp($runnable);
-        open(FILE, ">$runnable");
-        print FILE $data;
-        close(FILE);
+        (my $fh, my $runnable) = mkstemp("$self->{tmpDir}/auto.".$auto->name().".XXXXXXXX");
+        print $fh $data;
+        close($fh);
         push @toDelete, $runnable;
         chmod 0755, $runnable;
 
