@@ -1,5 +1,7 @@
 Staple 007snap
 
+	* optional default host when no host is configured
+
 Staple 006
 
 	* Better circular group dependencies check

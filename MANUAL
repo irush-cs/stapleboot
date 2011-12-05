@@ -506,6 +506,12 @@ __STAPLE_TMP__: The tmp directory. Can only be configured in staple.conf. There
                 /boot/staple/tmp, /private/staple/tmp, /staple/tmp, for available
                 tmp directory.
 
+__STAPLE_USE_DEFAULT_HOST__: If the host isn't configured in the staple
+                             database and this token is set to non false value,
+                             use the token's value as the host. Default is 0.
+                             Only meaningful when configured through
+                             staple.conf.
+
 5.2.5. Auto Tokens
 -------------------
 

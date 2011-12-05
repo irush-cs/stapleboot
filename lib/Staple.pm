@@ -107,6 +107,7 @@ my %DEFAULT_TOKENS = (
                       "__STAPLE_CRITICAL_reboot__"   => "/sbin/reboot -f",
                       "__STAPLE_CRITICAL_poweroff__" => "/sbin/poweroff -f",
                       "__STAPLE_FSCK_EXIT_OK__"      => "0,1",
+                      "__STAPLE_USE_DEFAULT_HOST__"  => "0",
                      );
 
 

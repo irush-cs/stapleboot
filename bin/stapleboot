@@ -340,10 +340,24 @@ sub initStage {
     }
 
     unless ($boot->{db}->getHostGroup($boot->{host})) {
+        if (exists $boot->{tokens}->{__STAPLE_USE_DEFAULT_HOST__}) {
+            my $defaulthost = $boot->{tokens}->{__STAPLE_USE_DEFAULT_HOST__}->{value};
+            if ($defaulthost and
+                $boot->{db}->getHostGroup($defaulthost)) {
+                $boot->output("$boot->{host} does not exist, using $defaulthost instead", 1);
+                $boot->{host} = $defaulthost;
+                $boot->setTokens({$boot->{db}->getCompleteTokens({})});
+                goto haveHost;
+            }
+        }
         $boot->error("$boot->{host} does not exist in the staple database");
         $boot->addMail("$boot->{host} does not exist in the staple database");
         $boot->doCriticalAction();
     }
+    
+  haveHost:
+    $boot->output("Starting: $boot->{host}", 1);
+    
     unless ($boot->{distribution}) {
         $boot->error("Can't recognize distribution");
         $boot->addMail("Can't determine current distribution (both /etc/staple/distribution and /proc/cmdline are missing)");
@@ -364,7 +378,7 @@ sub initStage {
     $boot->setDefaultGroups();
     $boot->update();
     
-    $boot->output("distribution: $boot->{distribution} ".$boot->{db}->getDistributionVersion($boot->{distribution}), 2);
+    $boot->output("Distribution: $boot->{distribution} ".$boot->{db}->getDistributionVersion($boot->{distribution}), 2);
 
     $boot->mountTmp() unless ($boot->{disabled});
     # openlog("stapleboot", "", $boot->{syslog});
@@ -587,7 +601,6 @@ if ($ENV{PAGER} and -e $ENV{PAGER}) {
 }
 
 $boot->output("Version: $Staple::VERSION");
-$boot->output("Starting: $boot->{host}", 1);
 
 while ($currentStage) {
     $boot->debug($boot->{debug});

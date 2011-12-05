@@ -11,6 +11,7 @@ use strict;
 use warnings;
 require Exporter;
 
+use Sys::Hostname;
 use Mail::Sendmail;
 use Staple;
 use Staple::Misc;
@@ -90,14 +91,18 @@ sub mail {
         $self->error("No mail recipient, not sending mail...");
         return 1;
     }
+    my $rhost = hostname;
     if (my $res = new Net::DNS::Resolver) {
         (my $domain) = $res->searchlist;
+        $rhost = $host unless $rhost;
         $host = "$host.".$domain;
+        $rhost =~ s/\.${domain}$//;        
     }
     $host =~ s/^\.+//;
     my $db = $self->{db}->info();
     my $prefix = "Staple version: $VERSION\n";
     $prefix .= "Staple database: $db\n";
+    $prefix .= "Host: $self->{host}".($self->{host} ne $rhost ? " ($rhost)" : "")."\n";
     $prefix .= "Distribution: $self->{distribution} (".($self->{db}->getDistributionVersion($self->{distribution}) || "unknown version").")\n";
     $prefix .= "Kernel: ".`uname -smr`;
     $prefix .= "\n";
@@ -106,7 +111,7 @@ sub mail {
     my %mail = (
                 subject => "$self->{host}: $subject",
                 to      => $self->{mailto},
-                from    => "stapleboot on $self->{host} <root\@$host>",
+                from    => "stapleboot on $rhost <root\@$host>",
                 Smtp    => $self->{smtpServer},
                 Message => $body,
                );
