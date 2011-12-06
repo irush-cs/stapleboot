@@ -82,12 +82,15 @@ sub describe {
 sub info {
     my $self = shift;
     my $db = "fs $self->{stapleDir}";
+    my @mounts;
     if (-r "/proc/mounts" and open(PROC, "/proc/mounts")) {
-        my @mounts = <PROC>;
+        @mounts = <PROC>;
         close(PROC);
-        (my $fs) = (grep {(split /\s/,$_)[1] eq $self->{stapleDir}} @mounts);
-        $db = $db." (".(split /\s/,$fs)[0].")" if defined $fs;   
+    } else {
+        @mounts = map {join " ", (split /\s+/,$_)[0, 2]} `mount`;
     }
+    (my $fs) = (grep {(split /\s/,$_)[1] eq $self->{stapleDir}} @mounts);
+    $db = $db." (".(split /\s/,$fs)[0].")" if defined $fs;   
     return $db;
 }
 
