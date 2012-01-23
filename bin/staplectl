@@ -34,6 +34,7 @@ use Staple::Hangman;
 use Staple::Template;
 use Staple::Script;
 use Staple::Autogroup;
+use Staple::Configuration;
 use Term::ReadLine;
 use Term::ANSIColor qw(:constants);
 use Net::DNS;
@@ -1967,6 +1968,8 @@ sub gci {
         print "Missing configurations\n";
         return;
     }
+    # remove +/- prefixes
+    $configuration_name = (Staple::Configuration->new({name => $configuration_name}))[0]->name();
     (my $conf) = $db->getFullConfigurations([$configuration_name], $distribution);
     unless ($conf) {
         print "No such configuration \"$configuration_name\"\n";
