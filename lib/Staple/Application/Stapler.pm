@@ -37,10 +37,10 @@ our $VERSION = '007snap';
 
 =over
 
-=item B<new([host], [distribution])>
+=item B<new([host], [distribution], [database])>
 
-Creates a new instance, set to the given host and distribution (if
-present).
+Creates a new instance, set to the given host, distribution (if
+present) and database string (if present).
 
 =cut
 
@@ -48,12 +48,13 @@ sub new {
     my $proto = shift;
     my $host = shift;
     my $distribution = shift;
+    my $database = shift;
     #return undef unless $host and $distribution;
     my $class = ref($proto) || $proto;
     my $self = {};
     bless ($self, $class);
 
-    $self->clearAll($host, $distribution);
+    $self->clearAll($host, $distribution, $database);
 
     return $self;
 }

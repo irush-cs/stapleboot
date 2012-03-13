@@ -803,13 +803,14 @@ sub getBadMounts {
 #   Internals
 ################################################################################
 
-# input: (self), host, distribution
+# input: (self), host, distribution, database
 sub clearAll {
     my $self = shift;
 
     $self->{host} = shift;
     $self->{distribution} = shift;
-    
+    my $db = shift;
+
     $self->{groups} = [];
     $self->{configurations} = [];
     $self->{tokens} = {};
@@ -827,7 +828,7 @@ sub clearAll {
         $self->{host} =~ s/\.${domain}$//;
     }
     $self->{distribution} = getDistribution() unless defined $self->{distribution};
-    $self->{db} = $self->useDB();
+    $self->{db} = $self->useDB($db ? split /\s+/, $db : undef);
     $self->{tmpDir} = $self->{db}->getTmpDir();
     $self->{rootDir} = "/";
     $self->{applied} = {"templates" => [],

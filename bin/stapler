@@ -172,7 +172,7 @@ if (@ARGV) {
 usage if $help;
 
 # init
-my $stapler = Staple::Application::Stapler->new($host, $distribution);
+my $stapler = Staple::Application::Stapler->new($host, $distribution, $database || undef);
 $stapler->output("version $Staple::VERSION");
 unless ($stapler->useDB($database ? split /\s+/, $database : undef)) {
     ## error was emmited in useDB
