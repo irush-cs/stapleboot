@@ -518,6 +518,9 @@ __STAPLE_USE_DEFAULT_HOST__: If the host isn't configured in the staple
 Auto tokens are tokens with values automatically assigned by staple. They
 cannot be changed in the database or via scripts. 
 
+__AUTO_DB__: The database in use. Might be the same as the original
+             __STAPLE_DB__ if present.
+
 __AUTO_DISTRIBUTION__: The distribution's name.
 
 __AUTO_HOSTNAME__: The hostname

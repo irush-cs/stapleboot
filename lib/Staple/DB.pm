@@ -1225,6 +1225,7 @@ sub getCompleteTokens {
     $tokens{__AUTO_STAPLE_LIB__} = {key => "__AUTO_STAPLE_LIB__", value => $INC{"Staple.pm"}, type => "static", source => "auto"};
     $tokens{__AUTO_STAPLE_LIB__}{value} =~ s,/Staple.pm$,,;
     $tokens{__AUTO_STAPLE_LIB__}{raw} = $tokens{__AUTO_STAPLE_LIB__}{value};
+    $tokens{__AUTO_DB__} = {key => "__AUTO_DB__", value => $self->info(), raw => $self->info(), type => "static", source => "auto"};
     #$tokens{__AUTO_IP__} = $ip;
     %tokens = setDefaultTokens(\%tokens, \%Staple::defaultTokens);
     %tokens = verifyTokens(\%tokens, \%Staple::allowedTokensValues);
