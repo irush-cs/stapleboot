@@ -3,6 +3,10 @@
 stty -isig
 trap ":" INT QUIT TSTP
 
+if [ -e /proc/cmdline -a -z "$staplesrc" ]; then
+    eval `cat /proc/cmdline`
+fi
+
 slow() {
     while read line; do
         sleep 1
@@ -13,16 +17,17 @@ slow() {
 nogo() {
     msg=$1
     domain=`hostname -d`
+    host=`hostname`
     echo $msg 1>&2
-    echo "EHLO ${HOSTNAME}.${domain}
+    echo "EHLO ${host}.${domain}
 MAIL FROM: <root>
 RCPT TO: <root@${domain}>
 DATA
 From: root
 To: root@${domain}
-Subject: ${HOSTNAME}: staple failed
+Subject: ${host}: staple failed
 
-Staple failed on host $HOSTNAME
+Staple failed on host $host
 $msg
 rebooting in 300 seconds...
 .

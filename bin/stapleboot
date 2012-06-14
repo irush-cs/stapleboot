@@ -16,6 +16,8 @@ use Staple::Hangman;
 use Staple::Application::Boot;
 use Term::ReadKey;
 use Term::ReadLine;
+use IO::Stty;
+
 #use Sys::Syslog;
 #use Sys::Syslog qw(:macros);
 
@@ -130,9 +132,10 @@ sub debug {
     }
     if ($action eq "bash") {
         $boot->output($stage, 0);
-        @SIG{("INT", "QUIT", "TSTP")} = ('DEFAULT','DEFAULT','DEFAULT');
+        my $oldmode = IO::Stty::stty(\*STDIN, '-g');
+        IO::Stty::stty(\*STDIN, 'isig');
         system($boot->{bash});
-        @SIG{("INT", "QUIT", "TSTP")} = ('IGNORE','IGNORE','IGNORE');
+        IO::Stty::stty(\*STDIN, $oldmode);
         if ($? == -1) {
             $boot->error("Failed to run $boot->{bash}: $!");
             $boot->addMail("Failed to run $boot->{bash}: $!");
@@ -202,9 +205,10 @@ sub debug {
                         $tempStage = $stages{$tempStage}->{next};
                     }
                 } elsif ($line eq "bash") {
-                    @SIG{("INT", "QUIT", "TSTP")} = ('DEFAULT','DEFAULT','DEFAULT');
-                    system("$boot->{bash}");
-                    @SIG{("INT", "QUIT", "TSTP")} = ('IGNORE','IGNORE','IGNORE');
+                    my $oldmode = IO::Stty::stty(\*STDIN, '-g');
+                    IO::Stty::stty(\*STDIN, 'isig');
+                    system($boot->{bash});
+                    IO::Stty::stty(\*STDIN, $oldmode);
                     $boot->error("Failed to run $boot->{bash}: $!") if ($? == -1);
                 } elsif ($line =~ m/^token:([^=]+)=(.*);$/) {
                     $boot->addTokens({"$1" => {key => "$1", value => "$2", raw => "$2", type => "static", source => "manual"}});
