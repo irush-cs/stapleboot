@@ -2,6 +2,7 @@ Staple 007snap
 
 	* Optional default host when no host is configured
 	* Added __AUTO_DB__ token with database information
+	* stapleboot: Accept keyboard signals on debug mode.
 	* Minor Bug fixes
 
 Staple 006
