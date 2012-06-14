@@ -31,14 +31,9 @@ system).
 2. Download
 ------------
 
-Currently the only way to download is through svn. For the latest development:
+Currently the only way to download is through git.
 
-  svn checkout http://stapleboot.googlecode.com/svn/trunk/ /path/to/download 
-
-or for specific version:
-
-  svn checkout http://stapleboot.googlecode.com/svn/tags/<version> /path/to/download 
-
+  git clone https://code.google.com/p/stapleboot/
 
 3. File System
 ---------------
