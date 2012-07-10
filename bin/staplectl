@@ -4250,10 +4250,17 @@ sub parseline {
         }
     }
     my @fixedParams;
-    foreach my $param (@params) {
+    while (my $param = shift @params) {
         if ($param eq '!$') {
             my $temp = (split / /, $lastCommand)[-1];
             $param = $temp if $temp;
+        }
+        if ($param =~ m/\\$/) {
+            my $temp = shift @params;
+            if ($temp) {
+                $param =~ s/\\$//;
+                $param .= " $temp";
+            }
         }
         push @fixedParams, $param;
     }
@@ -4573,7 +4580,7 @@ sub template_completion {
         $echooff = 0;
         return () unless (@templates and $templates[0]);
         @templates = map {$_->destination()} grep {$_->stage() eq $stage} @templates;
-        @currentCompletionList = grep {index($_, $text) == 0} @templates;
+        @currentCompletionList = map {$_ =~ s/ /\\ /g; $_} grep {index($_, $text) == 0} @templates;
     }
     return $currentCompletionList[$count];
 }
