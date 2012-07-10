@@ -99,9 +99,13 @@ my %commands = (
                 ght => \&ght,
                 ghg => \&ghg,
                 rct => \&rct,
+                uct => \&uct,
+                ugt => \&ugt,
                 rdt => \&rdt,
+                udt => \&udt,
                 rgt => \&rgt,
                 rht => \&rht,
+                uht => \&uht,
                 rhg => \&rhg,
                 ggc => \&ggc,
                 ghc => \&ghc,
@@ -207,9 +211,13 @@ my %commandMap = (
                   ght                              => "ght",
                   ghg                              => "ghg",
                   rct                              => "rct",
+                  uct                              => "uct",
+                  ugt                              => "ugt",
                   rdt                              => "rdt",
+                  udt                              => "udt",
                   rgt                              => "rgt",
                   rht                              => "rht",
+                  uht                              => "uht",
                   rhg                              => "rhg",
                   ggc                              => "ggc",
                   ghc                              => "ghc",
@@ -281,9 +289,13 @@ my %commandMap = (
                   removehost                       => "rh",
                   removegroup                      => "rg",
                   removeconfiguration              => "rc",
-                  removedistributiontoken          => "adt",
+                  removedistributiontoken          => "rdt",
+                  updatedistributiontoken          => "udt",
                   removeconfigurationtoken         => "rct",
+                  updateconfigurationtoken         => "uct",
+                  updategroupgroup                 => "ugt",
                   removehosttoken                  => "rht",
+                  updatehosttoken                  => "uht",
                   removegrouptoken                 => "rgt",
                   removehostgroup                  => "rhg",
                   adddistributiongroup             => "adg",
@@ -400,9 +412,13 @@ my %commandCompletionMap =
    ght       => [\&host_completion],
    ghg       => [\&host_completion],
    rct       => [\&configuration_completion, \&configuration_tokens_completion],
+   uct       => [\&configuration_completion, \&configuration_tokens_completion],
+   ugt       => [\&group_completion, \&group_tokens_completion],
    rdt       => [\&distribution_and_tokens_completion, \&distribution_tokens_completion],
+   udt       => [\&distribution_and_tokens_completion, \&distribution_tokens_completion],
    rgt       => [\&group_completion, \&group_tokens_completion],
    rht       => [\&host_completion, \&host_tokens_completion],
+   uht       => [\&host_completion, \&host_tokens_completion],
    rhg       => [\&host_completion, \&host_groups_completion],
    ggc       => [\&group_completion],
    ghc       => [\&host_completion],
@@ -802,11 +818,23 @@ parameters: <configuration> <token>
 
 Removes the <token> from the <configuration>'s tokens list.
 ",
+                    uct => "
+name: uct | update configuration token
+parameters: <configuration> <token>
+
+Updates the token <token> in <configuration>.
+",
                     rdt => "
 name: remove distribution token
 parameters: [<distribution>] <token>
 
 Removes the <token> from the (current) <distribution>'s tokens list.
+",
+                    udt => "
+name: update distribution token
+parameters: [<distribution>] <token>
+
+Updates the <token> in the (current) <distribution>.
 ",
                     rgt => "
 name: remove group token
@@ -814,11 +842,23 @@ parameters: <group> <token>
 
 Removes the <token> from the <group>'s tokens.
 ",
+                    ugt => "
+name: update group token
+parameters: <group> <token>
+
+Updates <token> in <group>.
+",
                     rht => "
 name: remove host token
 parameters: <host> <token>
 
 Removes the <token> from the <host>'s tokens.
+",
+                    uht => "
+name: update host token
+parameters: <host> <token>
+
+Updates <token> in <host>.
 ",
                     rhg => "
 name: rhg | remove host group
@@ -1089,6 +1129,7 @@ Distribution commands:
   gdt | get distribution tokens [<dist>]
   adt | add distribution token [<dist>]
   rdt | remove distribution token [<dist>] <token>
+  udt | update distribution token [<dist>] <token>
   gdg | get distribution groups [<dist>]          
   adg | add distribution group <group> [<location>]
   rdg | remove distribution group <group>          
@@ -1109,6 +1150,7 @@ Host commands:
   ght | get host tokens <host> 
   aht | add host token <host>  
   rht | remove host token <host> <token>
+  uht | update host token <host> <token>
   ghg | get host groups <host>
   ahg | add host group <host> <group> [<location>]
   rhg | remove host group <host> <group> 
@@ -1127,6 +1169,7 @@ Group commands:
    ggt | get group tokens <group>
    agt | add group token <group> 
    rgt | remove group token <group> <token>
+   ugt | update group token <group> <token>
    ggg | get group groups <group> 
    agg | add group group <group1> <group2> [<location>]
    rgg | remove group group <group1> <group2> 
@@ -1146,6 +1189,7 @@ Configuration commands:
    gct | get configuration tokens <conf> 
    act | add configuration token <conf>  
    rct | remove configuration token <conf> <token>
+   uct | update configuration token <conf> <token>
    gm  | get mounts <conf> 
    am  | add mount <conf> {+|-}<mount> [<location>]
    rm  | remove mount <conf> {+|-}<mount> 
@@ -3629,6 +3673,137 @@ sub act {
     } else {
         print "Configuration \"$configuration\" does no exist\n";
     }
+}
+
+sub updateToken {
+    my $node = shift;
+    my $token = shift;
+    my $oldtoken = $db->getTokens($node);
+    unless ($oldtoken) {
+        perror $db->{error}."\n";
+        return;
+    }
+    unless (exists $oldtoken->{$token}) {
+        perror "\"$node->{name}\" don't have a \"$token\" token.\n";
+        return;
+    }
+    $oldtoken = $oldtoken->{$token};
+    my $tmpFile = `mktemp /tmp/staplectl.XXXXXXXX 2>/dev/null`;
+    if ($? != 0) {
+        perror "Can't create temporary file on /tmp/\n";
+        return;
+    }
+    chomp $tmpFile;
+    unless (open(FILE, ">$tmpFile")) {
+        print "Can't open temporary file for writing $tmpFile: $!\n";
+        unlink $tmpFile;
+        return;
+    }
+    print FILE $oldtoken->{raw};
+    close(FILE);
+    unless (edit($tmpFile)) {
+        unlink $tmpFile;
+        return;
+    }
+    my $newtoken = {};
+    unless (open(FILE, "<$tmpFile")) {
+        perror "Can't open saved file for reading: $!\n";
+        return;
+    }
+    {
+        local $/;
+        $newtoken->{raw} = <FILE>;
+        close(FILE);
+    }
+    eval {
+        local $SIG{INT} = sub {die "SIGINT"};
+        $newtoken->{key} = prompt "key", $token;
+        do {
+            $newtoken->{type} = prompt "type (static, dynamic, regexp)", $oldtoken->{type};
+        } until ($newtoken->{type} =~ m/^(?:static|dynamic|regexp)$/);
+    };
+    if ($@) {
+        print "\n";
+        print "$@" if index($@,"SIGINT") != 0;
+        return;
+    }
+    unless ($db->addTokens({$newtoken->{key} => $newtoken}, $node)) {
+        perror $db->{error}."\n";
+    }
+}
+
+sub ugt {
+    my $groupName = shift;
+    my $token = shift;
+    unless ($groupName) {
+        print "Missing group\n";
+        return;
+    }
+    unless ($token) {
+        print "Missing token\n";
+        return
+    }
+    (my $group) = $db->getGroupsByName($groupName);
+    unless ($group) {
+        print "Group \"$groupName\" does not exist\n";
+        return;
+    }
+    updateToken($group, $token);
+}
+
+sub uct {
+    my $configuration = shift;
+    my $token = shift;
+    unless ($configuration) {
+        print "Missing configuration\n";
+        return;
+    }
+    unless ($token) {
+        print "Missing token\n";
+        return;
+    }
+    (my $conf) = $db->getFullConfigurations([$configuration], $distribution);
+    unless ($conf) {
+        print "Configuration \"$configuration\" does no exist\n";
+        return;
+    }
+    updateToken($conf, $token);
+}
+
+sub udt {
+    my $dist = $distribution;
+    $dist = shift if $_[1];
+    my $token = shift;
+    unless ($token) {
+        print "Missing token\n";
+        return;
+    }
+    my $group = $db->getDistributionGroup($dist);
+    unless ($group) {
+        perror $db->{error}."\n";
+        return;
+    }
+    updateToken($group, $token);
+}
+
+
+sub uht {
+    my $host = shift;
+    my $token = shift;
+    unless ($host) {
+        print "Missing host\n";
+        return;
+    }
+    unless ($token) {
+        print "Missing token\n";
+        return;
+    }
+    my $group = $db->getHostGroup($host);
+    unless ($group) {
+        perror $db->{error}."\n";
+        return;
+    }
+    updateToken($group, $token);
 }
 
 sub rct {
