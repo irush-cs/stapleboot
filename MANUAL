@@ -108,6 +108,8 @@ Auto - Auto, or autogroup, is a special form of script. It can configure the
 Template - Template is a single file which is copied at boot (after token
            values substitution). 
 
+Link - A type of template. Create a symbolic link, instead of copy.
+
 Mount - Mount is a single mount point that staple will mount. Mounts are
         configured using tokens, and are either mounted by staple or inserted
         into the fstab for later mount.
@@ -559,6 +561,12 @@ to the staple's tmp directory (which can be read by later scripts). This is the
 only exception, tokens are currently not substituted in the templates'
 destinations.
 
+Links are special types of template. Those are symbolic links the staple will
+create. They are considered templates, and whenever templates are copied, the
+links (if any) are created. Links don't have data, gid, uid or mode. The source
+of the link is the file to link to, and the destination is the location it will
+be created. No tokens substitution is done on links.
+
 Note for using the fs and fsql database, the database keeps the templates as
 files with their proper mode, uid and gid. As such if e.g. the staple database
 is nfs mounted with root squash, templates which are root read-only, will fail
@@ -918,6 +926,7 @@ Staple/Misc.pm - Miscellaneous functions that didn't fit elsewhere.
 Staple/Hangman.pm - Used to hang people.
 
 Staple/Template.pm
+Staple/Link.pm
 Staple/Mount.pm
 Staple/Script.pm
 Staple/Autogroup.pm  - Represents the different settings classes.
@@ -977,6 +986,7 @@ Staple::Setting
     Staple::Script
     Staple::Autogroup
     Staple::Mount
+    Staple::Link (subclass of Staple::Template)
 
 Staple::Node
 

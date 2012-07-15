@@ -14,9 +14,11 @@ use Staple::DB;
 use Staple::Misc;
 use File::Path;
 use Staple::Template;
+use Staple::Link;
 use Staple::Script;
 use Staple::Mount;
 use Staple::DBFactory;
+use Fcntl ':mode';
 
 our @ISA = ("Staple::DB");
 our $VERSION = '007snap';
@@ -501,27 +503,37 @@ sub getTemplates {
     my $self = shift;
     my @configurations = @_;
     my %templates = ();
+    my %links = ();
     foreach my $configuration (@configurations) {
         my $path = $configuration->path()."/templates";
         next unless -d "$path";
         my @raw = map {(my $a = $_) =~ s/$path//; $a} grep {! -d} getDirectoryList("$path");
         foreach my $rawTemplate (@raw) {
             if ($rawTemplate =~ m!^/(.*?)(/.*/?)([^/]*)$!) {
-                (my $mode, my $uid, my $gid) = (stat("$path/$rawTemplate"))[2,4,5];
-                $mode &= 07777;
-                $templates{"$1.$2$3"} = {source => "$path$rawTemplate",
-                                         data => undef,
+                (my $mode, my $uid, my $gid) = (lstat("$path/$rawTemplate"))[2,4,5];
+                if (S_ISLNK($mode)) {
+                    $links{"$1.$2$3"} = {source => readlink "$path$rawTemplate",
                                          destination => "$2$3",
                                          stage => "$1",
                                          configuration => $configuration,
-                                         mode => "$mode",
-                                         uid => "$uid",
-                                         gid => "$gid",
-                                        };
+                                         };
+                } else {
+                    $mode &= 07777;
+                    $templates{"$1.$2$3"} = {source => "$path$rawTemplate",
+                                             data => undef,
+                                             destination => "$2$3",
+                                             stage => "$1",
+                                             configuration => $configuration,
+                                             mode => "$mode",
+                                             uid => "$uid",
+                                             gid => "$gid",
+                                            };
+                }
             }
         }
     }
-    return Staple::Template->new(values %templates) if %templates;
+    return (%templates ? Staple::Template->new(values %templates) : (),
+            %links ? Staple::Link->new(values %links) : ());
     return ();
 }
 
@@ -534,23 +546,35 @@ sub addTemplates {
             push @errors, "Template missing destination";
             next;
         }
-        if ($template->uid() !~ /^\d+$/) {
-            my $uid;
-            (undef, undef, $uid) = getpwnam($template->uid());
-            unless (defined $uid) {
-                push @errors, "can't find uid of \"".$template->uid()."\"";
+        if ($template->type() eq "template") {
+            if ($template->uid() !~ /^\d+$/) {
+                my $uid;
+                (undef, undef, $uid) = getpwnam($template->uid());
+                unless (defined $uid) {
+                    push @errors, "can't find uid of \"".$template->uid()."\"";
+                    next;
+                }
+                $template->uid($uid);
+            }
+            if ($template->gid() !~ /^\d+$/) {
+                my $gid;
+                (undef, undef, $gid) = getgrnam($template->gid());
+                unless (defined $gid) {
+                    push @errors, "can't find gid of \"".$template->gid()."\"";
+                    next;
+                }
+                $template->gid($gid);
+            }
+        } elsif ($template->type() eq "link") {
+            my $version = $self->getVersionOf($template->configuration());
+            # links only available after 006
+            if (versionCompare($version, "006") <= 0) {
+                push @errors, "Links only available after version 006 (this distribution version is $version)";
                 next;
             }
-            $template->uid($uid);
-        }
-        if ($template->gid() !~ /^\d+$/) {
-            my $gid;
-            (undef, undef, $gid) = getgrnam($template->gid());
-            unless (defined $gid) {
-                push @errors, "can't find gid of \"".$template->gid()."\"";
-                next;
-            }
-            $template->gid($gid);
+        } else {
+            push @errors, "Unknown template type for ".$template->destination().": ".$template->type();
+            next;
         }
         my $path = $template->configuration()->path()."/templates/".$template->stage()."/".$template->destination();
         if (-e $path) {
@@ -565,23 +589,38 @@ sub addTemplates {
             push @errors, $self->error();
             next;
         }
-        my $data = $template->data();
-        if ($template->error()) {
-            push @errors, $template->error();
-            next;
-        }
-        unless (open(FILE, ">$path")) {
-            push @errors, "can't open \"$path\" for writing: $!";
-            next;
-        }
-        print FILE $data;
-        close(FILE);
-        unless (chown $template->uid(), $template->gid(), $path) {
-            push @errors, "can't chown \"$path\": $!";
-            next;
-        }
-        unless (chmod($template->mode(), $path)) {
-            push @errors, "can't chmod \"$path\": $!";
+        if ($template->type() eq "template") {
+            my $data = $template->data();
+            if ($template->error()) {
+                push @errors, $template->error();
+                next;
+            }
+            unless (open(FILE, ">$path")) {
+                push @errors, "can't open \"$path\" for writing: $!";
+                next;
+            }
+            print FILE $data;
+            close(FILE);
+            unless (chown $template->uid(), $template->gid(), $path) {
+                push @errors, "can't chown \"$path\": $!";
+                next;
+            }
+            unless (chmod($template->mode(), $path)) {
+                push @errors, "can't chmod \"$path\": $!";
+                next;
+            }
+        } elsif ($template->type() eq "link") {
+            my $source = $template->source();
+            if ($template->error()) {
+                push @errors, $template->error();
+                next;
+            }
+            unless (symlink $source, $path) {
+                push @errors, "Can't create link $path -> $source: $!";
+                next;
+            }
+        } else {
+            push @errors, "Unknown template type for ".$template->destination().": ".$template->type()." (I've checked this already, this shouldn't be)";
             next;
         }
     }
@@ -598,12 +637,12 @@ sub removeTemplates {
     my @errors = ();
     foreach my $template (@templates) {
         my $path = $template->configuration()->path()."/templates/".$template->stage()."/".$template->destination();
-        unless (-e $path) { 
-            push @errors, "Can't remove template \"".$template->destination()."\", it does not exist in the configuration \"".$template->configuration()->name()."\"";
+        unless (-e $path or ($template->type() eq "link" and -l $path)) {
+            push @errors, "Can't remove ".$template->type()." \"".$template->destination()."\", it does not exist in the configuration \"".$template->configuration()->name()."\"";
             next;
         }
         unless (unlink $path) {
-            push @errors, "Can't remove template $path: $!";
+            push @errors, "Can't remove ".$template->type()." $path: $!";
             next;
         }
         # remove empty dirs

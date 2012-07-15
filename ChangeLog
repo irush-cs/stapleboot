@@ -1,5 +1,6 @@
 Staple 007snap
 
+	* Added support for symbolic links, currently only in DB::FS.
 	* staplectl: update tokens
 	* Optional default host when no host is configured
 	* Added __AUTO_DB__ token with database information

@@ -63,6 +63,7 @@ my %commands = (
                 rm => \&rm,
                 gt => \&gtm,
                 at => \&at,
+                al => \&al,
                 rt => \&rt,
                 ut => \&ut,
                 gs => \&gs,
@@ -175,6 +176,7 @@ my %commandMap = (
                   rm                               => "rm",
                   gt                               => "gt",
                   at                               => "at",
+                  al                               => "al",
                   rt                               => "rt",
                   ut                               => "ut",
                   gs                               => "gs",
@@ -317,6 +319,7 @@ my %commandMap = (
                   gettemplates                     => "gtm",
                   gettemplatesource                => "gts",
                   addtemplate                      => "at",
+                  addlink                          => "al",
                   removetemplate                   => "rt",
                   updatetemplate                   => "ut",
                   getscripts                       => "gs",
@@ -381,6 +384,7 @@ my %commandCompletionMap =
    rm        => [\&configuration_completion, \&mount_completion],
    gt        => [\&configuration_completion],
    at        => [\&configuration_completion],
+   al        => [\&configuration_completion],
    rt        => [\&configuration_completion, \&template_stage_completion, \&template_completion],
    ut        => [\&configuration_completion, \&template_stage_completion, \&template_completion],
    gs        => [\&configuration_completion],
@@ -556,7 +560,16 @@ the template. After it finishes, you'll be prompt for the template's parameters:
          gid: The gid of the template either gid or name, defaults to 0.
         mode: The permissions of the template, octal, defaults to 644.
        stage: when to copy the template: mount, sysinit or final.
- destination: where to coy the template to.
+ destination: where to copy the template to.
+",
+                    al => "
+name: al | add link
+parameters: <configuration>
+
+Adds a new link to <configuration>. You'll be prompt for the link's parameters:
+       stage: when to create the link: mount, sysinit or final.
+      source: To where the link will point.
+ destination: where to create the link.
 ",
                     rt => "
 name: rt | remove template
@@ -1196,6 +1209,7 @@ Configuration commands:
    gt  | get templates <conf> 
    gts | get template source <conf> <stage> <template>
    at  | add template <conf> 
+   al  | add link <conf>
    rt  | remove template <conf> <stage> <template> 
    ut  | update template <conf> <stage> <template> 
    gs  | get scripts <conf> 
@@ -2582,6 +2596,42 @@ sub rt {
     }
 }
 
+sub al {
+    my $configuration = shift;
+    unless ($configuration) {
+        print "Missing configuration\n";
+        return undef;
+    }
+    (my $conf) = $db->getConfigurationsByName($configuration);
+    unless ($conf) {
+        print "unknown configuration \"$configuration\"\n";
+        return undef;
+    }
+    ($conf) = $db->getFullConfigurations([$conf], $distribution);
+    unless ($conf) {
+        print "No such configuration \"$configuration\" under the \"$distribution\" distribution\n";
+        return undef;
+    }
+
+    eval {
+        local $SIG{INT} = sub {die "SIGINT"};
+        my %link;
+        do {
+            $link{stage} = prompt "stage (mount, sysinit, final)";
+        } until ($link{stage} =~ m/^(?:mount|sysinit|final)$/);
+        $link{source} = prompt "source";
+        do {
+            $link{destination} = prompt "destination";
+        } until ($link{destination});
+        $link{configuration} = $conf;
+        perror $db->{error}."\n" unless ($db->addTemplates(Staple::Link->new(\%link)));
+    };
+    if ($@) {
+        print "\n";
+        print "$@" if index($@,"SIGINT") != 0;
+    }
+}
+
 sub at {
     my $configuration = shift;
     unless ($configuration) {
@@ -2650,48 +2700,72 @@ sub ut {
             print "No such template \"$template_name\" in \"$configuration\"\n";
             return;
         }
-        my $data = $template->data();
-        if ($template->error()) {
-            print $template->error()."\n";
+
+        if ($template->type() eq "link") {
+            eval {
+                local $SIG{INT} = sub {die "SIGINT"};
+                my %newLink;
+                do {
+                    $newLink{stage} = prompt "stage (mount, sysinit, final)", $template->stage();
+                } until ($newLink{stage} =~ m/^(?:mount|sysinit|final)$/);
+                $newLink{source} = prompt "source", $template->source();
+                $newLink{destination} = prompt "destination", $template->destination();
+                $newLink{configuration} = $template->configuration();
+                perror $db->{error}."\n" unless ($db->removeTemplates($template));
+                perror $db->{error}."\n" unless ($db->addTemplates(Staple::Link->new(\%newLink)));
+            };
+            if ($@) {
+                print "\n";
+                print "$@" if index($@,"SIGINT") != 0;
+            }
+        } elsif ($template->type() eq "template") {
+
+            my $data = $template->data();
+            if ($template->error()) {
+                print $template->error()."\n";
+                return;
+            }
+            my $tmpFile = `mktemp /tmp/staplectl.XXXXXXXX 2>/dev/null`;
+            if ($? != 0) {
+                print "Can't create temporary file on /tmp/\n";
+                return;
+            }
+            chomp $tmpFile;
+            unless (open(FILE, ">$tmpFile")) {
+                print "Can't open temp file for writing $tmpFile: $!\n";
+                unlink $tmpFile;
+                return;
+            }
+            print FILE $data;
+            close(FILE);
+            unless (edit($tmpFile)) {
+                unlink $tmpFile;
+                return;
+            }
+            eval {
+                local $SIG{INT} = sub {die "SIGINT"};
+                my %newTemplate;
+                $newTemplate{source} = $tmpFile;
+                $newTemplate{uid} = prompt "uid", $template->uid();
+                $newTemplate{gid} = prompt "gid", $template->gid();
+                $newTemplate{mode} = oct(prompt "mode", sprintf("%04o", $template->mode()));
+                do {
+                    $newTemplate{stage} = prompt "stage (mount, sysinit, final)", $template->stage();
+                } until ($newTemplate{stage} =~ m/^(?:mount|sysinit|final)$/);
+                $newTemplate{destination} = prompt "destination", $template->destination();
+                $newTemplate{configuration} = $template->configuration();
+                perror $db->{error}."\n" unless ($db->removeTemplates($template));
+                perror $db->{error}."\n" unless ($db->addTemplates(Staple::Template->new(\%newTemplate)));
+            };
+            if ($@) {
+                print "\n";
+                print "$@" if index($@,"SIGINT") != 0;
+            }
+            unlink $tmpFile
+        } else {
+            print "Bad template type: ".$template->type()."\n";
             return;
         }
-        my $tmpFile = `mktemp /tmp/staplectl.XXXXXXXX 2>/dev/null`;
-        if ($? != 0) {
-            print "Can't create temporary file on /tmp/\n";
-            return;
-        }
-        chomp $tmpFile;
-        unless (open(FILE, ">$tmpFile")) {
-            print "Can't open temp file for writing $tmpFile: $!\n";
-            unlink $tmpFile;
-            return;
-        }
-        print FILE $data;
-        close(FILE);
-        unless (edit($tmpFile)) {
-            unlink $tmpFile;
-            return;
-        }
-        eval {
-            local $SIG{INT} = sub {die "SIGINT"};
-            my %newTemplate;
-            $newTemplate{source} = $tmpFile;
-            $newTemplate{uid} = prompt "uid", $template->uid();
-            $newTemplate{gid} = prompt "gid", $template->gid();
-            $newTemplate{mode} = oct(prompt "mode", sprintf("%04o", $template->mode()));
-            do {
-                $newTemplate{stage} = prompt "stage (mount, sysinit, final)", $template->stage();
-            } until ($newTemplate{stage} =~ m/^(?:mount|sysinit|final)$/);
-            $newTemplate{destination} = prompt "destination", $template->destination();
-            $newTemplate{configuration} = $template->configuration();
-            perror $db->{error}."\n" unless ($db->removeTemplates($template));
-            perror $db->{error}."\n" unless ($db->addTemplates(Staple::Template->new(\%newTemplate)));
-        };
-        if ($@) {
-            print "\n";
-            print "$@" if index($@,"SIGINT") != 0;
-        }
-        unlink $tmpFile
     } else {
         print "No such template \"$template_name\" in \"$configuration\"\n";
         return;

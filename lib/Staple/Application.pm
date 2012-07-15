@@ -437,11 +437,11 @@ sub applyTemplates {
     my $stage = shift;
     foreach my $template (@{$self->{templates}}) {
         next if $template->stage() ne $stage;
-        $self->output("Applying template: ".$template->destination(), 2);
+        $self->output("Applying ".$template->type().": ".$template->destination(), 2);
         my $applied = $template->apply($self->{tokens}, $self->{rootDir});
         unless ($applied) {
             $self->error("applyTemplates: ".$template->error());
-            $self->addMail("Error applying template: ".$template->error());
+            $self->addMail("Error applying ".$template->type().": ".$template->error());
             next;
         }
         push @{$self->{applied}->{templates}}, $applied;
