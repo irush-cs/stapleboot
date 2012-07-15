@@ -82,12 +82,6 @@ noted). Most of them are set automatically by the member functions.
 
 =back
 
-=cut
-
-################################################################################
-#   Methods
-################################################################################
-
 =head1 METHODS
 
 =over
@@ -443,62 +437,14 @@ sub applyTemplates {
     my $stage = shift;
     foreach my $template (@{$self->{templates}}) {
         next if $template->stage() ne $stage;
-        my $configurationPath = $template->configuration()->path()."/templates/$stage";
-        
-        my $data = $template->data();
-        if ($template->error()) {
+        $self->output("Applying template: ".$template->destination(), 2);
+        my $applied = $template->apply($self->{tokens}, $self->{rootDir});
+        unless ($applied) {
             $self->error("applyTemplates: ".$template->error());
-            $self->addMail("Error reading template: ".$template->error());
+            $self->addMail("Error applying template: ".$template->error());
             next;
         }
-
-        $self->{tokens}->{__AUTO_CONFIGURATION__} = {key => "__AUTO_CONFIGURATION__",
-                                                     value => $template->configuration()->name(),
-                                                     raw => $template->configuration()->name(),
-                                                     type => "static",
-                                                     source => "auto"};
-        $self->{tokens}->{__AUTO_STAGE__} = {key => "__AUTO_STAGE__",
-                                             value => $template->stage(),
-                                             raw => $template->stage(),
-                                             type => "static",
-                                             source => "auto"};
-        $data = applyTokens($data, $self->{tokens});
-        delete $self->{tokens}->{__AUTO_CONFIGURATION__};
-        delete $self->{tokens}->{__AUTO_STAGE__};
-        my $destination = "$self->{rootDir}".$template->destination();
-        if ($template->destination() =~ m@^/__AUTO_TMP__/@) {
-            $destination = $template->destination();
-            $destination =~ s@^/__AUTO_TMP__@$self->{tmpDir}@;
-        }
-        $destination = fixPath($destination);
-        my @dirs = splitData($destination);
-        pop @dirs;
-        foreach my $dir (@dirs) {
-            unless (-e "$dir") {
-                mkdir "$dir";
-                (my $mode, my $uid, my $gid) = (stat("$configurationPath$dir"))[2,4,5];
-                chown $uid, $gid, "$dir";
-                chmod $mode & 07777, "$dir";
-            }
-        }
-        $self->output("Applying template: $destination", 2);
-        if (open(FILE, ">$destination")) {
-            print FILE $data;
-            close(FILE);
-            #(my $mode, my $uid, my $gid) = (stat("$template->{source}"))[2,4,5];
-            #chown $uid, $gid, "$rootDir$template->{destination}";
-            #chmod $mode & 07777, "$rootDir$template->{destination}";
-            chown $template->uid(), $template->gid(), "$destination";
-            chmod $template->mode(), "$destination";
-            if ($template->source()) {
-                push @{$self->{applied}->{templates}}, $template->source();
-            } else {
-                push @{$self->{applied}->{templates}}, $destination;
-            }
-        } else {
-            $self->error("applyTemplates error (".$template->destination()."): $!");
-            $self->addMail("Error coping template ".$template->destination()." from ".$template->configuration()->name().": $!");
-        }
+        push @{$self->{applied}->{templates}}, $applied;
     }
 }
 

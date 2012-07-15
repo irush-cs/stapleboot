@@ -23,7 +23,9 @@ Staple::Template module. Subclass of Staple::Setting
 
 use strict;
 use warnings;
+use Staple::Misc;
 use Staple::Setting;
+use Clone qw(clone);
 require Exporter;
 
 our @ISA = ("Staple::Setting");
@@ -147,6 +149,77 @@ I<gid> is undef don't change it, just return the current one.
 sub gid {
     my $self = shift;
     return $self->param("gid", shift);
+}
+
+=item B<apply(I<tokens hash>, I<rootdir>)>
+
+Applies this template with the given I<tokens>, into I<rootdir>. Returns the
+template source (or destination) on success or undef on error (and sets the
+error()).
+
+=cut
+
+sub apply {
+    my $self = shift;
+    my $tokens = clone(shift);
+    my $rootdir = shift;
+
+    my $confname = $self->configuration()->name();
+    my $data = $self->data();
+    if ($self->error()) {
+        return undef;
+    }
+
+    $tokens->{__AUTO_CONFIGURATION__} = {key => "__AUTO_CONFIGURATION__",
+                                         value => $confname,
+                                         raw => $confname,
+                                         type => "static",
+                                         source => "auto"};
+    $tokens->{__AUTO_STAGE__} = {key => "__AUTO_STAGE__",
+                                 value => $self->stage(),
+                                 raw => $self->stage(),
+                                 type => "static",
+                                 source => "auto"};
+    $data = applyTokens($data, $tokens);
+    delete $tokens->{__AUTO_CONFIGURATION__};
+    delete $tokens->{__AUTO_STAGE__};
+    my $destination = "$rootdir".$self->destination();
+    if ($self->destination() =~ m@^/__AUTO_TMP__/@ and
+        exists $tokens->{__AUTO_TMP__}) {
+        $destination = $self->destination();
+        $destination =~ s@^/__AUTO_TMP__@$tokens->{__AUTO_TMP__}->{value}@;
+    }
+    $destination = fixPath($destination);
+
+    my @dirs = splitData($destination);
+    pop @dirs;
+    my $configurationPath = $self->configuration()->path()."/templates/$self->{stage}";
+    foreach my $dir (@dirs) {
+        unless (-e "$dir") {
+            mkdir "$dir";
+            (my $mode, my $uid, my $gid) = (stat("$configurationPath$dir"))[2,4,5];
+            chown $uid, $gid, "$dir";
+            chmod $mode & 07777, "$dir";
+        }
+    }
+
+    if (open(FILE, ">$destination")) {
+        print FILE $data;
+        close(FILE);
+        #(my $mode, my $uid, my $gid) = (stat("$template->{source}"))[2,4,5];
+        #chown $uid, $gid, "$rootDir$template->{destination}";
+        #chmod $mode & 07777, "$rootDir$template->{destination}";
+        chown $self->uid(), $self->gid(), "$destination";
+        chmod $self->mode(), "$destination";
+        if ($self->source()) {
+            return $self->source();
+        } else {
+            return $destination;
+        }
+    } else {
+        $self->{error} = "Can't write to $destination: $!";
+        return undef;
+    }
 }
 
 =item B<description(I<level>)>
