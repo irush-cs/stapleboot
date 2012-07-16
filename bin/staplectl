@@ -4933,6 +4933,10 @@ sub version_completion {
 
 sub attempted_completion {
     my ($text, $line, $start, $end) = @_;
+    if ($attribs->{gnu_readline_p} and $line =~ m,//,) {
+        $line =~ s,/+,/,g;
+        Term::ReadLine::Gnu::XS::rl_replace_line("$line", 0);
+    }
     $currentCommand = substr($line, 0, $start);
     if (substr($line, 0, $start) =~ /^\s*$/) {
         return $input->completion_matches($text, \&command_completion);
