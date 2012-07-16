@@ -1126,11 +1126,13 @@ sub getAllConfigurations {
     my $self = shift;
     my $distribution = shift;
     my $path = $self->getConfigurationPath("/", $distribution);
-    return () unless $path;
+    my @configurations = ();
+    if ($path) {
+        @configurations = getDirectoryList($path);
+        @configurations = grep {-d $_ } @configurations;
+        @configurations = grep { s/^$path//; $_} @configurations;
+    }
     my $version = $self->getDistributionVersion($distribution);
-    my @configurations = getDirectoryList($path);
-    @configurations = grep {-d $_ } @configurations;
-    @configurations = grep { s/^$path//; $_} @configurations;
     if (versionCompare($version, "004") < 0) {
         @configurations = grep { m!^/[^/]+$! or m!configurations/[^/]+$! } @configurations;
         @configurations = map { s!/configurations/!/!g; $_ } @configurations;
