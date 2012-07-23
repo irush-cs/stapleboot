@@ -532,9 +532,9 @@ sub getTemplates {
             }
         }
     }
-    return (%templates ? Staple::Template->new(values %templates) : (),
-            %links ? Staple::Link->new(values %links) : ());
-    return ();
+    my @templates =  (%templates ? Staple::Template->new(values %templates) : (),
+                      %links ? Staple::Link->new(values %links) : ());
+    return @templates;
 }
 
 sub addTemplates {
