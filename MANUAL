@@ -845,7 +845,8 @@ Configuration: A configuration directory contains the followings:
                    scripts. 
   templates/     - The templates directory. Contains a directory for each
                    stage. Each stage directory contains the template's full
-                   path.
+                   path. If the template is a link, it is saved as a symbolic
+                   link pointing to the source.
   subconfs/      - A directory. Contains a configuration directory for each
                    subconfiguration 
 
