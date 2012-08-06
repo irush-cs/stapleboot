@@ -1873,11 +1873,16 @@ sub ct {
     $template2_dest = $template1_dest unless $template2_dest;
 
     if ($dist1 eq $dist2 and
-        $conf1 eq $conf2) {
+        $conf1 eq $conf2 and
+        $stage1 eq $stage2 and
+        $template1_dest eq $template2_dest) {
         print "To update a template use the \"update template\" command instead\n";
         return;
     }
-    if ($conf1 eq $conf2 and $conf1 =~ m,^common/,) {
+    if ($conf1 eq $conf2 and
+        $stage1 eq $stage2 and
+        $template1_dest eq $template2_dest and
+        $conf1 =~ m,^common/,) {
         print "Use \"update template\" for updating common template on the same configuration\n";
         return;
     }
