@@ -1526,25 +1526,35 @@ sub whc {
         print "Missing configuration\n";
         return;
     }
-    my @groups;
+    (my $conf) = $db->getFullConfigurations([$configuration], $distribution);
+    unless ($conf) {
+        perror "No such configuration \"$configuration\" (for $distribution)\n";
+        return;
+    }
+
+    my $agroups;
+    my $ngroups;
     eval {
         local $SIG{INT} = sub {die "SIGINT"};
-        @groups = $db->whoHasConfiguration($configuration, $distribution);
+        ($agroups,$ngroups) = $db->whoHasConfiguration($configuration, $distribution);
     };
     if ($@) {
         print "\n";
         print "$@" if index($@,"SIGINT") != 0;
         return;
     }
-    if (@groups and not defined $groups[0]) {
+    if (not defined $agroups) {
         perror $db->{error}."\n";
         return;
     }
     foreach my $type ("host", "distribution", "group", "configuration") {
-        my @subset = grep {$_->type() eq $type} @groups;
-        if (@subset) {
+        my @asubset = grep {$_->type() eq $type} @$agroups;
+        my @nsubset = grep {$_->type() eq $type} @$ngroups;
+        if (@asubset or @nsubset) {
             print "${type}s:\n";
-            print join("\n", map {"  ".$_->name()} sort {$a->name() cmp $b->name()}  @subset);
+            print join("\n", map {"  (+) ".$_->name()} sort {$a->name() cmp $b->name()}  @asubset);
+            print "\n" if @asubset;
+            print join("\n", map {"  (-) ".$_->name()} sort {$a->name() cmp $b->name()}  @nsubset);
             print "\n\n";
         }
     }
@@ -1556,8 +1566,14 @@ sub whg {
         print "Missing group\n";
         return;
     }
+    (my $groupr) = $db->getGroupsByName($group);
+    unless ($groupr) {
+        perror "No such group \"$group\"\n";
+        return;
+    }
+
     my @groups;
- eval {
+    eval {
         local $SIG{INT} = sub {die "SIGINT"};
         @groups = $db->whoHasGroup($group);
     };

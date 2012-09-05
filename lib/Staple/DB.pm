@@ -1006,12 +1006,12 @@ sub whoHasToken {
 
 =item B<whoHasConfiguration(I<configuration name, [distribution]>)>
 
-Receives a single configuration name (string), and returns a node list, of the
-nodes that are attached to the given configuration. The output can be a group,
-host, distribution groups or configurations. The output also includes nodes
-which contains a removed configurations.
+Receives a single configuration name (string), and returns two list refs on
+nodes.The first list are nodes where the configuration is active; and the
+second, inactive. Each node can be either a group, host, distribution groups or
+configurations.
 
-If the second argument is a valide distribution name, then configurations for
+If the second argument is a valid distribution name, then configurations for
 that distribution are also checked.
 
 On error undef is returned, and the error is set.
@@ -1024,23 +1024,52 @@ sub whoHasConfiguration {
     my $distribution = shift;
     $distribution = undef if defined $distribution and not $self->getDistributionGroup($distribution);
 
-    my @groups;
+    my @agroups;
+    my @ngroups;
     foreach my $group ((map {$self->getHostGroup($_)} $self->getAllHosts()),
                        (map {$self->getDistributionGroup($_)} $self->getAllDistributions()),
                        $self->getGroupsByName($self->getAllGroups())) {
         my @configurations = $self->getGroupConfigurations($group);
-        push @groups, $group if grep {$_->name() =~ /^${configuration}/} @configurations;
+        foreach my $conf (reverse @configurations) {
+            if ($conf->name() =~ /^${configuration}(?:\/|$)/) {
+                if ($conf->active()) {
+                    push @agroups, $group;
+                } else {
+                    # for inactive, need an exact match
+                    if ($conf->name() eq ${configuration}) {
+                        push @ngroups, $group;
+                    } else {
+                        # skip the next line's "last"
+                        next;
+                    }
+                }
+                last;
+            }
+        }
     }
 
     # recursive configurations and common configuration only from 004
     if ($distribution and versionCompare($self->getDistributionVersion($distribution), "004") >= 0) {
         foreach my $conf ($self->getFullConfigurations([$self->getAllConfigurations($distribution)], $distribution)) {
             my @configurations = $self->getConfigurationConfigurations($conf);
-            push @groups, $conf if grep {$_->name() =~ /^${configuration}/} @configurations;
+            foreach my $inconf (reverse @configurations) {
+                if ($inconf->name() =~ /^${configuration}(?:\/|$)/) {
+                    if ($inconf->active()) {
+                        push @agroups, $conf;
+                    } else {
+                        if ($conf->name() eq ${configuration}) {
+                            push @ngroups, $conf;
+                        } else {
+                            next;
+                        }
+                    }
+                    last;
+                }
+            }
         }
     }
 
-    return @groups;
+    return (\@agroups, \@ngroups);
 }
 
 #=item B<getConfigurationPath(I<conf string, distribution>)

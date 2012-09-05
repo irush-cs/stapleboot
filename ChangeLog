@@ -1,5 +1,6 @@
 Staple 007snap
 
+	* staplectl: whc to show whether configurations are active/inactive
 	* Added support for symbolic links, currently only in DB::FS.
 	* staplectl: update tokens
 	* Optional default host when no host is configured

@@ -1173,6 +1173,7 @@ sub whoHasGroup {
 }
 
 # re-activate after checking for common configurations
+# and when returning the active state
 ##sub whoHasConfiguration {
 ##    my $self = shift;
 ##    my $configuration = shift;
