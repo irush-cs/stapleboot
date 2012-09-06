@@ -31,6 +31,7 @@ use Staple;
 use Staple::Misc;
 use Staple::Hangman;
 use Staple::Application::Stapler;
+use File::Temp;
 
 my @allStages = qw(autoscripts auto mounttemplates mountscripts mount sysinittemplates sysinitscripts finaltemplates finalscript);
 
@@ -52,6 +53,7 @@ options are:
  --gt | --group-tokens\t add tokens from group
  --ct | --configuration-tokens\t\t add tokens from configurations
  --ht | --host-tokens\t\t add tokens from the host
+ --lt | --log-tokens\t\t add tokens from staple log
   -g  | --group\t\t apply group
   -c  | --configuration\t apply configuration
   -a  | --all\t\t If no -g -c are present, execute all instead of
@@ -126,7 +128,6 @@ my $mounts = 0;
 my $fstab = 0;
 my $doall = 0;
 my $database = "";
-#my $hosttokens = 0;
 my $extraTokens;
 my @stages = ();
 my @configurations;
@@ -134,6 +135,7 @@ my @groups;
 my @configurations_tokens;
 my @groups_tokens;
 my $hosttokens = 0;
+my $logtokens = 0;
 unless (GetOptions('help|h|?'                  => \$help,
                    'stage|s=s'                 => \@stages,
                    'host=s'                    => \$host,
@@ -147,6 +149,7 @@ unless (GetOptions('help|h|?'                  => \$help,
                    'group-tokens|gt=s'         => \@groups_tokens,
                    'configuration-tokens|ct=s' => \@configurations_tokens,
                    'host-tokens|ht!'           => \$hosttokens,
+                   'log-tokens|lt!'            => \$logtokens,
                    'all|a'                     => \$doall,
                    'database|db=s'             => \$database,
                   )) {
@@ -253,6 +256,39 @@ if (scalar @{$stapler->{configurations}} > 0) {
     $stapler->output("no configurations");
 }
 
+if ($logtokens) {
+    if (-r $stapler->{staplelog} and open(LOG, $stapler->{staplelog})) {
+        # get tokens from log
+        local $/;
+        my $log = <LOG>;
+        close(LOG);
+        $log =~ s/^.*(<tokens>.*<\/tokens>\n?).*/$1/s;
+
+        # write tokens to tmp file
+        (my $fh, my $tmptokens) = mkstemp("$stapler->{tmpDir}/tokens.XXXXXXXX");
+        print $fh $log;
+        close($fh);
+
+        # read tmp file
+        my %tokens = readTokensXMLFile("$tmptokens");
+
+        # fix source to log
+        foreach my $key (keys %tokens) {
+            $tokens{$key}->{source} = "log:file:$stapler->{staplelog}";
+        }
+
+        # delete tmp file
+        unlink $tmptokens;
+
+        # prepend tokens
+        my $oldTokens = $stapler->{tokens};
+        $stapler->setTokens(\%tokens);
+        $stapler->addTokens($oldTokens);
+    } else {
+        $stapler->error("Can't read staple log for tokens");
+    }
+}
+
 if (not $doall) {
     exit 0;
 }
@@ -272,34 +308,34 @@ if (grep {$_ eq "autoscripts"} @stages) {
 if (grep {$_ eq "auto"} @stages) {
     $stapler->output("Auto", 1);
     my @autoGroups = $stapler->applyAutos();
-    if (@autoGroups) {
-        $stapler->output("Automatically added groups:\n".join("\n", @autoGroups), 2);
-    } else { 
+    unless (@autoGroups) {
         $stapler->output("No automatically added groups", 2);
-    }
-    my @realGroups = $stapler->{db}->getGroupsByName(@autoGroups);
-    if (scalar @realGroups != scalar @autoGroups) {
-        my @missings = grep {my $a = $_; not grep {$a eq $_->name()} @realGroups} @autoGroups;
-        my $error = "Unknown groups from autogroup script:\n  ".join("\n  ", @missings)."\n";
-        $stapler->error("$error");
-    }
+    } else {
+        $stapler->output("Automatically added groups:\n".join("\n", @autoGroups), 2);
+        my @realGroups = $stapler->{db}->getGroupsByName(@autoGroups);
+        if (scalar @realGroups != scalar @autoGroups) {
+            my @missings = grep {my $a = $_; not grep {$a eq $_->name()} @realGroups} @autoGroups;
+            my $error = "Unknown groups from autogroup script:\n  ".join("\n  ", @missings)."\n";
+            $stapler->error("$error");
+        }
 
-    my @g = $stapler->{db}->getGroupsByName(@groups);
-    unshift @g, $stapler->{db}->getHostGroup($host) if ($withhost);
-    unshift @g, $stapler->{db}->getGroupsByName(@autoGroups);
-    unshift @g, $stapler->{db}->getDistributionGroup($distribution) if ($withdist);
-    $stapler->setGroups(@g);
+        my @g = $stapler->{db}->getGroupsByName(@groups);
+        unshift @g, $stapler->{db}->getHostGroup($host) if ($withhost);
+        unshift @g, $stapler->{db}->getGroupsByName(@autoGroups);
+        unshift @g, $stapler->{db}->getDistributionGroup($distribution) if ($withdist);
+        $stapler->setGroups(@g);
     
-    $stapler->{configurations} = [$stapler->{db}->getCompleteConfigurations([$stapler->{db}->getGroupsConfigurations(@{$stapler->{groups}}), $stapler->{db}->getConfigurationsByName(@configurations)], $stapler->{distribution}, \@badConfigurations)];
-    $stapler->updateSettings();
+        $stapler->{configurations} = [$stapler->{db}->getCompleteConfigurations([$stapler->{db}->getGroupsConfigurations(@{$stapler->{groups}}), $stapler->{db}->getConfigurationsByName(@configurations)], $stapler->{distribution}, \@badConfigurations)];
+        $stapler->updateSettings();
 
-    if (@badConfigurations) {
-        my $error = "Unknown configurations for current distribution ($stapler->{distribution}):\n  ".join("\n  ", @badConfigurations)."\n";
-        $stapler->error("$error");
-    }
+        if (@badConfigurations) {
+            my $error = "Unknown configurations for current distribution ($stapler->{distribution}):\n  ".join("\n  ", @badConfigurations)."\n";
+            $stapler->error("$error");
+        }
     
-    if ($extraTokens) {
-        $stapler->addTokens($extraTokens);
+        if ($extraTokens) {
+            $stapler->addTokens($extraTokens);
+        }
     }
 }
 
