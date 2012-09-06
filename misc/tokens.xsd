@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+    <xs:simpleType name="typeType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="static"/>
+            <xs:enumeration value="dynamic"/>
+            <xs:enumeration value="regexp"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:complexType name="tokenType">
+        <xs:all>
+            <xs:element name="key"    type="xs:string" minOccurs="1" maxOccurs="1" />
+            <xs:element name="type"   type="typeType"  minOccurs="1" maxOccurs="1" />
+            <xs:element name="raw"    type="xs:string" minOccurs="0" maxOccurs="1" />
+            <xs:element name="value"  type="xs:string" minOccurs="0" maxOccurs="1" />
+            <xs:element name="source" type="xs:string" minOccurs="0" maxOccurs="1" />
+        </xs:all>
+    </xs:complexType>
+
+    <xs:element name="tokens">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="token" type="tokenType" minOccurs="0" maxOccurs="unbounded"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- Local Variables: -->
+    <!-- sgml-indent-step:4 -->
+    <!-- End: -->
+
+</xs:schema>
