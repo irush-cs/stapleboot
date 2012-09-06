@@ -119,15 +119,55 @@ our $VERSION = '007snap';
 
 Compares between 2 versions of staple and returns -1, 0, or 1 if version1 is
 lower than, equal to, or greater than version2. "none" and undef are lower than
-everything. "none" is equal to "none". (\d{3})snap is lower than \1.
-
-Currently supports \d{3}(snap)? and "none" versions. Unknown (future) versions
-are considered greater than known ones. Two unknown versions are compared as
-strings.
+everything. "none" is equal to "none". (\d{3})(snap)? is the older version
+style and will be commpared with the older rules.
 
 =cut
 
 sub versionCompare {
+    my $a = shift;
+    my $b = shift;
+
+    $a = "none" if not defined $a;
+    $b = "none" if not defined $b;
+
+    return 0 if $a eq $b;
+
+    my $oldre = qr(^(?:\d{3}(?:snap)?|none)$);
+
+    if ($a =~ $oldre and
+        $b =~ $oldre) {
+        return oldVersionCompare($a, $b);
+    }
+    return -1 if $a =~ $oldre;
+    return 1 if $b =~ $oldre;
+
+    while ($a or $b) {
+        (my $aa, my $as, $a) = $a =~ m/^([^\.-]*)([\.-])?(.*)?$/;
+        (my $bb, my $bs, $b) = $b =~ m/^([^\.-]*)([\.-])?(.*)?$/;
+        $aa = undef if defined $aa and $aa eq "";
+        $bb = undef if defined $bb and $bb eq "";
+        return 0 if (not defined $aa and not defined $bb);
+        return -1 if (defined $bb and not defined $aa);
+        return 1 if (defined $aa and not defined $bb);
+        if ($aa =~ /^\d*$/ and $bb =~ /^\d*$/) {
+            my $cc = $aa <=> $bb;
+            return $cc if $cc;
+            return -1 if ($bs and $as and $bs eq "." and $as ne ".");
+            return 1 if ($bs and $as and $as eq "." and $bs ne ".");
+            next;
+        }
+        my $cc = $aa cmp $bb;
+        return $cc if $cc;
+        return -1 if ($bs and $as and $bs eq "." and $as ne ".");
+        return 1 if ($bs and $as and $as eq "." and $bs ne ".");
+        next;
+    }
+    return 0;
+}
+
+# old style compere, \d{3}(snap)?
+sub oldVersionCompare {
     my $v1 = shift;
     my $v2 = shift;
 
