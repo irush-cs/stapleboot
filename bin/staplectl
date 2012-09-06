@@ -3822,6 +3822,11 @@ sub updateToken {
         print "$@" if index($@,"SIGINT") != 0;
         return;
     }
+    if ($newtoken->{key} ne $token) {
+        unless ($db->removeTokens([$token], $node)) {
+            perror "Can't remove previous token: ".$db->{error}."\n";
+        }
+    }
     unless ($db->addTokens({$newtoken->{key} => $newtoken}, $node)) {
         perror $db->{error}."\n";
     }
