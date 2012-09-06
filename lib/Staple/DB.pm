@@ -15,7 +15,7 @@ use Staple::Group;
 use Staple::Host;
 use Staple::Distribution;
 
-our $VERSION = '007snap';
+our $VERSION = '0.2';
 
 =head1 NAME
 

@@ -21,7 +21,7 @@ use Staple::DBFactory;
 use Fcntl ':mode';
 
 our @ISA = ("Staple::DB");
-our $VERSION = '007snap';
+our $VERSION = '0.2';
 
 =head1 NAME
 

@@ -19,7 +19,7 @@ use Staple::Script;
 use Staple::Template;
 
 our @ISA = ("Staple::DB::SQL");
-our $VERSION = '007snap';
+our $VERSION = '0.2';
 
 =head1 NAME
 

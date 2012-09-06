@@ -1,5 +1,6 @@
-Staple 007snap
+Staple 0.2
 
+	* version system change
 	* stapler: Can read staple log for tokens
 	* staplectl: whc to show whether configurations are active/inactive
 	* Added support for symbolic links, currently only in DB::FS.
