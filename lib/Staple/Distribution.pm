@@ -29,7 +29,7 @@ use Staple::Misc;
 require Exporter;
 
 our @ISA = ("Staple::Group");
-our $VERSION = '0.2';
+our $VERSION = '0.2.x';
 
 =item B<new(I<\%attr>, [I<\%attr> [...]])>
 

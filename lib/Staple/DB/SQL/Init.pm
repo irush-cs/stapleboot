@@ -14,7 +14,7 @@ use warnings;
 require Exporter;
 
 our @ISA = qw(Exporter);
-our $VERSION = '0.2';
+our $VERSION = '0.2.x';
 
 our @createTables = (
 "CREATE TABLE _SCHEMA_hosts (

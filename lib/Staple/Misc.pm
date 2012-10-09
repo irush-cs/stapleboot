@@ -103,7 +103,7 @@ our @EXPORT = qw(
                     invalidConfiguration
                     invalidTokenKey
                );
-our $VERSION = '0.2';
+our $VERSION = '0.2.x';
 
 
 ################################################################################

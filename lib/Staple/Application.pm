@@ -17,7 +17,7 @@ use Staple::DBFactory;
 use Net::DNS;
 use File::Temp;
 
-our $VERSION = '0.2';
+our $VERSION = '0.2.x';
 
 =head1 NAME
 

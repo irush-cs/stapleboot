@@ -13,7 +13,7 @@ require Exporter;
 use Staple::DB;
 
 our @ISA = ("Staple::DB");
-our $VERSION = '0.2';
+our $VERSION = '0.2.x';
 
 =head1 NAME
 

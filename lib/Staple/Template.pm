@@ -29,7 +29,7 @@ use Clone qw(clone);
 require Exporter;
 
 our @ISA = ("Staple::Setting");
-our $VERSION = '0.2';
+our $VERSION = '0.2.x';
 
 =item B<new(I<\%attr>, [I<\%attr> [...]])>
 
