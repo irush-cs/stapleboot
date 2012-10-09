@@ -141,6 +141,11 @@ my %commands = (
                 scn => \&scn,
                 gcn => \&gcn,
 
+                uact => \&uact,
+                uagt => \&uagt,
+                uaht => \&uaht,
+                uadt => \&uadt,
+
                 sd  => \&sd,
                 sync => \&syncctl,
 
@@ -253,6 +258,10 @@ my %commandMap = (
                   sdn                              => "sdn",
                   gcn                              => "gcn",
                   scn                              => "scn",
+                  uact                             => "uact",
+                  uagt                             => "uagt",
+                  uaht                             => "uaht",
+                  uadt                             => "uadt",
 
                   sd                               => "sd",
                   sdb                              => "setdb",
@@ -295,6 +304,10 @@ my %commandMap = (
                   updatedistributiontoken          => "udt",
                   removeconfigurationtoken         => "rct",
                   updateconfigurationtoken         => "uct",
+                  updateallconfigurationtokens     => "uact",
+                  updateallgrouptokens             => "uagt",
+                  updateallhosttokens              => "uaht",
+                  updatealldistributiontokens      => "uadt",
                   updategroupgroup                 => "ugt",
                   removehosttoken                  => "rht",
                   updatehosttoken                  => "uht",
@@ -417,6 +430,10 @@ my %commandCompletionMap =
    ghg       => [\&host_completion],
    rct       => [\&configuration_completion, \&configuration_tokens_completion],
    uct       => [\&configuration_completion, \&configuration_tokens_completion],
+   uact      => [\&configuration_completion],
+   uagt      => [\&group_completion],
+   uaht      => [\&host_completion],
+   uadt      => [\&distribution_completion],
    ugt       => [\&group_completion, \&group_tokens_completion],
    rdt       => [\&distribution_and_tokens_completion, \&distribution_tokens_completion],
    udt       => [\&distribution_and_tokens_completion, \&distribution_tokens_completion],
@@ -837,6 +854,12 @@ parameters: <configuration> <token>
 
 Updates the token <token> in <configuration>.
 ",
+                    uact => "
+name: uact | update all configuration tokens
+parameters: <configuration>
+
+Updates all the tokens in <configuration>.
+",
                     rdt => "
 name: remove distribution token
 parameters: [<distribution>] <token>
@@ -848,6 +871,12 @@ name: update distribution token
 parameters: [<distribution>] <token>
 
 Updates the <token> in the (current) <distribution>.
+",
+                    uadt => "
+name: uact | update all distribution tokens
+parameters: [<distribution>]
+
+Updates all the tokens in [the current] <distribution>.
 ",
                     rgt => "
 name: remove group token
@@ -861,6 +890,12 @@ parameters: <group> <token>
 
 Updates <token> in <group>.
 ",
+                    uagt => "
+name: uagt | update all group tokens
+parameters: <group>
+
+Updates all the tokens in <group>.
+",
                     rht => "
 name: remove host token
 parameters: <host> <token>
@@ -872,6 +907,12 @@ name: update host token
 parameters: <host> <token>
 
 Updates <token> in <host>.
+",
+                    uaht => "
+name: uact | update all host tokens
+parameters: <host>
+
+Updates all the tokens in <host>.
 ",
                     rhg => "
 name: rhg | remove host group
@@ -1134,104 +1175,108 @@ Turns off debugging on the specified <host>.
 
                     helpdistributions  => "
 Distribution commands:
-  sd  | set distribution <dist>
-  gad | get all distributions
-  gdi | get distribution info <dist>
-  ad  | add distribution <dist>
-  rd  | remove distribution <dist>
-  gdt | get distribution tokens [<dist>]
-  adt | add distribution token [<dist>]
-  rdt | remove distribution token [<dist>] <token>
-  udt | update distribution token [<dist>] <token>
-  gdg | get distribution groups [<dist>]          
-  adg | add distribution group <group> [<location>]
-  rdg | remove distribution group <group>          
-  gdc | get distribution configurations [<dist>]   
-  adc | add distribution configuration {+|-}<conf> [<location>] 
-  rdc | remove distribution configuration {+|-}<conf>
-  gdv | get distribution version [<dist>]
-  sdv | set distribution version <version> [<dist>]
-  sdn | set distribution note <dist> <note>
-  gdn | get distribution note [<dist>]
+  sd   | set distribution <dist>
+  gad  | get all distributions
+  gdi  | get distribution info <dist>
+  ad   | add distribution <dist>
+  rd   | remove distribution <dist>
+  gdt  | get distribution tokens [<dist>]
+  adt  | add distribution token [<dist>]
+  rdt  | remove distribution token [<dist>] <token>
+  udt  | update distribution token [<dist>] <token>
+  uadt | update all distribution tokens [<dist>]
+  gdg  | get distribution groups [<dist>]          
+  adg  | add distribution group <group> [<location>]
+  rdg  | remove distribution group <group>          
+  gdc  | get distribution configurations [<dist>]   
+  adc  | add distribution configuration {+|-}<conf> [<location>] 
+  rdc  | remove distribution configuration {+|-}<conf>
+  gdv  | get distribution version [<dist>]
+  sdv  | set distribution version <version> [<dist>]
+  sdn  | set distribution note <dist> <note>
+  gdn  | get distribution note [<dist>]
 ",
                     helphosts          => "
 Host commands:
-  gah | get all hosts [pattern]
-  ghi | get host info <host> 
-  ah  | add host <host> 
-  rh  | remove host <host> 
-  ght | get host tokens <host> 
-  aht | add host token <host>  
-  rht | remove host token <host> <token>
-  uht | update host token <host> <token>
-  ghg | get host groups <host>
-  ahg | add host group <host> <group> [<location>]
-  rhg | remove host group <host> <group> 
-  ghc | get host configurations <host>
-  ahc | add host configuration <host> {+|-}<conf> [<location>] 
-  rhc | remove host configuration <host> {+|-}<conf>
-  ghn | get host note <host>
-  shn | set host note <host> <note>
+  gah  | get all hosts [pattern]
+  ghi  | get host info <host> 
+  ah   | add host <host> 
+  rh   | remove host <host> 
+  ght  | get host tokens <host> 
+  aht  | add host token <host>  
+  rht  | remove host token <host> <token>
+  uht  | update host token <host> <token>
+  uaht | update all host tokens <host>
+  ghg  | get host groups <host>
+  ahg  | add host group <host> <group> [<location>]
+  rhg  | remove host group <host> <group> 
+  ghc  | get host configurations <host>
+  ahc  | add host configuration <host> {+|-}<conf> [<location>] 
+  rhc  | remove host configuration <host> {+|-}<conf>
+  ghn  | get host note <host>
+  shn  | set host note <host> <note>
 ",
                     helpgroups         => "
 Group commands:
-   gag | get all groups [pattern]
-   ggi | get group info 
-   ag  | add group <group>
-   rg  | remove group <group>
-   ggt | get group tokens <group>
-   agt | add group token <group> 
-   rgt | remove group token <group> <token>
-   ugt | update group token <group> <token>
-   ggg | get group groups <group> 
-   agg | add group group <group1> <group2> [<location>]
-   rgg | remove group group <group1> <group2> 
-   ggc | get group configurations <group> 
-   agc | add group configuration <group> {+|-}<conf> [<location>]
-   rgc | remove group configuration <group> {+|-}<conf>
-   whg | who has group <group>
-   sgn | set group note <group> <note>
-   ggn | get group note <group>
+   gag  | get all groups [pattern]
+   ggi  | get group info 
+   ag   | add group <group>
+   rg   | remove group <group>
+   ggt  | get group tokens <group>
+   agt  | add group token <group> 
+   rgt  | remove group token <group> <token>
+   ugt  | update group token <group> <token>
+   uagt | update all group tokens <group>
+   ggg  | get group groups <group> 
+   agg  | add group group <group1> <group2> [<location>]
+   rgg  | remove group group <group1> <group2> 
+   ggc  | get group configurations <group> 
+   agc  | add group configuration <group> {+|-}<conf> [<location>]
+   rgc  | remove group configuration <group> {+|-}<conf>
+   whg  | who has group <group>
+   sgn  | set group note <group> <note>
+   ggn  | get group note <group>
 ",
                     helpconfigurations => "
 Configuration commands:
-   gac | get all configurations [<pattern>]
-   gci | get configuration info 
-   ac  | add configuration <conf> 
-   rc  | remove configuration <conf> 
-   gct | get configuration tokens <conf> 
-   act | add configuration token <conf>  
-   rct | remove configuration token <conf> <token>
-   uct | update configuration token <conf> <token>
-   gm  | get mounts <conf> 
-   am  | add mount <conf> {+|-}<mount> [<location>]
-   rm  | remove mount <conf> {+|-}<mount> 
-   gt  | get templates <conf> 
-   gts | get template source <conf> <stage> <template>
-   at  | add template <conf> 
-   al  | add link <conf>
-   rt  | remove template <conf> <stage> <template> 
-   ut  | update template <conf> <stage> <template> 
-   gs  | get scripts <conf> 
-   gss | get script source <conf> <stage> <script> 
-   as  | add script <conf> 
-   rs  | remove script <conf> <stage> <script> 
-   us  | update script <conf> <stage> <script> 
-   ga  | get autos <conf> 
-   gas | get auto source <conf> <auto> 
-   aa  | add auto <conf> 
-   ra  | remove auto <conf> <auto> 
-   ua  | update auto <conf> <auto> 
-   cc  | copy configuration <conf> <from> <to> 
-   cs  | copy script <dist1> <conf1> <stage1> {<script>|<loc>} <dist2> [<conf2> [<stage2> [<script2> [<loc2>]]]]
-   ca  | copy auto <dist1> <conf1> {<auto>|<loc>} <dist2> [<conf2> [<auto2> [<loc2>]]]
-   ct  | copy template <dist1> <conf1> <stage1> {<template>|<loc>} <dist2> [<conf2> [<stage2> [<template2> [<loc2>]]]]
-   whc | who has configuration <conf>
-   acc | add configuration configuration <conf> {+|-}<conf> [<location>]
-   gcc | get configuration configurations <conf>
-   rcc | remove configuration configuration <conf1> {+|-}<conf2>
-   scn | set configuration note <conf> <note>
-   gcn | get configuration note <conf>
+   gac  | get all configurations [<pattern>]
+   gci  | get configuration info 
+   ac   | add configuration <conf> 
+   rc   | remove configuration <conf> 
+   gct  | get configuration tokens <conf> 
+   act  | add configuration token <conf>  
+   rct  | remove configuration token <conf> <token>
+   uct  | update configuration token <conf> <token>
+   uact | update all configuration tokens <conf>
+   gm   | get mounts <conf> 
+   am   | add mount <conf> {+|-}<mount> [<location>]
+   rm   | remove mount <conf> {+|-}<mount> 
+   gt   | get templates <conf> 
+   gts  | get template source <conf> <stage> <template>
+   at   | add template <conf> 
+   al   | add link <conf>
+   rt   | remove template <conf> <stage> <template> 
+   ut   | update template <conf> <stage> <template> 
+   gs   | get scripts <conf> 
+   gss  | get script source <conf> <stage> <script> 
+   as   | add script <conf> 
+   rs   | remove script <conf> <stage> <script> 
+   us   | update script <conf> <stage> <script> 
+   ga   | get autos <conf> 
+   gas  | get auto source <conf> <auto> 
+   aa   | add auto <conf> 
+   ra   | remove auto <conf> <auto> 
+   ua   | update auto <conf> <auto> 
+   cc   | copy configuration <conf> <from> <to> 
+   cs   | copy script <dist1> <conf1> <stage1> {<script>|<loc>} <dist2> [<conf2> [<stage2> [<script2> [<loc2>]]]]
+   ca   | copy auto <dist1> <conf1> {<auto>|<loc>} <dist2> [<conf2> [<auto2> [<loc2>]]]
+   ct   | copy template <dist1> <conf1> <stage1> {<template>|<loc>} <dist2> [<conf2> [<stage2> [<template2> [<loc2>]]]]
+   whc  | who has configuration <conf>
+   acc  | add configuration configuration <conf> {+|-}<conf> [<location>]
+   gcc  | get configuration configurations <conf>
+   rcc  | remove configuration configuration <conf1> {+|-}<conf2>
+   scn  | set configuration note <conf> <note>
+   gcn  | get configuration note <conf>
 ",
                     helpothers         => "
 Other commands:
@@ -3832,6 +3877,42 @@ sub updateToken {
     }
 }
 
+
+sub updateAllTokens {
+    use Data::Dumper;
+    my $node = shift;
+    my $tokens = $db->getTokens($node);
+    unless ($tokens) {
+        perror $db->{error}."\n";
+        return;
+    }
+    my $tmpFile = `mktemp /tmp/staplectl.XXXXXXXX 2>/dev/null`;
+    if ($? != 0) {
+        perror "Can't create temporary file on /tmp/\n";
+        return;
+    }
+    chomp $tmpFile;
+    unless (writeTokensXMLFile($tmpFile, $tokens)) {
+        print "Can't write tokens file\n";
+        unlink $tmpFile;
+        return;
+    }
+    unless (edit($tmpFile)) {
+        unlink $tmpFile;
+        return;
+    }
+    my @tokens = readTokensXMLFile($tmpFile);
+    unlink $tmpFile;
+    if (@tokens and not defined $tokens[0]) {
+        perror "Error parsing tokens file\n";
+        return;
+    }
+    my %tokens = @tokens;
+    unless ($db->setTokens(\%tokens, $node)) {
+        perror $db->{error}."\n";
+    }
+}
+
 sub ugt {
     my $groupName = shift;
     my $token = shift;
@@ -3868,6 +3949,59 @@ sub uct {
         return;
     }
     updateToken($conf, $token);
+}
+
+sub uact {
+    my $configuration = shift;
+    unless ($configuration) {
+        print "Missing configuration\n";
+        return;
+    }
+    (my $conf) = $db->getFullConfigurations([$configuration], $distribution);
+    unless ($conf) {
+        print "Configuration \"$configuration\" does no exist\n";
+        return;
+    }
+    updateAllTokens($conf);
+}
+
+sub uagt {
+    my $groupName = shift;
+    unless ($groupName) {
+        print "Missing group\n";
+        return;
+    }
+    (my $group) = $db->getGroupsByName($groupName);
+    unless ($group) {
+        print "Group \"$groupName\" does not exist\n";
+        return;
+    }
+    updateAllTokens($group);
+}
+
+sub uaht {
+    my $host = shift;
+    unless ($host) {
+        print "Missing host\n";
+        return;
+    }
+    my $group = $db->getHostGroup($host);
+    unless ($group) {
+        perror $db->{error}."\n";
+        return;
+    }
+    updateAllTokens($group);
+}
+
+sub uadt {
+    my $dist = $distribution;
+    $dist = shift if $_[0];
+    my $group = $db->getDistributionGroup($dist);
+    unless ($group) {
+        perror $db->{error}."\n";
+        return;
+    }
+    updateAllTokens($group);
 }
 
 sub udt {
