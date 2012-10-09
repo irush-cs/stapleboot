@@ -3848,6 +3848,7 @@ sub updateToken {
     my $newtoken = {};
     unless (open(FILE, "<$tmpFile")) {
         perror "Can't open saved file for reading: $!\n";
+        unlink $tmpFile;
         return;
     }
     {
@@ -3862,6 +3863,7 @@ sub updateToken {
             $newtoken->{type} = prompt "type (static, dynamic, regexp)", $oldtoken->{type};
         } until ($newtoken->{type} =~ m/^(?:static|dynamic|regexp)$/);
     };
+    unlink $tmpFile;
     if ($@) {
         print "\n";
         print "$@" if index($@,"SIGINT") != 0;
