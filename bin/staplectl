@@ -3134,6 +3134,8 @@ sub agc {
     }
     (my $conf) = $db->getConfigurationsByName($configuration);
     if ($conf) {
+        (my $conf2) = $db->getFullConfigurations([$conf], $distribution);
+        print "WARNING: No such configuration \"$configuration\" under the \"$distribution\" distribution\n" unless ($conf2);
         $conf->active($active);
         unless ($db->addGroupConfiguration($group, $conf, $location)) {
             perror $db->{error}."\n";
@@ -3285,6 +3287,11 @@ sub adc {
     }
     (my $conf) = $db->getConfigurationsByName($configuration);
     if ($conf) {
+        (my $conf2) = $db->getFullConfigurations([$conf], $distribution);
+        unless ($conf2) {
+            perror "No such configuration \"$configuration\" under the \"$distribution\" distribution\n";
+            return;
+        }
         $conf->active($active);
         unless ($db->addGroupConfiguration($group, $conf, $location)) {
             perror $db->{error}."\n";
@@ -3331,6 +3338,8 @@ sub ahc {
     }
     (my $conf) = $db->getConfigurationsByName($configuration);
     if ($conf) {
+        (my $conf2) = $db->getFullConfigurations([$conf], $distribution);
+        print "WARNING: No such configuration \"$configuration\" under the \"$distribution\" distribution\n" unless ($conf2);
         $conf->active($active);
         unless ($db->addGroupConfiguration($group, $conf, $location)) {
             perror $db->{error}."\n";

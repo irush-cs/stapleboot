@@ -1,6 +1,7 @@
 
 Staple 0.3
 	* staplectl: ua[chgd]t, xml edit all [configuration,group,host,distribution] tokens
+	* staplectl: warnings when adding unknown configurations to groups
 	* Minor bug fixes
 
 Staple 0.2
