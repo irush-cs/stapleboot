@@ -147,6 +147,8 @@ sub debug {
         my $tokenKey = "";
         while (1) {
             my $line = readDebugLine("staple [$stage]> ", !length($tokenKey));
+            # end of input? might not be able to get a terminal
+            last unless defined $line;
             if ($tokenKey) {
                 if ($line =~ m/;\n$/) {
                     $line =~ s/;\n$//;
