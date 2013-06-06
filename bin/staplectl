@@ -4485,8 +4485,8 @@ sub parseline {
     $line =~ s/^\s*//;
     $line =~ s/\s*$//;
     (my $command, my @params) = split / /, $line;
-    $command = lc($command);
     $command = " " unless $command;
+    $command = lc($command);
     while (not $commandMap{$command} or not $commands{$commandMap{$command}}) {
         if (@params) {
             $command .= lc(shift @params);
