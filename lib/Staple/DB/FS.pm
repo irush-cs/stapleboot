@@ -1081,7 +1081,7 @@ sub whoHasGroup {
     }
 
     # hosts
-    my $cmd = "find ".$self->{stapleDir}."/hosts -type f -name groups -print0 | xargs -0 egrep -l '^".$group.$suffix."'";
+    my $cmd = "find ".$self->{stapleDir}."/hosts/ -type f -name groups -print0 | xargs -0 egrep -l '^".$group.$suffix."'";
     my @hosts = `$cmd`;
     chomp @hosts;
     # grep returns an error if nothing is found
@@ -1094,7 +1094,7 @@ sub whoHasGroup {
     return undef if (grep {not defined $_} @hosts);
 
     # distributions
-    $cmd = "find ".$self->{stapleDir}."/distributions -type f -name groups -print0 | xargs -0 egrep -l '^".$group.$suffix."'";
+    $cmd = "find ".$self->{stapleDir}."/distributions/ -type f -name groups -print0 | xargs -0 egrep -l '^".$group.$suffix."'";
     my @distributions = `$cmd`;
     chomp @distributions;
     #if ($? >> 8) {
@@ -1107,7 +1107,7 @@ sub whoHasGroup {
     return undef if (grep {not defined $_} @distributions);
 
     # groups
-    $cmd = "find ".$self->{stapleDir}."/groups -type f -name groups -print0 | xargs -0 egrep -l '^".$group.$suffix."'";
+    $cmd = "find ".$self->{stapleDir}."/groups/ -type f -name groups -print0 | xargs -0 egrep -l '^".$group.$suffix."'";
     my @groups = `$cmd`;
     chomp @groups;
     #if ($? >> 8) {
