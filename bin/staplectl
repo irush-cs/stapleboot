@@ -3890,7 +3890,6 @@ sub updateToken {
 
 
 sub updateAllTokens {
-    use Data::Dumper;
     my $node = shift;
     my $tokens = $db->getTokens($node);
     unless ($tokens) {

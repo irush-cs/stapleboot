@@ -513,6 +513,7 @@ sub writeTokensXMLFile {
     if (open(FILE, ">$file")) {
         print FILE $xml;
         close(FILE);
+        chmod 0644, $file;
         return 1;
     }
     return undef;
