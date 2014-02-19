@@ -114,6 +114,7 @@ sub mail {
                 from    => "stapleboot on $rhost <root\@$host>",
                 Smtp    => $self->{smtpServer},
                 Message => $body,
+                "Content-Type" => 'text/plain; charset="utf-8"',
                );
     unless (sendmail(%mail)) {
         $self->error("Can't send mail to $self->{mailto}");
