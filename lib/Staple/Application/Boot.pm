@@ -109,7 +109,7 @@ sub mail {
     $prefix .= "=" x 77;
     $body = $prefix."\n\n".$body;
     my %mail = (
-                subject => "$self->{host}: $subject",
+                subject => "$rhost: $subject",
                 to      => $self->{mailto},
                 from    => "stapleboot on $rhost <root\@$host>",
                 Smtp    => $self->{smtpServer},
