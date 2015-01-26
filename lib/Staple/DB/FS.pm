@@ -1413,6 +1413,7 @@ sub mkdirs {
             $self->{error} = "Failed mkdir: $!";
             return 0;
         }
+        chmod 0755, $dir;
     }
     return 1;
 }

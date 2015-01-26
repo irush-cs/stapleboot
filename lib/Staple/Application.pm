@@ -560,7 +560,7 @@ sub applyMounts {
                     $excludes .= " ".join(" " , map {"--exclude='$_'"} split /\s+/, $mount->copyLinks()) if $mount->copyLinks();
                     $self->output("Copying ".$mount->copySource()." to $destination", 2);
                     #my $status = `cp -RPp -- $source $destination`;
-                    my $cmd = "tar cpsf - -C ".$mount->copySource()." $excludes $files | tar xpsf - -C $destination";
+                    my $cmd = "tar cpf - -C ".$mount->copySource()." $excludes $files | tar xpsf - -C $destination";
                     #my $cmd = "rsync -aW --delete --progress $excludes $mount->{copySource} $destination";
                     $self->output($cmd, 0);
 
