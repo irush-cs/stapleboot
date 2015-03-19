@@ -203,6 +203,7 @@ sub apply {
         }
     }
 
+    unlink "$destination" if (-e $destination);
     if (open(FILE, ">$destination")) {
         print FILE $data;
         close(FILE);
