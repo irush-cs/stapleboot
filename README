@@ -1,0 +1,13 @@
+
+Staple is a framework for diskless boot management. Its purpose is to simplify
+the configuration of machines that boot from the same root filesystem but might
+need a different set of applications/configurations.
+
+Staple itself is a collection of perl scripts and modules, that at boot
+identifies the machine and the root filesystem and apply the appropriate
+configurations accordingly. Configurations can be mounting disks, copying
+templates, or running scripts. 
+
+Please check the MANUAL file for usage information.
+
+Site: https://github.com/irush-cs/stapleboot
