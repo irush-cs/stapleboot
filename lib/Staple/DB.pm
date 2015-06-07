@@ -1157,7 +1157,7 @@ sub getGroupsByName {
         my $path = $self->getGroupPath($group);
         push @groups, Staple::Group->new({name => $group, path => $path}) if $path;
     }
-    return @groups;
+    return grep {ref $_ eq "Staple::Group"} @groups;
 }
 
 =item B<getHostGroup(I<host>)>
