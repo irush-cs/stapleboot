@@ -351,7 +351,7 @@ sub initStage {
             if ($defaulthost and
                 $boot->{db}->getHostGroup($defaulthost)) {
                 $boot->output("$boot->{host} does not exist, using $defaulthost instead", 1);
-                $boot->{host} = $defaulthost;
+                $boot->{defaulthost} = $defaulthost;
                 $boot->setTokens({$boot->{db}->getCompleteTokens({})});
                 goto haveHost;
             }

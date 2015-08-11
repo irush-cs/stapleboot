@@ -78,6 +78,8 @@ noted). Most of them are set automatically by the member functions.
 
 =item I<poweroffCommand>   - The poweroff command to is if critical is poweroff
 
+=itme I<defaulthost>       - A host to use instead of I<host>
+
 =back
 
 =back
@@ -229,7 +231,7 @@ sub setDefaultGroups {
     $self->setGroups(
                      $self->{db}->getDistributionGroup($self->{distribution}),
                      $self->{db}->getGroupsByName(@_),
-                     $self->{db}->getHostGroup($self->{host})
+                     $self->{db}->getHostGroup($self->{defaulthost} or $self->{host})
                     );
 }
 
@@ -767,6 +769,7 @@ sub clearAll {
     $self->{badConfigurations} = [];
     $self->{badMounts} = [];
     $self->{exitCode} = 0;
+    $self->{defaulthost} = undef;
 
     $self->{host} = hostname unless defined $self->{host};
     if (my $res = new Net::DNS::Resolver) {
