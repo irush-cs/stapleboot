@@ -18,7 +18,7 @@ use Fcntl;
 use Staple::Script;
 use Staple::Template;
 
-no if $] >= 5.018 && $] < 5.021, warnings => 'experimental::smartmatch';
+no if $] >= 5.018 && $] < 5.023, warnings => 'experimental::smartmatch';
 
 our @ISA = ("Staple::DB::SQL");
 our $VERSION = '0.2.x';
