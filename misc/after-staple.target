@@ -1,0 +1,6 @@
+# -*- conf -*-
+
+[Unit]
+Description=After staple target
+Requires=staple.service graphical.target
+After=staple.service graphical.target

@@ -1,0 +1,11 @@
+# -*- conf -*-
+
+# See systemd.special(7) for details
+
+[Unit]
+Description=stapled default target
+Requires=staple.service
+After=staple.service
+
+[Install]
+Alias=default.target

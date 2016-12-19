@@ -1,0 +1,19 @@
+# -*- conf -*-
+
+[Unit]
+Description=stapleboot
+#IgnoreOnSnapshot=true
+DefaultDependencies=false
+
+[Service]
+#Type=notify
+#Type=simple
+Type=oneshot
+ExecStart=/etc/rcS.staple
+ExecStartPost=/bin/systemctl daemon-reload ; /bin/systemctl start --no-block after-staple.target
+KillMode=none
+#StandardInput=tty-force
+StandardInput=tty
+StandardOutput=tty
+StandardError=tty
+TimeoutSec=0
