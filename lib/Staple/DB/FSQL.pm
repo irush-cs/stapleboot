@@ -18,8 +18,6 @@ use Fcntl;
 use Staple::Script;
 use Staple::Template;
 
-no if $] >= 5.018 && $] < 5.027, warnings => 'experimental::smartmatch';
-
 our @ISA = ("Staple::DB::SQL");
 our $VERSION = '0.2.x';
 
@@ -480,7 +478,7 @@ sub findNextName {
         my @all = ($prefixes[0] .. $prefixes[-1]);
         my $check = $prefixes[-1];
         foreach my $check (@all) {
-            next if $check ~~ @prefixes;
+            next if grep {$_ eq $check} @prefixes;
             $check--;
             last;
         }
