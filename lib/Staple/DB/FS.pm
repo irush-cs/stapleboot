@@ -1,7 +1,7 @@
 package Staple::DB::FS;
 
 #
-# Copyright (C) 2007-2011 Hebrew University Of Jerusalem, Israel
+# Copyright (C) 2007-2020 Hebrew University Of Jerusalem, Israel
 # See the LICENSE file.
 #
 # Author: Yair Yarom <irush@cs.huji.ac.il>
@@ -766,11 +766,11 @@ sub getAutos {
                               configuration => $configuration};
             }
         }
-        push @results, @autos;
+        push @results, sort {$a->{order} <=> $b->{order}} @autos;
     }
     map {$_->{critical} = $_->{critical} ? 1 : 0} @results;
     map {$_->{tokens} = $_->{tokens} ? 1 : 0} @results;
-    return Staple::Autogroup->new(sort {$a->{order} <=> $b->{order}} @results) if @results;
+    return Staple::Autogroup->new(@results) if @results;
     return ();
 }
 
