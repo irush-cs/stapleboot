@@ -1,7 +1,7 @@
 package Staple::Application;
 
 #
-# Copyright (C) 2007-2011 Hebrew University Of Jerusalem, Israel
+# Copyright (C) 2007-2020 Hebrew University Of Jerusalem, Israel
 # See the LICENSE file.
 #
 # Author: Yair Yarom <irush@cs.huji.ac.il>
@@ -62,7 +62,7 @@ noted). Most of them are set automatically by the member functions.
 
 =item I<rootDir>           - The root directory (when applying templates)
 
-=item I<applied>           - Hash ref of "templates" (strings list), "scripts" (strings list) and "autos" (hash -> auto => string lists).
+=item I<applied>           - Hash ref of "templates" (strings list), "scripts" (strings list) and "autos" (list -> auto => string lists).
 
 =item I<db>                - The staple database (Staple::DB).
 
@@ -415,8 +415,9 @@ sub applyAutos {
         chmod 0755, $runnable;
 
         my ($autoExit, $autoOutput, $autoError) = runCommand($runnable);
-        $self->{applied}->{autos}->{$autoname} = [split /\n/, $autoOutput];
-        push @groups, @{$self->{applied}->{autos}->{$autoname}};
+        my @newgroups = split /\n/, $autoOutput;
+        push @{$self->{applied}->{autos}}, {$autoname => [@newgroups]};
+        push @groups, @newgroups;
         $self->error($auto->configuration()->name()."/".$auto->name()." failed ($autoExit)") if $autoExit;
         $self->error($auto->configuration()->name()."/".$auto->name()."\n$autoError") if $autoError;
         $self->addMail($auto->configuration()->name()."/".$auto->name()." failed:\nerror: $autoError\n exit code: $autoExit;") if $autoError or $autoExit;
@@ -782,7 +783,7 @@ sub clearAll {
     $self->{rootDir} = "/";
     $self->{applied} = {"templates" => [],
                         "scripts" => [],
-                        "autos" => {},
+                        "autos" => [],
                        };
 
     $self->{tokensToData} = {
