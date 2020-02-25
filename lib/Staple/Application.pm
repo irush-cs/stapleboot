@@ -414,6 +414,9 @@ sub applyAutos {
         push @toDelete, $runnable;
         chmod 0755, $runnable;
 
+        local %ENV;
+        $ENV{TMPDIR} = $self->{tmpDir};
+        $self->output("Running auto: ".$auto->name(), 2);
         my ($autoExit, $autoOutput, $autoError) = runCommand($runnable);
         my @newgroups = split /\n/, $autoOutput;
         push @{$self->{applied}->{autos}}, {$autoname => [@newgroups]};
