@@ -382,10 +382,10 @@ sub fillIntermediate {
     foreach my $data (@compactData) {
         my @splited = splitData $data->name();
         for my $split (@splited) {
-            unless ($data{$split}) {
+            unless ($data{join(":", $data->type(), $split)}) {
                 my $newData = clone($data);
                 push @data, $newData if $newData->name($split);
-                $data{$split} = 1;
+                $data{join(":", $data->type(), $split)} = 1;
             }
         }
     }

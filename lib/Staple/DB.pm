@@ -1737,18 +1737,18 @@ sub getCompleteGroups1 {
     my $tocheck = shift;
     my @groups = ();
     my %groups = ();
-    @groups{map {$_->name()} @$result} = @$result;
-    @groups{map {$_->name()} @$nogood} = @$nogood;
+    @groups{map {join(":", $_->type() ,$_->name())} @$result} = @$result;
+    @groups{map {join(":", $_->type() ,$_->name())} @$nogood} = @$nogood;
     
     my @rawGroups = fillIntermediate(@$tocheck);
     map {$_->path($self->getGroupPath($_->name())) if $_->type() eq "group"} @rawGroups;
     
     foreach my $rawGroup (@rawGroups) {
         push @$nogood, $rawGroup;
-        unless ($groups{$rawGroup->name()}) {
+        unless ($groups{join(":", $rawGroup->type(), $rawGroup->name())}) {
             $self->getCompleteGroups1($result, $nogood, [$self->getGroupGroups($rawGroup)]);
             push @$result, $rawGroup;
-            @groups{map {$_->name()} @$result} = @$result;
+            @groups{map {join(":", $_->type(), $_->name())} @$result} = @$result;
         }
     }
 
